@@ -2,12 +2,15 @@ package interop_test
 
 import (
 	"io/ioutil"
+	"log"
+	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/stapelberg/go-rsyncd-server/internal/rsyncd"
 )
 
 func TestInterop(t *testing.T) {
@@ -25,50 +28,59 @@ func TestInterop(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// TODO: implement our own server :)
 	// start a server to sync from
 	{
-		config := filepath.Join(tmp, "rsyncd.conf")
-		rsyncdConfig := `
-use chroot = no
-# 0 = no limit
-max connections = 0
-pid file = ` + tmp + `/rsyncd.pid
-exclude = lost+found/
-transfer logging = yes
-timeout = 900
-ignore nonreadable = yes
-dont compress   = *.gz *.tgz *.zip *.z *.Z *.rpm *.deb *.bz2 *.zst
-
-[interop]
-       path = ` + source + `
-       comment = interop
-       read only = yes
-       list = true
-
-`
-		if err := ioutil.WriteFile(config, []byte(rsyncdConfig), 0644); err != nil {
+		srv := &rsyncd.Server{}
+		ln, err := net.Listen("tcp", "localhost:8730")
+		if err != nil {
 			t.Fatal(err)
 		}
-		srv := exec.Command("rsync",
-			"--daemon",
-			"--config="+config,
-			"--verbose",
-			"--address=localhost",
-			"--no-detach",
-			"--port=8730")
-		srv.Stdout = os.Stdout
-		srv.Stderr = os.Stderr
-		if err := srv.Start(); err != nil {
-			t.Fatal(err)
-		}
-		go func() {
-			if err := srv.Wait(); err != nil {
-				t.Error(err)
-			}
-		}()
-		defer srv.Process.Kill()
+		log.Printf("listening on %s", ln.Addr())
+		go srv.Serve(ln)
 	}
+
+	// 	{
+	// 		config := filepath.Join(tmp, "rsyncd.conf")
+	// 		rsyncdConfig := `
+	// use chroot = no
+	// # 0 = no limit
+	// max connections = 0
+	// pid file = ` + tmp + `/rsyncd.pid
+	// exclude = lost+found/
+	// transfer logging = yes
+	// timeout = 900
+	// ignore nonreadable = yes
+	// dont compress   = *.gz *.tgz *.zip *.z *.Z *.rpm *.deb *.bz2 *.zst
+
+	// [interop]
+	//        path = ` + source + `
+	//        comment = interop
+	//        read only = yes
+	//        list = true
+
+	// `
+	// 		if err := ioutil.WriteFile(config, []byte(rsyncdConfig), 0644); err != nil {
+	// 			t.Fatal(err)
+	// 		}
+	// 		srv := exec.Command("rsync",
+	// 			"--daemon",
+	// 			"--config="+config,
+	// 			"--verbose",
+	// 			"--address=localhost",
+	// 			"--no-detach",
+	// 			"--port=8730")
+	// 		srv.Stdout = os.Stdout
+	// 		srv.Stderr = os.Stderr
+	// 		if err := srv.Start(); err != nil {
+	// 			t.Fatal(err)
+	// 		}
+	// 		go func() {
+	// 			if err := srv.Wait(); err != nil {
+	// 				t.Error(err)
+	// 			}
+	// 		}()
+	// 		defer srv.Process.Kill()
+	// 	}
 
 	// sync into dest dir
 	rsync := exec.Command("rsync",
