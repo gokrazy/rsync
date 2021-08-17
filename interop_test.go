@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/stapelberg/go-rsyncd-server/internal/rsyncd"
@@ -39,9 +40,9 @@ func TestInterop(t *testing.T) {
 		go srv.Serve(ln)
 	}
 
-	// 	{
-	// 		config := filepath.Join(tmp, "rsyncd.conf")
-	// 		rsyncdConfig := `
+	// {
+	// 	config := filepath.Join(tmp, "rsyncd.conf")
+	// 	rsyncdConfig := `
 	// use chroot = no
 	// # 0 = no limit
 	// max connections = 0
@@ -59,33 +60,38 @@ func TestInterop(t *testing.T) {
 	//        list = true
 
 	// `
-	// 		if err := ioutil.WriteFile(config, []byte(rsyncdConfig), 0644); err != nil {
-	// 			t.Fatal(err)
-	// 		}
-	// 		srv := exec.Command("rsync",
-	// 			"--daemon",
-	// 			"--config="+config,
-	// 			"--verbose",
-	// 			"--address=localhost",
-	// 			"--no-detach",
-	// 			"--port=8730")
-	// 		srv.Stdout = os.Stdout
-	// 		srv.Stderr = os.Stderr
-	// 		if err := srv.Start(); err != nil {
-	// 			t.Fatal(err)
-	// 		}
-	// 		go func() {
-	// 			if err := srv.Wait(); err != nil {
-	// 				t.Error(err)
-	// 			}
-	// 		}()
-	// 		defer srv.Process.Kill()
+	// 	if err := ioutil.WriteFile(config, []byte(rsyncdConfig), 0644); err != nil {
+	// 		t.Fatal(err)
 	// 	}
+	// 	srv := exec.Command("rsync",
+	// 		"--daemon",
+	// 		"--config="+config,
+	// 		"--verbose",
+	// 		"--address=localhost",
+	// 		"--no-detach",
+	// 		"--port=8730")
+	// 	srv.Stdout = os.Stdout
+	// 	srv.Stderr = os.Stderr
+	// 	if err := srv.Start(); err != nil {
+	// 		t.Fatal(err)
+	// 	}
+	// 	go func() {
+	// 		if err := srv.Wait(); err != nil {
+	// 			t.Error(err)
+	// 		}
+	// 	}()
+	// 	defer srv.Process.Kill()
+	// }
+
+	time.Sleep(1 * time.Second)
 
 	// sync into dest dir
-	rsync := exec.Command("rsync",
+	rsync := exec.Command("/home/michael/src/openrsync/openrsync",
+		//"--debug=all4",
 		"--archive",
-		"rsync://localhost:8730/interop/", // copy contents of interop
+		"-v", "-v", "-v", "-v",
+		"--port=8730",
+		"rsync://localhost/interop/", // copy contents of interop
 		//source+"/", // sync from local directory
 		dest) // directly into dest
 	rsync.Stdout = os.Stdout
