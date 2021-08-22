@@ -377,7 +377,8 @@ func (s *Server) handleConn(conn net.Conn) error {
 	dOpt := opt.Bool("D", false)
 	opt.BoolVar(&opts.Recurse, "recursive", false, opt.Alias("r"))
 	opt.BoolVar(&opts.PreserveTimes, "times", false, opt.Alias("t"))
-	opt.Bool("v", false) // verbosity; ignored
+	opt.Bool("v", false)     // verbosity; ignored
+	opt.Bool("debug", false) // debug; ignored
 	opt.BoolVar(&opts.IgnoreTimes, "ignore-times", false, opt.Alias("I"))
 
 	//getoptions.Debug.SetOutput(os.Stderr)
