@@ -36,6 +36,7 @@ func TestInterop(t *testing.T) {
 	}
 
 	// start a server to sync from
+	port := "8730"
 	{
 		srv := &rsyncd.Server{
 			Modules: map[string]rsyncd.Module{
@@ -44,11 +45,15 @@ func TestInterop(t *testing.T) {
 				},
 			},
 		}
-		ln, err := net.Listen("tcp", "localhost:8730")
+		ln, err := net.Listen("tcp", "localhost:0")
 		if err != nil {
 			t.Fatal(err)
 		}
 		log.Printf("listening on %s", ln.Addr())
+		_, port, err = net.SplitHostPort(ln.Addr().String())
+		if err != nil {
+			t.Fatal(err)
+		}
 		go srv.Serve(ln)
 	}
 
@@ -111,7 +116,7 @@ func TestInterop(t *testing.T) {
 		"--debug=all4",
 		"--archive",
 		"-v", "-v", "-v", "-v",
-		"--port=8730",
+		"--port="+port,
 		"rsync://localhost/interop/", // copy contents of interop
 		//source+"/", // sync from local directory
 		dest) // directly into dest
@@ -137,7 +142,7 @@ func TestInterop(t *testing.T) {
 		// TODO: should this be --checksum instead?
 		"--ignore-times", // disable rsync’s “quick check”
 		"-v", "-v", "-v", "-v",
-		"--port=8730",
+		"--port="+port,
 		"rsync://localhost/interop/", // copy contents of interop
 		//source+"/", // sync from local directory
 		dest) // directly into dest
