@@ -1,4 +1,4 @@
-package interop_test
+package rsync_test
 
 import (
 	"io/ioutil"
@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gokrazy/rsync/internal/rsyncd"
 	"github.com/google/go-cmp/cmp"
-	"github.com/stapelberg/go-rsyncd-server/internal/rsyncd"
 )
 
 // TODO: add a symbolic link and verify it

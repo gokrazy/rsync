@@ -1,4 +1,4 @@
-module github.com/stapelberg/go-rsyncd-server
+module github.com/gokrazy/rsync
 
 go 1.17
 
