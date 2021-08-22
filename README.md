@@ -1,5 +1,7 @@
 # gokrazy rsync
 
+[![tests](https://github.com/gokrazy/rsync/actions/workflows/main.yml/badge.svg)](https://github.com/gokrazy/rsync/actions/workflows/main.yml)
+
 Package rsync contains a native Go rsync implementation.
 
 The only component currently is gokr-rsyncd, a read-only rsync daemon
