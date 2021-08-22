@@ -98,8 +98,16 @@ func TestInterop(t *testing.T) {
 
 	time.Sleep(1 * time.Second)
 
-	// sync into dest dir
 	rsync := exec.Command("rsync", //"/home/michael/src/openrsync/openrsync",
+		"--version")
+	rsync.Stdout = os.Stdout
+	rsync.Stderr = os.Stderr
+	if err := rsync.Run(); err != nil {
+		t.Fatalf("%v: %v", rsync.Args, err)
+	}
+
+	// sync into dest dir
+	rsync = exec.Command("rsync", //"/home/michael/src/openrsync/openrsync",
 		"--debug=all4",
 		"--archive",
 		"-v", "-v", "-v", "-v",
