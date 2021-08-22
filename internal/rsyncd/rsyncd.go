@@ -14,7 +14,7 @@ import (
 	"syscall"
 
 	"github.com/DavidGamba/go-getoptions"
-	"github.com/kaiakz/rsync-os/rsync"
+	"github.com/stapelberg/rsync-os/rsync"
 	"golang.org/x/crypto/md4"
 )
 
