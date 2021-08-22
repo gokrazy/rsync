@@ -9,9 +9,11 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"log"
 	"net"
 	"net/http"
+	"strings"
 
 	"github.com/gokrazy/rsync/internal/rsyncd"
 
@@ -28,6 +30,10 @@ func rsyncdMain() error {
 		"",
 		"optional [host]:port listen address for a HTTP debug interface")
 
+	moduleMap := flag.String("modulemap",
+		"nonex=/nonexistant/path",
+		"<modulename>=<path> pairs for quick setup of the server, without a config file")
+
 	flag.Parse()
 	if *monitoringListen != "" {
 		go func() {
@@ -37,7 +43,20 @@ func rsyncdMain() error {
 			}
 		}()
 	}
-	srv := &rsyncd.Server{}
+	var modMap map[string]rsyncd.Module
+	if *moduleMap != "" {
+		parts := strings.Split(*moduleMap, "=")
+		if len(parts) != 2 {
+			return fmt.Errorf("malformed -modulemap parameter %q, expected <modulename>=<path>", *moduleMap)
+		}
+		modMap = map[string]rsyncd.Module{
+			parts[0]: rsyncd.Module{
+				Path: parts[1],
+			},
+		}
+		log.Printf("rsync module %q with path %s configured", parts[0], parts[1])
+	}
+	srv := &rsyncd.Server{Modules: modMap}
 	ln, err := net.Listen("tcp", *listen)
 	if err != nil {
 		return err
