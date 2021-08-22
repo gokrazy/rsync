@@ -2,7 +2,6 @@ package rsyncd
 
 import (
 	"bufio"
-	"bytes"
 	"encoding/binary"
 	"fmt"
 	"io"
@@ -48,113 +47,6 @@ func (w *multiplexWriter) Write(p []byte) (n int, err error) {
 	return w.underlying.Write(p)
 }
 
-type rsyncConn struct {
-	wr io.Writer
-	rd io.Reader
-}
-
-func (c *rsyncConn) writeByte(data byte) error {
-	return binary.Write(c.wr, binary.LittleEndian, data)
-}
-
-func (c *rsyncConn) writeInt32(data int32) error {
-	return binary.Write(c.wr, binary.LittleEndian, data)
-}
-
-func (c *rsyncConn) writeInt64(data int64) error {
-	// send as a 32-bit integer if possible
-	if data <= 0x7FFFFFFF && data >= 0 {
-		return c.writeInt32(int32(data))
-	}
-	// otherwise, send -1 followed by the 64-bit integer
-	if err := c.writeInt32(-1); err != nil {
-		return err
-	}
-	return binary.Write(c.wr, binary.LittleEndian, data)
-}
-
-func (c *rsyncConn) writeString(data string) error {
-	_, err := io.WriteString(c.wr, data)
-	return err
-}
-
-func (c *rsyncConn) readByte() (byte, error) {
-	var buf [1]byte
-	if _, err := io.ReadFull(c.rd, buf[:]); err != nil {
-		return 0, err
-	}
-	return buf[0], nil
-}
-
-func (c *rsyncConn) readInt32() (int32, error) {
-	var buf [4]byte
-	if _, err := io.ReadFull(c.rd, buf[:]); err != nil {
-		return 0, err
-	}
-	return int32(binary.LittleEndian.Uint32(buf[:])), nil
-}
-
-type sumHead struct {
-	// “number of blocks” (openrsync)
-	// “how many chunks” (rsync)
-	ChecksumCount int32
-
-	// “block length in the file” (openrsync)
-	// maximum (1 << 29) for older rsync, (1 << 17) for newer
-	BlockLength int32
-
-	// “long checksum length” (openrsync)
-	ChecksumLength int32
-
-	// “terminal (remainder) block length” (openrsync)
-	// RemainderLength is flength % BlockLength
-	RemainderLength int32
-}
-
-func (c *rsyncConn) readSumHead() (sumHead, error) {
-	var s sumHead
-	var err error
-	s.ChecksumCount, err = c.readInt32()
-	if err != nil {
-		return s, err
-	}
-
-	s.BlockLength, err = c.readInt32()
-	if err != nil {
-		return s, err
-	}
-
-	s.ChecksumLength, err = c.readInt32()
-	if err != nil {
-		return s, err
-	}
-
-	s.RemainderLength, err = c.readInt32()
-	if err != nil {
-		return s, err
-	}
-	return s, nil
-}
-
-func (c *rsyncConn) writeSumHead(s sumHead) error {
-	if err := c.writeInt32(s.ChecksumCount); err != nil {
-		return err
-	}
-
-	if err := c.writeInt32(s.BlockLength); err != nil {
-		return err
-	}
-
-	if err := c.writeInt32(s.ChecksumLength); err != nil {
-		return err
-	}
-
-	if err := c.writeInt32(s.RemainderLength); err != nil {
-		return err
-	}
-	return nil
-}
-
 type file struct {
 	path    string
 	regular bool
@@ -162,8 +54,7 @@ type file struct {
 
 func (s *Server) sendFileList(c *rsyncConn, root string, opts rsyncOpts) ([]file, error) {
 	var fileList []file
-	var fileEnt bytes.Buffer
-	fec := &rsyncConn{wr: &fileEnt}
+	fec := &rsyncBuffer{}
 
 	//root := "/srv/repo.distr1.org/distri"
 	//root := "/home/michael/i3/docs"
@@ -189,34 +80,24 @@ func (s *Server) sendFileList(c *rsyncConn, root string, opts rsyncOpts) ([]file
 		log.Printf("flags for %s: %v", name, flags)
 
 		// 1.   status byte (integer)
-		if err := fec.writeByte(flags); err != nil {
-			return err
-		}
+		fec.writeByte(flags)
 
 		// 2.   inherited filename length (optional, byte)
 		// 3.   filename length (integer or byte)
-		if err := fec.writeInt32(int32(len(name))); err != nil {
-			return err
-		}
+		fec.writeInt32(int32(len(name)))
 
 		// 4.   file (byte array)
-		if err := fec.writeString(name); err != nil {
-			return err
-		}
+		fec.writeString(name)
 
 		// 5.   file length (long)
 		sz := info.Size()
 		log.Printf("size: %d", sz)
-		if err := fec.writeInt64(info.Size()); err != nil {
-			return err
-		}
+		fec.writeInt64(info.Size())
 
 		// 6.   file modification time (optional, integer)
 		mtime := int32(info.ModTime().Unix())
 		log.Printf("mtime = %v", mtime)
-		if err := fec.writeInt32(mtime); err != nil {
-			return err
-		}
+		fec.writeInt32(mtime)
 
 		// 7.   file mode (optional, mode_t, integer)
 		mode := int32(info.Mode() & os.ModePerm)
@@ -228,31 +109,23 @@ func (s *Server) sendFileList(c *rsyncConn, root string, opts rsyncOpts) ([]file
 			mode |= 0o0100000 // S_IFREG from /usr/include/bits/stat.h
 			log.Printf("mode reg: %v (%o)", uint32(mode), uint32(mode))
 		}
-		if err := fec.writeInt32(mode); err != nil {
-			return err
-		}
+		fec.writeInt32(mode)
 
 		if opts.PreserveUid {
 			// 8.   if -o, the user id (integer)
-			if err := fec.writeInt32(1000); err != nil {
-				return err
-			}
+			fec.writeInt32(1000)
 		}
 
 		if opts.PreserveGid {
 			// 9.   if -g, the group id (integer)
-			if err := fec.writeInt32(1000); err != nil {
-				return err
-			}
+			fec.writeInt32(1000)
 		}
 
 		const isSpecial = false // TODO
 		if opts.PreserveSpecials && isSpecial {
 			// 10.  if a special file and -D, the device “rdev” type (integer)
 			// TODO: what to send here?
-			if err := fec.writeInt32(0); err != nil {
-				return err
-			}
+			fec.writeInt32(0)
 		}
 
 		// 11.  if a symbolic link and -l, the link target's length (integer)
@@ -278,32 +151,20 @@ func (s *Server) sendFileList(c *rsyncConn, root string, opts rsyncOpts) ([]file
 	}
 
 	const endOfFileList = 0
-	if err := fec.writeByte(endOfFileList); err != nil {
-		return nil, err
-	}
+	fec.writeByte(endOfFileList)
 
 	for i := 0; i < 2; i++ {
-		if err := fec.writeInt32(1000); err != nil {
-			return nil, err
-		}
-		if err := fec.writeByte(byte(len("michael"))); err != nil {
-			return nil, err
-		}
-		if err := fec.writeString("michael"); err != nil {
-			return nil, err
-		}
+		fec.writeInt32(1000)
+		fec.writeByte(byte(len("michael")))
+		fec.writeString("michael")
 		const endOfSet = 0
-		if err := fec.writeInt32(endOfSet); err != nil {
-			return nil, err
-		}
+		fec.writeInt32(endOfSet)
 	}
 
 	const ioErrors = 0
-	if err := fec.writeInt32(ioErrors); err != nil {
-		return nil, err
-	}
+	fec.writeInt32(ioErrors)
 
-	log.Printf("fileEnt: %x", fileEnt.Bytes())
+	log.Printf("fileEnt: %x", fec.buf.Bytes())
 	// 0000   4b 00 00 07 01 01 2e 3c 00 00 00 8b b9 1a 61 ed   K......<......a.
 	//                    ^^ xflags
 	//                       ^^ len(name)
@@ -325,7 +186,7 @@ func (s *Server) sendFileList(c *rsyncConn, root string, opts rsyncOpts) ([]file
 	// 0040   6d 69 63 68 61 65 6c 00 00 00 00 00 00 00 00      michael........
 	//                                         ^^ ^^ ^^ ^^ i/o errors
 
-	if err := c.writeString(fileEnt.String()); err != nil {
+	if err := c.writeString(fec.buf.String()); err != nil {
 		return nil, err
 	}
 
@@ -350,7 +211,11 @@ func (s *Server) handleConn(conn net.Conn) error {
 	const terminationCommand = "@RSYNCD: OK\n"
 	rd := bufio.NewReader(conn)
 	// send server greeting
-	const protocolVersion = "27" // TODO: which is which?
+
+	// protocol version 27 seems to be the safest bet for wide compatibility:
+	// version 27 was introduced by rsync 2.6.0 (released 2004), and is
+	// supported by openrsync and rsyn.
+	const protocolVersion = "27"
 	fmt.Fprintf(conn, "@RSYNCD: %s\n", protocolVersion)
 
 	// read client greeting
@@ -371,14 +236,14 @@ func (s *Server) handleConn(conn net.Conn) error {
 	requestedModule = strings.TrimSpace(requestedModule)
 	log.Printf("client sent: %q", requestedModule)
 	if requestedModule == "" || requestedModule == "#list" {
-		// send available modules
+		// TODO: send available modules
 	}
 	module, err := s.getModule(requestedModule)
 	if err != nil {
+		// TODO: add a test to verify our human-readable error message is
+		// displayed by the client.
 		return err
 	}
-	// TODO: check if requested module exists
-	//io.WriteString(conn, "\n")
 
 	// read requested flags
 	var flags []string
@@ -555,6 +420,7 @@ func (s *Server) handleConn(conn net.Conn) error {
 		}
 
 		// TODO: factor into its own function
+		// TODO: open with O_NOATIME if supported
 		f, err := os.Open(fileList[fileIndex].path)
 		if err != nil {
 			return err

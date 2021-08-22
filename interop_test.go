@@ -14,6 +14,10 @@ import (
 	"github.com/stapelberg/go-rsyncd-server/internal/rsyncd"
 )
 
+// TODO: add a symbolic link and verify it
+
+// TODO: test dry-run
+
 func TestInterop(t *testing.T) {
 	tmp := t.TempDir()
 	source := filepath.Join(tmp, "source")
@@ -120,6 +124,7 @@ func TestInterop(t *testing.T) {
 	rsync = exec.Command("rsync", //"/home/michael/src/openrsync/openrsync",
 		"--debug=all4",
 		"--archive",
+		// TODO: should this be --checksum instead?
 		"--ignore-times", // disable rsync’s “quick check”
 		"-v", "-v", "-v", "-v",
 		"--port=8730",
