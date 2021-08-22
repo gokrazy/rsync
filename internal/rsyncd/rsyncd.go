@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 
 	"github.com/DavidGamba/go-getoptions"
 	"github.com/kaiakz/rsync-os/rsync"
@@ -33,21 +34,8 @@ func (s *Server) getModule(requestedModule string) (Module, error) {
 	return m, nil
 }
 
-type multiplexWriter struct {
-	underlying io.Writer
-}
-
-func (w *multiplexWriter) Write(p []byte) (n int, err error) {
-	header := uint32(7)<<24 | uint32(len(p))
-	log.Printf("len %d (hex %x)", len(p), uint32(len(p)))
-	log.Printf("header=%v (%x)", header, header)
-	if err := binary.Write(w.underlying, binary.LittleEndian, header); err != nil {
-		return 0, err
-	}
-	return w.underlying.Write(p)
-}
-
 type file struct {
+	// TODO: store relative to the root to conserve RAM
 	path    string
 	regular bool
 }
@@ -207,6 +195,117 @@ type rsyncOpts struct {
 	IgnoreTimes      bool
 }
 
+func (c *rsyncConn) sendFile(fl file) error {
+	const chunkSize = 32 * 1024 // rsync/rsync.h
+
+	f, err := os.OpenFile(fl.path, os.O_RDONLY|syscall.O_NOATIME, 0)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	fi, err := f.Stat()
+	if err != nil {
+		return err
+	}
+
+	sh := sumSizesSqroot(fi.Size())
+	log.Printf("sh = %+v", sh)
+	if err := c.writeSumHead(sh); err != nil {
+		return err
+	}
+
+	h := md4.New()
+	binary.Write(h, binary.LittleEndian, c.seed)
+	buf := make([]byte, chunkSize)
+	for {
+		n, err := f.Read(buf)
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			return err
+		}
+		chunk := buf[:n]
+		// chunk size (“rawtok” variable in openrsync)
+		if err := c.writeInt32(int32(len(chunk))); err != nil {
+			return err
+		}
+		if _, err := c.wr.Write(chunk); err != nil {
+			return err
+		}
+		h.Write(chunk)
+	}
+	// transfer finished:
+	if err := c.writeInt32(0); err != nil {
+		return err
+	}
+
+	// whole file long checksum (16 bytes)
+	sum := h.Sum(nil)
+	log.Printf("sum: %x (len = %d)", sum, len(sum))
+	if _, err := c.wr.Write(sum); err != nil {
+		return err
+	}
+	return nil
+}
+
+// rsync/sender.c:send_files()
+func (c *rsyncConn) sendFiles(fileList []file) error {
+	for {
+		// receive data about receiver’s copy of the file list contents (not
+		// ordered)
+		// see (*rsync.Receiver).Generator()
+		fileIndex, err := c.readInt32()
+		if err != nil {
+			return err
+		}
+		if fileIndex == -1 {
+			// acknowledge phase change by sending -1
+			if err := c.writeInt32(-1); err != nil {
+				return err
+			}
+			break
+		}
+		log.Printf("fileIndex: %v (hex %x)", fileIndex, fileIndex)
+		sumHead, err := c.readSumHead()
+		if err != nil {
+			return err
+		}
+		log.Printf("sum head: %+v", sumHead)
+		longChecksum := make([]byte, sumHead.ChecksumLength)
+		for i := int32(0); i < sumHead.ChecksumCount; i++ {
+			shortChecksum, err := c.readInt32()
+			if err != nil {
+				return err
+			}
+			n, err := c.rd.Read(longChecksum)
+			if err != nil {
+				return err
+			}
+			log.Printf("short %d, long %x", shortChecksum, longChecksum[:n])
+		}
+
+		// TODO: only send data that has changed (based on the checksums
+		// received above)
+
+		if err := c.writeInt32(fileIndex); err != nil {
+			return err
+		}
+
+		if err := c.sendFile(fileList[fileIndex]); err != nil {
+			return err
+		}
+	}
+
+	// phase done
+	if err := c.writeInt32(-1); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (s *Server) handleConn(conn net.Conn) error {
 	const terminationCommand = "@RSYNCD: OK\n"
 	rd := bufio.NewReader(conn)
@@ -295,23 +394,22 @@ func (s *Server) handleConn(conn net.Conn) error {
 	log.Printf("remaining: %q", remaining)
 	// TODO: verify --sender is set and error out otherwise
 
-	// TODO: seed?
-	c := &rsyncConn{
-		rd: rd,
-		wr: conn,
-	}
-
 	// “SHOULD be unique to each connection” as per
 	// https://github.com/JohannesBuchner/Jarsync/blob/master/jarsync/rsync.txt
 	//
 	// TODO: random seed
 	// TODO: from which source?
 	const sessionChecksumSeed = 666
-	if err := c.writeInt32(sessionChecksumSeed); err != nil {
-		return err
+
+	c := &rsyncConn{
+		seed: sessionChecksumSeed,
+		rd:   rd,
+		wr:   conn,
 	}
 
-	log.Printf("wrote seed")
+	if err := c.writeInt32(c.seed); err != nil {
+		return err
+	}
 
 	// Switch to multiplexing protocol, but only for server-side transmissions.
 	// Transmissions received from the client are not multiplexed.
@@ -351,128 +449,8 @@ func (s *Server) handleConn(conn net.Conn) error {
 
 	log.Printf("exclusion list read")
 
-	var queued []int32
-	phase := 0
-	for {
-		// receive data about receiver’s copy of the file list contents (not
-		// ordered)
-		// see (*rsync.Receiver).Generator()
-		fileIndex, err := c.readInt32()
-		if err != nil {
-			return err
-		}
-		if fileIndex == -1 {
-			phase++
-			log.Printf("phase change! now %d", phase)
-			// acknowledge phase change by sending -1
-			if err := c.writeInt32(-1); err != nil {
-				return err
-			}
-			break
-		}
-		log.Printf("fileIndex: %v (hex %x)", fileIndex, fileIndex)
-		sumHead, err := c.readSumHead()
-		if err != nil {
-			return err
-		}
-		log.Printf("sum head: %+v", sumHead)
-		buf := make([]byte, sumHead.ChecksumLength)
-		for i := int32(0); i < sumHead.ChecksumCount; i++ {
-			// short checksum
-			shortChecksum, err := c.readInt32()
-			if err != nil {
-				return err
-			}
-			n, err := c.rd.Read(buf)
-			if err != nil {
-				return err
-			}
-			log.Printf("short %d, long %x", shortChecksum, buf[:n])
-		}
-
-		// TODO: only send data that has changed (based on the checksums
-		// received above)
-
-		queued = append(queued, fileIndex)
-	}
-
-	// TODO: maybe v2.6.1pre2 is a better rsync version to read?
-
-	// TODO: FileDownloader
-	// rsync/sender.c:send_files()
-
-	const chunkSize = 32 * 1024 // rsync/rsync.h
-
-	// TODO: do this interleaved with receiving requests
-	for {
-		if len(queued) == 0 {
-			if err := c.writeInt32(-1); err != nil {
-				return err
-			}
-			break
-		}
-		fileIndex := queued[0]
-		queued = queued[1:]
-
-		// file index
-		if err := c.writeInt32(fileIndex); err != nil {
-			return err
-		}
-
-		// TODO: factor into its own function
-		// TODO: open with O_NOATIME if supported
-		f, err := os.Open(fileList[fileIndex].path)
-		if err != nil {
-			return err
-		}
-
-		fi, err := f.Stat()
-		if err != nil {
-			return err
-		}
-
-		sh := sumSizesSqroot(fi.Size())
-		log.Printf("sh = %+v", sh)
-		if err := c.writeSumHead(sh); err != nil {
-			return err
-		}
-
-		h := md4.New()
-		binary.Write(h, binary.LittleEndian, int32(sessionChecksumSeed))
-		buf := make([]byte, chunkSize)
-		for {
-			n, err := f.Read(buf)
-			if err != nil {
-				if err == io.EOF {
-					break
-				}
-				return err
-			}
-			chunk := buf[:n]
-			// chunk size (“rawtok” variable in openrsync)
-			if err := c.writeInt32(int32(len(chunk))); err != nil {
-				return err
-			}
-			if _, err := c.wr.Write(chunk); err != nil {
-				return err
-			}
-			h.Write(chunk)
-		}
-		// transfer finished:
-		if err := c.writeInt32(0); err != nil {
-			return err
-		}
-
-		// whole file long checksum (16 bytes)
-		sum := h.Sum(nil)
-		log.Printf("sum: %x (len = %d)", sum, len(sum))
-		if _, err := c.wr.Write(sum); err != nil {
-			return err
-		}
-
-		if err := f.Close(); err != nil {
-			return err
-		}
+	if err := c.sendFiles(fileList); err != nil {
+		return err
 	}
 
 	// TODO: make this conditional
@@ -491,56 +469,10 @@ func (s *Server) handleConn(conn net.Conn) error {
 	if err != nil {
 		return err
 	}
-	log.Printf("finish %d", finish)
-
-	_ = fileList
-
-	// --------------------------------------------------------------------------------
-
-	// for idx, fl := range fileList {
-
-	// 	if !fl.regular {
-	// 		continue
-	// 	}
-	// 	log.Printf("transferring file %d, %s", idx, fl.path)
-	// 	var fileBuf bytes.Buffer
-	// 	fb := &rsyncConn{wr: &fileBuf}
-
-	// 	// file index
-	// 	if err := fb.writeInt32(int32(idx)); err != nil {
-	// 		return err
-	// 	}
-
-	// 	// rsync/io.c:write_sum_head()
-
-	// 	// block count
-	// 	// block length
-	// 	// checksum length, i.e. MD4 checksum length
-	// 	// block remainder
-
-	// 	// TODO: send tokens and calculate md4 of the file
-	// 	// TODO: block size scales linearly with file size?
-	// }
-
-	// --------------------------------------------------------------------------------
-
-	// 4 byte header (first byte: tag, rest: payload length)
-	// arbitrary length payload
-
-	// tag 7: normal data
-	// tag 1: error on the sender’s part, triggers an exit
-	// anything else: out-of-band server messages
-
-	// for {
-	// 	// TODO: limit this read?
-	// 	payload, err := ioutil.ReadAll(muxr)
-	// 	if err != nil {
-	// 		return err
-	// 	}
-	// 	log.Printf("payload: %q", payload)
-	// }
-
-	return fmt.Errorf("NYI")
+	if finish != -1 {
+		return fmt.Errorf("protocol error: expected final -1, got %d", finish)
+	}
+	return nil
 }
 
 func (s *Server) Serve(ln net.Listener) error {

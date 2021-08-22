@@ -4,7 +4,22 @@ import (
 	"bytes"
 	"encoding/binary"
 	"io"
+	"log"
 )
+
+type multiplexWriter struct {
+	underlying io.Writer
+}
+
+func (w *multiplexWriter) Write(p []byte) (n int, err error) {
+	header := uint32(7)<<24 | uint32(len(p))
+	log.Printf("len %d (hex %x)", len(p), uint32(len(p)))
+	log.Printf("header=%v (%x)", header, header)
+	if err := binary.Write(w.underlying, binary.LittleEndian, header); err != nil {
+		return 0, err
+	}
+	return w.underlying.Write(p)
+}
 
 type rsyncBuffer struct {
 	// buf.Write() never fails, making for a convenient API.
@@ -35,8 +50,9 @@ func (b *rsyncBuffer) writeString(data string) {
 }
 
 type rsyncConn struct {
-	wr io.Writer
-	rd io.Reader
+	seed int32
+	wr   io.Writer
+	rd   io.Reader
 }
 
 func (c *rsyncConn) writeByte(data byte) error {

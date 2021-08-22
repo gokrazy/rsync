@@ -18,6 +18,8 @@ import (
 
 // TODO: test dry-run
 
+// TODO: non-empty exclusion list
+
 func TestInterop(t *testing.T) {
 	tmp := t.TempDir()
 	source := filepath.Join(tmp, "source")
