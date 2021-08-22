@@ -114,4 +114,22 @@ func TestInterop(t *testing.T) {
 	if diff := cmp.Diff(want, got); diff != "" {
 		t.Fatalf("unexpected file contents: diff (-want +got):\n%s", diff)
 	}
+
+	// Run rsync again. This should not modify any files, but will result in
+	// rsync sending sums to the sender.
+	rsync = exec.Command("rsync", //"/home/michael/src/openrsync/openrsync",
+		"--debug=all4",
+		"--archive",
+		"--ignore-times", // disable rsync’s “quick check”
+		"-v", "-v", "-v", "-v",
+		"--port=8730",
+		"rsync://localhost/interop/", // copy contents of interop
+		//source+"/", // sync from local directory
+		dest) // directly into dest
+	rsync.Stdout = os.Stdout
+	rsync.Stderr = os.Stderr
+	if err := rsync.Run(); err != nil {
+		t.Fatalf("%v: %v", rsync.Args, err)
+	}
+
 }

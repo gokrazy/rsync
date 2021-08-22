@@ -343,6 +343,7 @@ type rsyncOpts struct {
 	PreserveSpecials bool
 	PreserveTimes    bool
 	Recurse          bool
+	IgnoreTimes      bool
 }
 
 func (s *Server) handleConn(conn net.Conn) error {
@@ -413,6 +414,7 @@ func (s *Server) handleConn(conn net.Conn) error {
 	opt.BoolVar(&opts.Recurse, "recursive", false, opt.Alias("r"))
 	opt.BoolVar(&opts.PreserveTimes, "times", false, opt.Alias("t"))
 	opt.Bool("v", false) // verbosity; ignored
+	opt.BoolVar(&opts.IgnoreTimes, "ignore-times", false, opt.Alias("I"))
 
 	//getoptions.Debug.SetOutput(os.Stderr)
 	remaining, err := opt.Parse(flags)
@@ -509,7 +511,23 @@ func (s *Server) handleConn(conn net.Conn) error {
 			return err
 		}
 		log.Printf("sum head: %+v", sumHead)
-		// TODO: handle non-zero sumHead :)
+		buf := make([]byte, sumHead.ChecksumLength)
+		for i := int32(0); i < sumHead.ChecksumCount; i++ {
+			// short checksum
+			shortChecksum, err := c.readInt32()
+			if err != nil {
+				return err
+			}
+			n, err := c.rd.Read(buf)
+			if err != nil {
+				return err
+			}
+			log.Printf("short %d, long %x", shortChecksum, buf[:n])
+		}
+
+		// TODO: only send data that has changed (based on the checksums
+		// received above)
+
 		queued = append(queued, fileIndex)
 	}
 
