@@ -497,6 +497,10 @@ const blockSize = 700 // rsync/rsync.h
 func sumSizesSqroot(len int64) sumHead {
 	// * The block size is a rounded square root of file length.
 
+	// 	The block size algorithm plays a crucial role in the protocol efficiency. In general, the block size is the rounded square root of the total file size. The minimum block size, however, is 700 B. Otherwise, the square root computation is simply sqrt(3) followed by ceil(3)
+
+	// For reasons unknown, the square root result is rounded up to the nearest multiple of eight.
+
 	// TODO: round this
 	blockLength := int32(math.Sqrt(float64(len)))
 	if blockLength < blockSize {
