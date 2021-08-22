@@ -9,7 +9,9 @@ import (
 	"math"
 	"net"
 	"os"
+	"os/user"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"syscall"
 
@@ -43,6 +45,9 @@ type file struct {
 func (s *Server) sendFileList(c *rsyncConn, root string, opts rsyncOpts) ([]file, error) {
 	var fileList []file
 	fec := &rsyncBuffer{}
+
+	uidMap := make(map[int32]string)
+	gidMap := make(map[int32]string)
 
 	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
 		// log.Printf("filepath.WalkFn(path=%s)", path)
@@ -98,6 +103,14 @@ func (s *Server) sendFileList(c *rsyncConn, root string, opts rsyncOpts) ([]file
 			var uid int32
 			if st, ok := info.Sys().(*syscall.Stat_t); ok {
 				uid = int32(st.Uid)
+				if _, ok := uidMap[uid]; !ok {
+					u, err := user.LookupId(strconv.Itoa(int(uid)))
+					if err != nil {
+						log.Printf("lookup(%d) = %v", uid, err)
+					} else {
+						uidMap[uid] = u.Username
+					}
+				}
 			}
 			// 8.   if -o, the user id (integer)
 			fec.writeInt32(uid)
@@ -107,6 +120,14 @@ func (s *Server) sendFileList(c *rsyncConn, root string, opts rsyncOpts) ([]file
 			var gid int32
 			if st, ok := info.Sys().(*syscall.Stat_t); ok {
 				gid = int32(st.Gid)
+				if _, ok := gidMap[gid]; !ok {
+					g, err := user.LookupGroupId(strconv.Itoa(int(gid)))
+					if err != nil {
+						log.Printf("lookupgroup(%d) = %v", gid, err)
+					} else {
+						gidMap[gid] = g.Name
+					}
+				}
 			}
 			// 9.   if -g, the group id (integer)
 			fec.writeInt32(gid)
@@ -143,13 +164,19 @@ func (s *Server) sendFileList(c *rsyncConn, root string, opts rsyncOpts) ([]file
 	const endOfFileList = 0
 	fec.writeByte(endOfFileList)
 
-	for i := 0; i < 2; i++ {
-		fec.writeInt32(1000)
-		fec.writeByte(byte(len("michael")))
-		fec.writeString("michael")
-		const endOfSet = 0
-		fec.writeInt32(endOfSet)
+	const endOfSet = 0
+	for uid, name := range uidMap {
+		fec.writeInt32(uid)
+		fec.writeByte(byte(len(name)))
+		fec.writeString(name)
 	}
+	fec.writeInt32(endOfSet)
+	for gid, name := range gidMap {
+		fec.writeInt32(gid)
+		fec.writeByte(byte(len(name)))
+		fec.writeString(name)
+	}
+	fec.writeInt32(endOfSet)
 
 	const ioErrors = 0
 	fec.writeInt32(ioErrors)
