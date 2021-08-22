@@ -44,10 +44,8 @@ func (s *Server) sendFileList(c *rsyncConn, root string, opts rsyncOpts) ([]file
 	var fileList []file
 	fec := &rsyncBuffer{}
 
-	//root := "/srv/repo.distr1.org/distri"
-	//root := "/home/michael/i3/docs"
 	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
-		log.Printf("filepath.WalkFn(path=%s)", path)
+		// log.Printf("filepath.WalkFn(path=%s)", path)
 		if err != nil {
 			return err
 		}
@@ -65,7 +63,7 @@ func (s *Server) sendFileList(c *rsyncConn, root string, opts rsyncOpts) ([]file
 			name = "."
 			flags |= rsync.FLIST_TOP_LEVEL
 		}
-		log.Printf("flags for %s: %v", name, flags)
+		// log.Printf("flags for %s: %v", name, flags)
 
 		// 1.   status byte (integer)
 		fec.writeByte(flags)
@@ -78,35 +76,40 @@ func (s *Server) sendFileList(c *rsyncConn, root string, opts rsyncOpts) ([]file
 		fec.writeString(name)
 
 		// 5.   file length (long)
-		sz := info.Size()
-		log.Printf("size: %d", sz)
 		fec.writeInt64(info.Size())
 
 		// 6.   file modification time (optional, integer)
-		mtime := int32(info.ModTime().Unix())
-		log.Printf("mtime = %v", mtime)
-		fec.writeInt32(mtime)
+		// TODO: this will overflow in 2038! :(
+		fec.writeInt32(int32(info.ModTime().Unix()))
 
 		// 7.   file mode (optional, mode_t, integer)
 		mode := int32(info.Mode() & os.ModePerm)
-		log.Printf("mode before: %v (%o)", uint32(mode), uint32(mode))
+		// log.Printf("mode before: %v (%o)", uint32(mode), uint32(mode))
 		if info.Mode().IsDir() {
 			mode |= 0o0040000 // S_IFDIR from /usr/include/bits/stat.h
-			log.Printf("mode dir: %v (%o)", uint32(mode), uint32(mode))
+			// log.Printf("mode dir: %v (%o)", uint32(mode), uint32(mode))
 		} else if info.Mode().IsRegular() {
 			mode |= 0o0100000 // S_IFREG from /usr/include/bits/stat.h
-			log.Printf("mode reg: %v (%o)", uint32(mode), uint32(mode))
+			// log.Printf("mode reg: %v (%o)", uint32(mode), uint32(mode))
 		}
 		fec.writeInt32(mode)
 
 		if opts.PreserveUid {
+			var uid int32
+			if st, ok := info.Sys().(*syscall.Stat_t); ok {
+				uid = int32(st.Uid)
+			}
 			// 8.   if -o, the user id (integer)
-			fec.writeInt32(1000)
+			fec.writeInt32(uid)
 		}
 
 		if opts.PreserveGid {
+			var gid int32
+			if st, ok := info.Sys().(*syscall.Stat_t); ok {
+				gid = int32(st.Gid)
+			}
 			// 9.   if -g, the group id (integer)
-			fec.writeInt32(1000)
+			fec.writeInt32(gid)
 		}
 
 		const isSpecial = false // TODO
@@ -133,7 +136,6 @@ func (s *Server) sendFileList(c *rsyncConn, root string, opts rsyncOpts) ([]file
 
 		return nil
 	})
-	log.Printf("filepath.Walk = %v", err)
 	if err != nil {
 		return nil, err
 	}
@@ -151,28 +153,6 @@ func (s *Server) sendFileList(c *rsyncConn, root string, opts rsyncOpts) ([]file
 
 	const ioErrors = 0
 	fec.writeInt32(ioErrors)
-
-	log.Printf("fileEnt: %x", fec.buf.Bytes())
-	// 0000   4b 00 00 07 01 01 2e 3c 00 00 00 8b b9 1a 61 ed   K......<......a.
-	//                    ^^ xflags
-	//                       ^^ len(name)
-	//                          ^^ name = .
-	//                             ^^ ^^ ^^ ^^ ^^ ^^ ^^ ^^ size (+extra)
-	//                                                     ^^
-	// 0010   41 00 00 e8 03 00 00 e8 03 00 00 98 05 64 75 6d   A............dum
-	//        ^^ ^^ ^^ mod time
-	//                 ^^ ^^ ^^ ^^ uid
-	//                             ^^ ^^ ^^ ^^ gid
-	//                                         ^^ xflags
-	//                                            ^^ len(name)
-	// 0020   6d 79 04 00 00 00 a4 81 00 00 00 e8 03 00 00 07   my..............
-	//                                         ^^ ^^ ^^ ^^ uid
-	//                                                     ^^ len(username)
-	// 0030   6d 69 63 68 61 65 6c 00 00 00 00 e8 03 00 00 07   michael.........
-	//        ^^ ^^ ^^ ^^ ^^ ^^ ^^ user name
-	//                             ^^ ^^ ^^ ^^ end of set
-	// 0040   6d 69 63 68 61 65 6c 00 00 00 00 00 00 00 00      michael........
-	//                                         ^^ ^^ ^^ ^^ i/o errors
 
 	if err := c.writeString(fec.buf.String()); err != nil {
 		return nil, err
@@ -210,7 +190,7 @@ func (c *rsyncConn) sendFile(fl file) error {
 	}
 
 	sh := sumSizesSqroot(fi.Size())
-	log.Printf("sh = %+v", sh)
+	// log.Printf("sh = %+v", sh)
 	if err := c.writeSumHead(sh); err != nil {
 		return err
 	}
@@ -243,7 +223,7 @@ func (c *rsyncConn) sendFile(fl file) error {
 
 	// whole file long checksum (16 bytes)
 	sum := h.Sum(nil)
-	log.Printf("sum: %x (len = %d)", sum, len(sum))
+	// log.Printf("sum: %x (len = %d)", sum, len(sum))
 	if _, err := c.wr.Write(sum); err != nil {
 		return err
 	}
@@ -267,12 +247,12 @@ func (c *rsyncConn) sendFiles(fileList []file) error {
 			}
 			break
 		}
-		log.Printf("fileIndex: %v (hex %x)", fileIndex, fileIndex)
+		// log.Printf("fileIndex: %v (hex %x)", fileIndex, fileIndex)
 		sumHead, err := c.readSumHead()
 		if err != nil {
 			return err
 		}
-		log.Printf("sum head: %+v", sumHead)
+		// log.Printf("sum head: %+v", sumHead)
 		longChecksum := make([]byte, sumHead.ChecksumLength)
 		for i := int32(0); i < sumHead.ChecksumCount; i++ {
 			shortChecksum, err := c.readInt32()
@@ -283,11 +263,13 @@ func (c *rsyncConn) sendFiles(fileList []file) error {
 			if err != nil {
 				return err
 			}
-			log.Printf("short %d, long %x", shortChecksum, longChecksum[:n])
+			_ = shortChecksum
+			_ = n
+			// log.Printf("short %d, long %x", shortChecksum, longChecksum[:n])
 		}
 
-		// TODO: only send data that has changed (based on the checksums
-		// received above)
+		// TODO(optimization): only send data that has changed (based on the
+		// checksums received above)
 
 		if err := c.writeInt32(fileIndex); err != nil {
 			return err
@@ -333,10 +315,12 @@ func (s *Server) handleConn(conn net.Conn) error {
 		return err
 	}
 	requestedModule = strings.TrimSpace(requestedModule)
-	log.Printf("client sent: %q", requestedModule)
 	if requestedModule == "" || requestedModule == "#list" {
+		log.Printf("client requested rsync module listing")
 		// TODO: send available modules
+		return fmt.Errorf("listing not yet implemented")
 	}
+	log.Printf("client requested rsync module %q", requestedModule)
 	module, err := s.getModule(requestedModule)
 	if err != nil {
 		// TODO: add a test to verify our human-readable error message is

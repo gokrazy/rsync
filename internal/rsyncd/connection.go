@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/binary"
 	"io"
-	"log"
 )
 
 type multiplexWriter struct {
@@ -13,8 +12,8 @@ type multiplexWriter struct {
 
 func (w *multiplexWriter) Write(p []byte) (n int, err error) {
 	header := uint32(7)<<24 | uint32(len(p))
-	log.Printf("len %d (hex %x)", len(p), uint32(len(p)))
-	log.Printf("header=%v (%x)", header, header)
+	// log.Printf("len %d (hex %x)", len(p), uint32(len(p)))
+	// log.Printf("header=%v (%x)", header, header)
 	if err := binary.Write(w.underlying, binary.LittleEndian, header); err != nil {
 		return 0, err
 	}
