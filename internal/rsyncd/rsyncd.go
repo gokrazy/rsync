@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"math"
 	"net"
 	"os"
 	"path/filepath"
@@ -14,9 +15,23 @@ import (
 
 	"github.com/DavidGamba/go-getoptions"
 	"github.com/kaiakz/rsync-os/rsync"
+	"golang.org/x/crypto/md4"
 )
 
+type Module struct {
+	Path string
+}
+
 type Server struct {
+	Modules map[string]Module
+}
+
+func (s *Server) getModule(requestedModule string) (Module, error) {
+	m, ok := s.Modules[requestedModule]
+	if !ok {
+		return Module{}, fmt.Errorf("no such module")
+	}
+	return m, nil
 }
 
 type multiplexWriter struct {
@@ -79,17 +94,89 @@ func (c *rsyncConn) readInt32() (int32, error) {
 	return int32(binary.LittleEndian.Uint32(buf[:])), nil
 }
 
-func (s *Server) sendFileList(c *rsyncConn, opts rsyncOpts) error {
+type sumHead struct {
+	// “number of blocks” (openrsync)
+	// “how many chunks” (rsync)
+	ChecksumCount int32
+
+	// “block length in the file” (openrsync)
+	// maximum (1 << 29) for older rsync, (1 << 17) for newer
+	BlockLength int32
+
+	// “long checksum length” (openrsync)
+	ChecksumLength int32
+
+	// “terminal (remainder) block length” (openrsync)
+	// RemainderLength is flength % BlockLength
+	RemainderLength int32
+}
+
+func (c *rsyncConn) readSumHead() (sumHead, error) {
+	var s sumHead
+	var err error
+	s.ChecksumCount, err = c.readInt32()
+	if err != nil {
+		return s, err
+	}
+
+	s.BlockLength, err = c.readInt32()
+	if err != nil {
+		return s, err
+	}
+
+	s.ChecksumLength, err = c.readInt32()
+	if err != nil {
+		return s, err
+	}
+
+	s.RemainderLength, err = c.readInt32()
+	if err != nil {
+		return s, err
+	}
+	return s, nil
+}
+
+func (c *rsyncConn) writeSumHead(s sumHead) error {
+	if err := c.writeInt32(s.ChecksumCount); err != nil {
+		return err
+	}
+
+	if err := c.writeInt32(s.BlockLength); err != nil {
+		return err
+	}
+
+	if err := c.writeInt32(s.ChecksumLength); err != nil {
+		return err
+	}
+
+	if err := c.writeInt32(s.RemainderLength); err != nil {
+		return err
+	}
+	return nil
+}
+
+type file struct {
+	path    string
+	regular bool
+}
+
+func (s *Server) sendFileList(c *rsyncConn, root string, opts rsyncOpts) ([]file, error) {
+	var fileList []file
 	var fileEnt bytes.Buffer
 	fec := &rsyncConn{wr: &fileEnt}
 
 	//root := "/srv/repo.distr1.org/distri"
-	root := "/home/michael/i3/docs"
+	//root := "/home/michael/i3/docs"
 	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
 		log.Printf("filepath.WalkFn(path=%s)", path)
 		if err != nil {
 			return err
 		}
+
+		fileList = append(fileList, file{
+			path:    path,
+			regular: info.Mode().IsRegular(),
+		})
 
 		// Only ever transmit long names, like openrsync
 		flags := byte(rsync.FLIST_NAME_LONG)
@@ -132,7 +219,16 @@ func (s *Server) sendFileList(c *rsyncConn, opts rsyncOpts) error {
 		}
 
 		// 7.   file mode (optional, mode_t, integer)
-		if err := fec.writeInt32(int32(info.Mode())); err != nil {
+		mode := int32(info.Mode() & os.ModePerm)
+		log.Printf("mode before: %v (%o)", uint32(mode), uint32(mode))
+		if info.Mode().IsDir() {
+			mode |= 0o0040000 // S_IFDIR from /usr/include/bits/stat.h
+			log.Printf("mode dir: %v (%o)", uint32(mode), uint32(mode))
+		} else if info.Mode().IsRegular() {
+			mode |= 0o0100000 // S_IFREG from /usr/include/bits/stat.h
+			log.Printf("mode reg: %v (%o)", uint32(mode), uint32(mode))
+		}
+		if err := fec.writeInt32(mode); err != nil {
 			return err
 		}
 
@@ -178,33 +274,33 @@ func (s *Server) sendFileList(c *rsyncConn, opts rsyncOpts) error {
 	})
 	log.Printf("filepath.Walk = %v", err)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	const endOfFileList = 0
 	if err := fec.writeByte(endOfFileList); err != nil {
-		return err
+		return nil, err
 	}
 
 	for i := 0; i < 2; i++ {
 		if err := fec.writeInt32(1000); err != nil {
-			return err
+			return nil, err
 		}
 		if err := fec.writeByte(byte(len("michael"))); err != nil {
-			return err
+			return nil, err
 		}
 		if err := fec.writeString("michael"); err != nil {
-			return err
+			return nil, err
 		}
 		const endOfSet = 0
 		if err := fec.writeInt32(endOfSet); err != nil {
-			return err
+			return nil, err
 		}
 	}
 
 	const ioErrors = 0
 	if err := fec.writeInt32(ioErrors); err != nil {
-		return err
+		return nil, err
 	}
 
 	log.Printf("fileEnt: %x", fileEnt.Bytes())
@@ -230,10 +326,10 @@ func (s *Server) sendFileList(c *rsyncConn, opts rsyncOpts) error {
 	//                                         ^^ ^^ ^^ ^^ i/o errors
 
 	if err := c.writeString(fileEnt.String()); err != nil {
-		return err
+		return nil, err
 	}
 
-	return nil
+	return fileList, nil
 }
 
 type rsyncOpts struct {
@@ -276,6 +372,10 @@ func (s *Server) handleConn(conn net.Conn) error {
 	if requestedModule == "" || requestedModule == "#list" {
 		// send available modules
 	}
+	module, err := s.getModule(requestedModule)
+	if err != nil {
+		return err
+	}
 	// TODO: check if requested module exists
 	//io.WriteString(conn, "\n")
 
@@ -298,6 +398,11 @@ func (s *Server) handleConn(conn net.Conn) error {
 	var opts rsyncOpts
 	// rsync itself uses /usr/include/popt.h for option parsing
 	opt := getoptions.New()
+
+	// rsync (but not openrsync) bundles short options together, i.e. it sends
+	// e.g. -logDtpr
+	opt.SetMode(getoptions.Bundling)
+
 	opt.BoolVar(&opts.Server, "server", false)
 	opt.BoolVar(&opts.Sender, "sender", false)
 	opt.BoolVar(&opts.PreserveGid, "group", false, opt.Alias("g"))
@@ -308,11 +413,13 @@ func (s *Server) handleConn(conn net.Conn) error {
 	opt.BoolVar(&opts.Recurse, "recursive", false, opt.Alias("r"))
 	opt.BoolVar(&opts.PreserveTimes, "times", false, opt.Alias("t"))
 	opt.Bool("v", false) // verbosity; ignored
+
+	//getoptions.Debug.SetOutput(os.Stderr)
 	remaining, err := opt.Parse(flags)
 	if err != nil {
 		// TODO: terminate connection with an error about which flag is not
 		// supported
-		return err
+		return fmt.Errorf("opt.Parse: %v", err)
 	}
 	if *dOpt {
 		opts.PreserveDevices = true
@@ -359,7 +466,8 @@ func (s *Server) handleConn(conn net.Conn) error {
 	// https://github.com/kristapsdz/openrsync/blob/master/rsync.5
 
 	// send file list
-	if err := s.sendFileList(c, opts); err != nil {
+	fileList, err := s.sendFileList(c, module.Path, opts)
+	if err != nil {
 		return err
 	}
 
@@ -376,16 +484,161 @@ func (s *Server) handleConn(conn net.Conn) error {
 
 	log.Printf("exclusion list read")
 
-	// TODO: receive data about receiver’s copy of the file list contents (not
-	// ordered)
-	// see (*rsync.Receiver).Generator()
-	fileIndex, err := c.readInt32()
+	var queued []int32
+	phase := 0
+	for {
+		// receive data about receiver’s copy of the file list contents (not
+		// ordered)
+		// see (*rsync.Receiver).Generator()
+		fileIndex, err := c.readInt32()
+		if err != nil {
+			return err
+		}
+		if fileIndex == -1 {
+			phase++
+			log.Printf("phase change! now %d", phase)
+			// acknowledge phase change by sending -1
+			if err := c.writeInt32(-1); err != nil {
+				return err
+			}
+			break
+		}
+		log.Printf("fileIndex: %v (hex %x)", fileIndex, fileIndex)
+		sumHead, err := c.readSumHead()
+		if err != nil {
+			return err
+		}
+		log.Printf("sum head: %+v", sumHead)
+		// TODO: handle non-zero sumHead :)
+		queued = append(queued, fileIndex)
+	}
+
+	// TODO: maybe v2.6.1pre2 is a better rsync version to read?
+
+	// TODO: FileDownloader
+	// rsync/sender.c:send_files()
+
+	const chunkSize = 32 * 1024 // rsync/rsync.h
+
+	// TODO: do this interleaved with receiving requests
+	for {
+		if len(queued) == 0 {
+			if err := c.writeInt32(-1); err != nil {
+				return err
+			}
+			break
+		}
+		fileIndex := queued[0]
+		queued = queued[1:]
+
+		// file index
+		if err := c.writeInt32(fileIndex); err != nil {
+			return err
+		}
+
+		// TODO: factor into its own function
+		f, err := os.Open(fileList[fileIndex].path)
+		if err != nil {
+			return err
+		}
+
+		fi, err := f.Stat()
+		if err != nil {
+			return err
+		}
+
+		sh := sumSizesSqroot(fi.Size())
+		log.Printf("sh = %+v", sh)
+		if err := c.writeSumHead(sh); err != nil {
+			return err
+		}
+
+		h := md4.New()
+		binary.Write(h, binary.LittleEndian, int32(sessionChecksumSeed))
+		buf := make([]byte, chunkSize)
+		for {
+			n, err := f.Read(buf)
+			if err != nil {
+				if err == io.EOF {
+					break
+				}
+				return err
+			}
+			chunk := buf[:n]
+			// chunk size (“rawtok” variable in openrsync)
+			if err := c.writeInt32(int32(len(chunk))); err != nil {
+				return err
+			}
+			if _, err := c.wr.Write(chunk); err != nil {
+				return err
+			}
+			h.Write(chunk)
+		}
+		// transfer finished:
+		if err := c.writeInt32(0); err != nil {
+			return err
+		}
+
+		// whole file long checksum (16 bytes)
+		sum := h.Sum(nil)
+		log.Printf("sum: %x (len = %d)", sum, len(sum))
+		if _, err := c.wr.Write(sum); err != nil {
+			return err
+		}
+
+		if err := f.Close(); err != nil {
+			return err
+		}
+	}
+
+	// TODO: make this conditional
+	// send statistics
+	if err := c.writeInt64(1234); err != nil {
+		return err
+	}
+	if err := c.writeInt64(5678); err != nil {
+		return err
+	}
+	if err := c.writeInt64(666); err != nil {
+		return err
+	}
+
+	finish, err := c.readInt32()
 	if err != nil {
 		return err
 	}
-	log.Printf("fileIndex: %v (hex %x)", fileIndex, fileIndex)
+	log.Printf("finish %d", finish)
 
-	// TODO: FileDownloader
+	_ = fileList
+
+	// --------------------------------------------------------------------------------
+
+	// for idx, fl := range fileList {
+
+	// 	if !fl.regular {
+	// 		continue
+	// 	}
+	// 	log.Printf("transferring file %d, %s", idx, fl.path)
+	// 	var fileBuf bytes.Buffer
+	// 	fb := &rsyncConn{wr: &fileBuf}
+
+	// 	// file index
+	// 	if err := fb.writeInt32(int32(idx)); err != nil {
+	// 		return err
+	// 	}
+
+	// 	// rsync/io.c:write_sum_head()
+
+	// 	// block count
+	// 	// block length
+	// 	// checksum length, i.e. MD4 checksum length
+	// 	// block remainder
+
+	// 	// TODO: send tokens and calculate md4 of the file
+	// 	// TODO: block size scales linearly with file size?
+	// }
+
+	// --------------------------------------------------------------------------------
 
 	// 4 byte header (first byte: tag, rest: payload length)
 	// arbitrary length payload
@@ -418,5 +671,32 @@ func (s *Server) Serve(ln net.Listener) error {
 				log.Printf("[%s] handle: %v", conn.RemoteAddr(), err)
 			}
 		}()
+	}
+}
+
+const blockSize = 700 // rsync/rsync.h
+
+// Corresponds to rsync/generator.c:sum_sizes_sqroot
+func sumSizesSqroot(len int64) sumHead {
+	// * The block size is a rounded square root of file length.
+
+	// TODO: round this
+	blockLength := int32(math.Sqrt(float64(len)))
+	if blockLength < blockSize {
+		blockLength = blockSize
+	}
+
+	// * The checksum size is determined according to:
+	// *     blocksum_bits = BLOCKSUM_EXP + 2*log2(file_len) - log2(block_len)
+	// * provided by Donovan Baarda which gives a probability of rsync
+	// * algorithm corrupting data and falling back using the whole md4
+	// * checksums.
+	const checksumLength = 16 // TODO?
+
+	return sumHead{
+		ChecksumCount:   int32((len + (int64(blockLength) - 1)) / int64(blockLength)),
+		RemainderLength: int32(len % int64(blockLength)),
+		BlockLength:     blockLength,
+		ChecksumLength:  checksumLength,
 	}
 }

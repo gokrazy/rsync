@@ -31,7 +31,13 @@ func TestInterop(t *testing.T) {
 
 	// start a server to sync from
 	{
-		srv := &rsyncd.Server{}
+		srv := &rsyncd.Server{
+			Modules: map[string]rsyncd.Module{
+				"interop": rsyncd.Module{
+					Path: source,
+				},
+			},
+		}
 		ln, err := net.Listen("tcp", "localhost:8730")
 		if err != nil {
 			t.Fatal(err)
@@ -40,54 +46,55 @@ func TestInterop(t *testing.T) {
 		go srv.Serve(ln)
 	}
 
-	// {
-	// 	config := filepath.Join(tmp, "rsyncd.conf")
-	// 	rsyncdConfig := `
-	// use chroot = no
-	// # 0 = no limit
-	// max connections = 0
-	// pid file = ` + tmp + `/rsyncd.pid
-	// exclude = lost+found/
-	// transfer logging = yes
-	// timeout = 900
-	// ignore nonreadable = yes
-	// dont compress   = *.gz *.tgz *.zip *.z *.Z *.rpm *.deb *.bz2 *.zst
+	// 	{
+	// 		config := filepath.Join(tmp, "rsyncd.conf")
+	// 		rsyncdConfig := `
+	// 	use chroot = no
+	// 	# 0 = no limit
+	// 	max connections = 0
+	// 	pid file = ` + tmp + `/rsyncd.pid
+	// 	exclude = lost+found/
+	// 	transfer logging = yes
+	// 	timeout = 900
+	// 	ignore nonreadable = yes
+	// 	dont compress   = *.gz *.tgz *.zip *.z *.Z *.rpm *.deb *.bz2 *.zst
 
-	// [interop]
-	//        path = ` + source + `
-	//        comment = interop
-	//        read only = yes
-	//        list = true
+	// 	[interop]
+	// 	       path = /home/michael/i3/docs
+	// #` + source + `
+	// 	       comment = interop
+	// 	       read only = yes
+	// 	       list = true
 
-	// `
-	// 	if err := ioutil.WriteFile(config, []byte(rsyncdConfig), 0644); err != nil {
-	// 		t.Fatal(err)
-	// 	}
-	// 	srv := exec.Command("rsync",
-	// 		"--daemon",
-	// 		"--config="+config,
-	// 		"--verbose",
-	// 		"--address=localhost",
-	// 		"--no-detach",
-	// 		"--port=8730")
-	// 	srv.Stdout = os.Stdout
-	// 	srv.Stderr = os.Stderr
-	// 	if err := srv.Start(); err != nil {
-	// 		t.Fatal(err)
-	// 	}
-	// 	go func() {
-	// 		if err := srv.Wait(); err != nil {
-	// 			t.Error(err)
+	// 	`
+	// 		if err := ioutil.WriteFile(config, []byte(rsyncdConfig), 0644); err != nil {
+	// 			t.Fatal(err)
 	// 		}
-	// 	}()
-	// 	defer srv.Process.Kill()
-	// }
+	// 		srv := exec.Command("rsync",
+	// 			"--daemon",
+	// 			"--config="+config,
+	// 			"--verbose",
+	// 			"--address=localhost",
+	// 			"--no-detach",
+	// 			"--port=8730")
+	// 		srv.Stdout = os.Stdout
+	// 		srv.Stderr = os.Stderr
+	// 		if err := srv.Start(); err != nil {
+	// 			t.Fatal(err)
+	// 		}
+	// 		go func() {
+	// 			if err := srv.Wait(); err != nil {
+	// 				t.Error(err)
+	// 			}
+	// 		}()
+	// 		defer srv.Process.Kill()
+	// 	}
 
 	time.Sleep(1 * time.Second)
 
 	// sync into dest dir
-	rsync := exec.Command("/home/michael/src/openrsync/openrsync",
-		//"--debug=all4",
+	rsync := exec.Command("rsync", //"/home/michael/src/openrsync/openrsync",
+		"--debug=all4",
 		"--archive",
 		"-v", "-v", "-v", "-v",
 		"--port=8730",
