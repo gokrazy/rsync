@@ -103,7 +103,7 @@ func (s *Server) sendFileList(c *rsyncConn, root string, opts rsyncOpts) ([]file
 			var uid int32
 			if st, ok := info.Sys().(*syscall.Stat_t); ok {
 				uid = int32(st.Uid)
-				if _, ok := uidMap[uid]; !ok {
+				if _, ok := uidMap[uid]; !ok && uid != 0 {
 					u, err := user.LookupId(strconv.Itoa(int(uid)))
 					if err != nil {
 						log.Printf("lookup(%d) = %v", uid, err)
@@ -120,7 +120,7 @@ func (s *Server) sendFileList(c *rsyncConn, root string, opts rsyncOpts) ([]file
 			var gid int32
 			if st, ok := info.Sys().(*syscall.Stat_t); ok {
 				gid = int32(st.Gid)
-				if _, ok := gidMap[gid]; !ok {
+				if _, ok := gidMap[gid]; !ok && gid != 0 {
 					g, err := user.LookupGroupId(strconv.Itoa(int(gid)))
 					if err != nil {
 						log.Printf("lookupgroup(%d) = %v", gid, err)
