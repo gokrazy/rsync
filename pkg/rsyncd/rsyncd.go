@@ -21,15 +21,32 @@ import (
 )
 
 type Module struct {
-	Path string
+	name string
+	path string
+}
+
+func NewModule(name string, path string) Module {
+	return Module{
+		name: name,
+		path: path,
+	}
 }
 
 type Server struct {
-	Modules map[string]Module
+	modules map[string]Module
+}
+
+func NewServer(modules ...Module) *Server {
+	moduleMap := map[string]Module{}
+	for _, module := range modules {
+		moduleMap[module.name] = module
+	}
+
+	return &Server{moduleMap}
 }
 
 func (s *Server) getModule(requestedModule string) (Module, error) {
-	m, ok := s.Modules[requestedModule]
+	m, ok := s.modules[requestedModule]
 	if !ok {
 		return Module{}, fmt.Errorf("no such module")
 	}
@@ -443,7 +460,7 @@ func (s *Server) handleConn(conn net.Conn) error {
 	// https://github.com/kristapsdz/openrsync/blob/master/rsync.5
 
 	// send file list
-	fileList, err := s.sendFileList(c, module.Path, opts)
+	fileList, err := s.sendFileList(c, module.path, opts)
 	if err != nil {
 		return err
 	}

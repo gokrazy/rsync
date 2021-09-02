@@ -44,20 +44,20 @@ func rsyncdMain() error {
 			}
 		}()
 	}
-	var modMap map[string]rsyncd.Module
+	modules := []rsyncd.Module{}
 	if *moduleMap != "" {
 		parts := strings.Split(*moduleMap, "=")
 		if len(parts) != 2 {
 			return fmt.Errorf("malformed -modulemap parameter %q, expected <modulename>=<path>", *moduleMap)
 		}
-		modMap = map[string]rsyncd.Module{
-			parts[0]: rsyncd.Module{
-				Path: parts[1],
-			},
-		}
+		name, path := parts[0], parts[1]
+
+		modules = append(modules, rsyncd.NewModule(name, path))
+
 		log.Printf("rsync module %q with path %s configured", parts[0], parts[1])
 	}
-	srv := &rsyncd.Server{Modules: modMap}
+
+	srv := rsyncd.NewServer(modules...)
 	var ln net.Listener
 	if listeners, err := activation.Listeners(); err == nil && len(listeners) > 0 {
 		if got, want := len(listeners), 1; got != want {
