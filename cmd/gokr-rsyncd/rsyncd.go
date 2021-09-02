@@ -55,7 +55,7 @@ func rsyncdMain(ctx context.Context) error {
 
 		modules = append(modules, rsyncd.NewModule(name, path))
 
-		log.Printf("rsync module %q with path %s configured", parts[0], parts[1])
+		log.Printf("rsync module %q with path %s configured", name, path)
 	}
 
 	srv := rsyncd.NewServer(modules...)
