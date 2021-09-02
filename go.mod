@@ -1,4 +1,6 @@
-module github.com/gokrazy/rsync
+# stupid Go modules not supporting using forked code without modifying go.mod
+# https://stackoverflow.com/questions/61311436/how-to-fix-parsing-go-mod-module-declares-its-path-as-x-but-was-required-as-y#comment109850472_61311436
+module github.com/joonas-fi/rsync
 
 go 1.17
 
