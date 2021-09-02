@@ -16,7 +16,7 @@ import (
 	"strings"
 
 	"github.com/coreos/go-systemd/activation"
-	"github.com/gokrazy/rsync/internal/rsyncd"
+	"github.com/gokrazy/rsync/pkg/rsyncd"
 
 	// For profiling and debugging
 	_ "net/http/pprof"
