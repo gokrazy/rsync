@@ -2,6 +2,7 @@ package rsyncd
 
 import (
 	"bufio"
+	"context"
 	"encoding/binary"
 	"fmt"
 	"io"
@@ -504,7 +505,12 @@ func (s *Server) handleConn(conn net.Conn) error {
 	return nil
 }
 
-func (s *Server) Serve(ln net.Listener) error {
+func (s *Server) Serve(ctx context.Context, ln net.Listener) error {
+	go func() {
+		<-ctx.Done()
+		ln.Close() // will unblock accept
+	}()
+
 	for {
 		conn, err := ln.Accept()
 		if err != nil {
@@ -512,6 +518,7 @@ func (s *Server) Serve(ln net.Listener) error {
 		}
 		go func() {
 			defer conn.Close()
+			// TODO: handle context cancellation?
 			if err := s.handleConn(conn); err != nil {
 				log.Printf("[%s] handle: %v", conn.RemoteAddr(), err)
 			}

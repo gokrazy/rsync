@@ -8,6 +8,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"log"
@@ -22,7 +23,7 @@ import (
 	_ "net/http/pprof"
 )
 
-func rsyncdMain() error {
+func rsyncdMain(ctx context.Context) error {
 	listen := flag.String("listen",
 		"localhost:8730",
 		"[host]:port listen address for the rsync daemon protocol")
@@ -72,11 +73,11 @@ func rsyncdMain() error {
 		}
 	}
 	log.Printf("rsync daemon listening on rsync://%s", ln.Addr())
-	return srv.Serve(ln)
+	return srv.Serve(ctx, ln)
 }
 
 func main() {
-	if err := rsyncdMain(); err != nil {
+	if err := rsyncdMain(context.TODO()); err != nil {
 		log.Fatal(err)
 	}
 }
