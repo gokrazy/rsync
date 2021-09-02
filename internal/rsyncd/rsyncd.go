@@ -205,7 +205,7 @@ type rsyncOpts struct {
 func (c *rsyncConn) sendFile(fl file) error {
 	const chunkSize = 32 * 1024 // rsync/rsync.h
 
-	f, err := os.OpenFile(fl.path, os.O_RDONLY|syscall.O_NOATIME, 0)
+	f, err := os.Open(fl.path)
 	if err != nil {
 		return err
 	}
