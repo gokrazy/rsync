@@ -15,6 +15,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/coreos/go-systemd/activation"
 	"github.com/gokrazy/rsync/internal/rsyncd"
 
 	// For profiling and debugging
@@ -57,9 +58,18 @@ func rsyncdMain() error {
 		log.Printf("rsync module %q with path %s configured", parts[0], parts[1])
 	}
 	srv := &rsyncd.Server{Modules: modMap}
-	ln, err := net.Listen("tcp", *listen)
-	if err != nil {
-		return err
+	var ln net.Listener
+	if listeners, err := activation.Listeners(); err == nil && len(listeners) > 0 {
+		if got, want := len(listeners), 1; got != want {
+			return fmt.Errorf("unexpected number of sockets received from systemd: got %d, want %d", got, want)
+		}
+		ln = listeners[0]
+	} else if err != nil || len(listeners) == 0 {
+		log.Printf("could not obtain listeners from systemd, creating listener")
+		ln, err = net.Listen("tcp", *listen)
+		if err != nil {
+			return err
+		}
 	}
 	log.Printf("rsync daemon listening on rsync://%s", ln.Addr())
 	return srv.Serve(ln)
