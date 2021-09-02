@@ -1,0 +1,8 @@
+[Unit]
+Description=gokrazy rsync server socket
+
+[Socket]
+ListenStream=127.0.0.1:873
+
+[Install]
+WantedBy=sockets.target

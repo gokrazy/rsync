@@ -1,0 +1,82 @@
+[Unit]
+Description=gokrazy rsync server daemon (for serving files)
+
+[Service]
+ExecStart=/usr/bin/gokr-rsyncd
+
+# See also http://0pointer.net/blog/dynamic-users-with-systemd.html
+DynamicUser=yes
+
+# Do not establish any new connections:
+PrivateNetwork=yes
+
+# Remove all capabilities(7), this is a stateless web server:
+CapabilityBoundingSet=
+
+# Ensure the service can never gain new privileges:
+NoNewPrivileges=yes
+
+# Prohibit access to any kind of namespacing:
+RestrictNamespaces=yes
+
+# Prohibit all address families:
+# TODO(https://github.com/systemd/systemd/issues/15753): restrict to none
+RestrictAddressFamilies=AF_UNIX
+RestrictAddressFamilies=~AF_UNIX
+
+# Make home directories inaccessible:
+ProtectHome=true
+
+# Make device nodes except for /dev/null, /dev/zero, /dev/full,
+# /dev/random and /dev/urandom inaccessible:
+PrivateDevices=yes
+
+# Make users other than root and the user for this daemon inaccessible:
+PrivateUsers=yes
+
+# Make cgroup file system hierarchy inaccessible:
+ProtectControlGroups=yes
+
+# Deny kernel module loading:
+ProtectKernelModules=yes
+
+# Make kernel variables (e.g. /proc/sys) read-only:
+ProtectKernelTunables=yes
+
+# Deny hostname changing:
+ProtectHostname=yes
+
+# Deny realtime scheduling:
+RestrictRealtime=yes
+
+# Deny access to other user’s information in /proc:
+ProtectProc=invisible
+
+# Only allow access to /proc pid files, no other files:
+ProcSubset=pid
+
+# Deny access to the kernel log ring buffer
+ProtectKernelLogs=yes
+
+# Deny setting the hardware or system clock:
+ProtectClock=yes
+
+# This daemon must not create any new files, but set the umask to 077 just in case.
+UMask=077
+
+# Filter dangerous system calls. The following is listed as safe basic choice
+# in systemd.exec(5):
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallFilter=~@privileged
+SystemCallFilter=~@resources
+SystemCallErrorNumber=EPERM
+
+# Deny kernel execution domain changing:
+LockPersonality=yes
+
+# Deny memory mappings that are writable and executable:
+MemoryDenyWriteExecute=yes
+
+# no-op for a socket-activated unit, but better for systemd-analyze security:
+IPAddressDeny=any

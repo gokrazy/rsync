@@ -13,6 +13,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"os"
 	"strings"
 
 	"github.com/coreos/go-systemd/activation"
@@ -21,6 +22,10 @@ import (
 	// For profiling and debugging
 	_ "net/http/pprof"
 )
+
+func version() {
+	log.Printf("gokrazy rsync, pid %d", os.Getpid())
+}
 
 func rsyncdMain() error {
 	listen := flag.String("listen",
@@ -55,7 +60,18 @@ func rsyncdMain() error {
 				Path: parts[1],
 			},
 		}
-		log.Printf("rsync module %q with path %s configured", parts[0], parts[1])
+	}
+	if err := namespace(modMap, *listen); err == errIsParent {
+		return nil
+	} else if err != nil {
+		return fmt.Errorf("namespace: %v", err)
+	}
+	for name, mod := range modMap {
+		if err := canUnexpectedlyWriteTo(mod.Path); err != nil {
+			return err
+		}
+
+		log.Printf("rsync module %q with path %s configured", name, mod.Path)
 	}
 	srv := &rsyncd.Server{Modules: modMap}
 	var ln net.Listener

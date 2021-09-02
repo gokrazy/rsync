@@ -76,3 +76,120 @@ Transfer starting: 369 files
 Transfer complete: 5.5 KB sent, 1.2 KB read, 666 B file size
 
 ```
+
+## Supported environments and privilege dropping
+
+Supported environments:
+
+1. systemd (Linux)
+1. Docker (Linux)
+1. privileged Linux
+1. privileged non-Linux
+
+In all environments, the default instructions will take care that:
+
+* (On Linux only) The host file system is made **read-only** for `gokr-rsyncd`,
+  to guard against accidental data exfiltration.
+* `gokr-rsyncd` is running without privileges, as user `nobody`, to limit the
+  scope of what an attacker can do when exploiting a vulnerability.
+
+Known gaps:
+
+* `gokr-rsyncd` does not guard against denial of service attacks, i.e. consuming
+  too many resources (connections, bandwidth, CPU, …).
+  * See also [Per-IP rate limiting with
+    iptables](https://making.pusher.com/per-ip-rate-limiting-with-iptables/).
+
+
+### systemd (unprivileged)
+
+We provide [a `gokr-rsyncd.socket` and `gokr-rsyncd.service`
+file](https://github.com/gokrazy/rsync/tree/main/systemd/) for systemd. These
+files enables most of systemd’s security features. You can check by running
+`systemd-analyze security gokr-rsyncd.service`, which should result in an
+exposure level of “0.2 SAFE” as of systemd 249 (September 2021).
+
+First, configure your server flags by creating a systemd service override file:
+
+```shell
+systemctl edit gokr-rsyncd.service
+```
+
+In the opened editor, change the file to:
+```
+[Service]
+ExecStart=
+ExecStart=/usr/bin/gokr-rsyncd -modulemap=pwd=/etc/tmpfiles.d
+```
+
+Close the editor and install the service using:
+
+```shell
+systemctl enable --now gokr-rsyncd.socket
+```
+
+Additional hardening recommendations:
+
+* Restrict which IP addresses are allowed to connect to your rsync server, for example:
+  * using iptables or nftables on your host system
+  * using [`gokr-rsyncd`’s built-in IP allow/deny mechanism](https://github.com/gokrazy/rsync/issues/4) (once implemented)
+  * using [systemd’s `IPAddressDeny` and `IPAddressAllow`](https://manpages.debian.org/systemd.resource-control.5) in `gokr-rsyncd.socket`
+* To reduce the impact of Denial Of Service attacks, you can restrict resources
+  with systemd, see [Managing
+  Resources](http://0pointer.de/blog/projects/resources.html).
+* To hide system directories not relevant to any rsync module, use [systemd’s
+  `TemporaryFileSystem=` and
+  `BindReadOnlyPaths=`](https://manpages.debian.org/systemd.exec.5) directives
+  as described in [Use TemporaryFileSystem to hide files or directories from
+  systemd
+  services](https://www.sherbers.de/use-temporaryfilesystem-to-hide-files-or-directories-from-systemd-services/). Note
+  that you [may need to disable `ProtectSystem=strict` due to a
+  bug](https://github.com/systemd/systemd/issues/18999).
+
+### Docker (unprivileged)
+
+We provide [a `Dockerfile` for
+`gokr-rsyncd`](https://github.com/gokrazy/rsync/tree/main/docker/).
+
+```shell
+docker run \
+  --read-only \
+  -p 127.0.0.1:8730:8730 \
+  -v /etc/tmpfiles.d:/srv/rsync:ro \
+  stapelberg/gokrazy-rsync:latest \
+    -modulemap=pwd=/srv/rsync
+```
+
+Additional hardening recommendations:
+
+* Restrict which IP addresses are allowed to connect to your rsync server, for example:
+  * using iptables or nftables on your host system
+  * using [`gokr-rsyncd`’s built-in IP allow/deny mechanism](https://github.com/gokrazy/rsync/issues/4) (once implemented)
+    * Be sure to set up Docker such that the remote IPv4 or IPv6 address is available inside the container, see https://michael.stapelberg.ch/posts/2018-12-12-docker-ipv6/
+
+### privileged Linux (including gokrazy.org)
+
+When started as `root` on Linux, `gokr-rsyncd` will create a mount namespace,
+mount all configured rsync modules read-only into the namespace, then change
+into the namespace using [`chroot(2)`](https://manpages.debian.org/chroot.2) and
+drop privileges using [`setuid(2)`](https://manpages.debian.org/setuid.2).
+
+**Tip:** you can verify which file system objects the daemon process can see by
+using `ls -l /proc/$(pidof gokr-rsyncd)/root/`.
+
+Additional hardening recommendations:
+
+* Restrict which IP addresses are allowed to connect to your rsync server, for example:
+  * using iptables or nftables on your host system
+  * using [`gokr-rsyncd`’s built-in IP allow/deny mechanism](https://github.com/gokrazy/rsync/issues/4) (once implemented)
+
+### privileged non-Linux (e.g. Mac)
+
+When started as `root` on non-Linux (e.g. Mac), `gokr-rsyncd` will drop
+privileges using [`setuid(2)`](https://manpages.debian.org/setuid.2).
+
+### unprivileged with write permission (e.g. from a shell)
+
+To prevent accidental misconfiguration, `gokr-rsyncd` refuses to start when it
+detects that it has write permission in any configured rsync module.
+
