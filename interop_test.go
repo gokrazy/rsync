@@ -1,10 +1,12 @@
 package rsync_test
 
 import (
+	"bytes"
 	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/gokrazy/rsync/internal/rsynctest"
@@ -16,6 +18,32 @@ import (
 // TODO: test dry-run
 
 // TODO: non-empty exclusion list
+
+func TestModuleListing(t *testing.T) {
+	tmp := t.TempDir()
+
+	// start a server to sync from
+	srv := rsynctest.New(t, rsynctest.InteropModMap(tmp))
+
+	// request module list
+	var buf bytes.Buffer
+	rsync := exec.Command("rsync", //"/home/michael/src/openrsync/openrsync",
+		//		"--debug=all4",
+		"--archive",
+		"-v", "-v", "-v", "-v",
+		"--port="+srv.Port,
+		"rsync://localhost")
+	rsync.Stdout = &buf
+	rsync.Stderr = os.Stderr
+	if err := rsync.Run(); err != nil {
+		t.Fatalf("%v: %v", rsync.Args, err)
+	}
+
+	output := buf.String()
+	if want := "interop\tinterop"; !strings.Contains(output, want) {
+		t.Fatalf("rsync output unexpectedly did not contain %q:\n%s", want, output)
+	}
+}
 
 func TestInterop(t *testing.T) {
 	tmp := t.TempDir()

@@ -36,6 +36,20 @@ func (s *Server) getModule(requestedModule string) (Module, error) {
 	return m, nil
 }
 
+func (s *Server) formatModuleList() string {
+	if len(s.Modules) == 0 {
+		return ""
+	}
+	var list strings.Builder
+	for name := range s.Modules {
+		comment := name // for now
+		fmt.Fprintf(&list, "%s\t%s\n",
+			name,
+			comment)
+	}
+	return list.String()
+}
+
 type file struct {
 	// TODO: store relative to the root to conserve RAM
 	path    string
@@ -355,8 +369,9 @@ func (s *Server) handleConn(conn net.Conn) (err error) {
 	requestedModule = strings.TrimSpace(requestedModule)
 	if requestedModule == "" || requestedModule == "#list" {
 		log.Printf("client requested rsync module listing")
-		// TODO: send available modules
-		return fmt.Errorf("listing not yet implemented")
+		io.WriteString(conn, s.formatModuleList())
+		io.WriteString(conn, "@RSYNCD: EXIT\n")
+		return nil
 	}
 	log.Printf("client requested rsync module %q", requestedModule)
 	module, err := s.getModule(requestedModule)
