@@ -202,7 +202,7 @@ type rsyncOpts struct {
 	IgnoreTimes      bool
 }
 
-func (c *rsyncConn) sendFile(fl file) error {
+func (c *rsyncConn) sendFile(fileIndex int32, fl file) error {
 	const chunkSize = 32 * 1024 // rsync/rsync.h
 
 	f, err := os.Open(fl.path)
@@ -213,6 +213,10 @@ func (c *rsyncConn) sendFile(fl file) error {
 
 	fi, err := f.Stat()
 	if err != nil {
+		return err
+	}
+
+	if err := c.writeInt32(fileIndex); err != nil {
 		return err
 	}
 
@@ -298,12 +302,20 @@ func (c *rsyncConn) sendFiles(fileList []file) error {
 		// TODO(optimization): only send data that has changed (based on the
 		// checksums received above)
 
-		if err := c.writeInt32(fileIndex); err != nil {
-			return err
-		}
-
-		if err := c.sendFile(fileList[fileIndex]); err != nil {
-			return err
+		if err := c.sendFile(fileIndex, fileList[fileIndex]); err != nil {
+			if _, ok := err.(*os.PathError); ok {
+				// OpenFile() failed. Log the error (server side only) and
+				// proceed. Only starting with protocol 30, an I/O error flag is
+				// sent after the file transfer phase.
+				if os.IsNotExist(err) {
+					log.Printf("file has vanished: %s", fileList[fileIndex].path)
+				} else {
+					log.Printf("sendFiles: %v", err)
+				}
+				continue
+			} else {
+				return err
+			}
 		}
 	}
 
