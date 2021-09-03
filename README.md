@@ -77,6 +77,19 @@ Transfer complete: 5.5 KB sent, 1.2 KB read, 666 B file size
 
 ```
 
+## Limitations
+
+### Bandwidth
+
+In my tests, `gokr-rsyncd` can easily transfer data at ≈ 2 Gbit/s. The current
+bottleneck is the `golang.org/x/crypto/md4` implementation. With a faster
+implementation, we would be able to fill a 10 Gbit/s link!
+
+### Protocol related limitations
+
+* xattrs (including acls) was introduced in rsync protocol 30, so is currently
+  not supported.
+
 ## Supported environments and privilege dropping
 
 Supported environments:
