@@ -113,7 +113,7 @@ func TestInterop(t *testing.T) {
 
 	// sync into dest dir
 	rsync = exec.Command("rsync", //"/home/michael/src/openrsync/openrsync",
-		"--debug=all4",
+		//		"--debug=all4",
 		"--archive",
 		"-v", "-v", "-v", "-v",
 		"--port="+port,
@@ -137,7 +137,7 @@ func TestInterop(t *testing.T) {
 	// Run rsync again. This should not modify any files, but will result in
 	// rsync sending sums to the sender.
 	rsync = exec.Command("rsync", //"/home/michael/src/openrsync/openrsync",
-		"--debug=all4",
+		//		"--debug=all4",
 		"--archive",
 		// TODO: should this be --checksum instead?
 		"--ignore-times", // disable rsync’s “quick check”
