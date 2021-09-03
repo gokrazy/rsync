@@ -41,14 +41,6 @@ func rsyncdMain() error {
 		"<modulename>=<path> pairs for quick setup of the server, without a config file")
 
 	flag.Parse()
-	if *monitoringListen != "" {
-		go func() {
-			log.Printf("HTTP server for monitoring listening on http://%s/debug/pprof", *monitoringListen)
-			if err := http.ListenAndServe(*monitoringListen, nil); err != nil {
-				log.Printf("-monitoring_listen: %v", err)
-			}
-		}()
-	}
 	var modMap map[string]rsyncd.Module
 	if *moduleMap != "" {
 		parts := strings.Split(*moduleMap, "=")
@@ -73,6 +65,16 @@ func rsyncdMain() error {
 
 		log.Printf("rsync module %q with path %s configured", name, mod.Path)
 	}
+
+	if *monitoringListen != "" {
+		go func() {
+			log.Printf("HTTP server for monitoring listening on http://%s/debug/pprof", *monitoringListen)
+			if err := http.ListenAndServe(*monitoringListen, nil); err != nil {
+				log.Printf("-monitoring_listen: %v", err)
+			}
+		}()
+	}
+
 	srv := &rsyncd.Server{Modules: modMap}
 	var ln net.Listener
 	if listeners, err := activation.Listeners(); err == nil && len(listeners) > 0 {
