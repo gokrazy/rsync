@@ -2,15 +2,12 @@ package rsync_test
 
 import (
 	"io/ioutil"
-	"log"
-	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"testing"
-	"time"
 
-	"github.com/gokrazy/rsync/internal/rsyncd"
+	"github.com/gokrazy/rsync/internal/rsynctest"
 	"github.com/google/go-cmp/cmp"
 )
 
@@ -36,26 +33,7 @@ func TestInterop(t *testing.T) {
 	}
 
 	// start a server to sync from
-	port := "8730"
-	{
-		srv := &rsyncd.Server{
-			Modules: map[string]rsyncd.Module{
-				"interop": rsyncd.Module{
-					Path: source,
-				},
-			},
-		}
-		ln, err := net.Listen("tcp", "localhost:0")
-		if err != nil {
-			t.Fatal(err)
-		}
-		log.Printf("listening on %s", ln.Addr())
-		_, port, err = net.SplitHostPort(ln.Addr().String())
-		if err != nil {
-			t.Fatal(err)
-		}
-		go srv.Serve(ln)
-	}
+	srv := rsynctest.New(t, rsynctest.InteropModMap(source))
 
 	// 	{
 	// 		config := filepath.Join(tmp, "rsyncd.conf")
@@ -99,9 +77,9 @@ func TestInterop(t *testing.T) {
 	// 			}
 	// 		}()
 	// 		defer srv.Process.Kill()
+	//
+	//      time.Sleep(1 * time.Second)
 	// 	}
-
-	time.Sleep(1 * time.Second)
 
 	rsync := exec.Command("rsync", //"/home/michael/src/openrsync/openrsync",
 		"--version")
@@ -116,7 +94,7 @@ func TestInterop(t *testing.T) {
 		//		"--debug=all4",
 		"--archive",
 		"-v", "-v", "-v", "-v",
-		"--port="+port,
+		"--port="+srv.Port,
 		"rsync://localhost/interop/", // copy contents of interop
 		//source+"/", // sync from local directory
 		dest) // directly into dest
@@ -142,7 +120,7 @@ func TestInterop(t *testing.T) {
 		// TODO: should this be --checksum instead?
 		"--ignore-times", // disable rsync’s “quick check”
 		"-v", "-v", "-v", "-v",
-		"--port="+port,
+		"--port="+srv.Port,
 		"rsync://localhost/interop/", // copy contents of interop
 		//source+"/", // sync from local directory
 		dest) // directly into dest

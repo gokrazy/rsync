@@ -3,15 +3,13 @@ package rsync_test
 import (
 	"bytes"
 	"io/ioutil"
-	"log"
-	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
 
-	"github.com/gokrazy/rsync/internal/rsyncd"
+	"github.com/gokrazy/rsync/internal/rsynctest"
 	"github.com/google/go-cmp/cmp"
 )
 
@@ -26,26 +24,7 @@ func TestErrors(t *testing.T) {
 	nonExistant := filepath.Join(tmp, "non/existant")
 
 	// start a server to sync from
-	port := "8730"
-	{
-		srv := &rsyncd.Server{
-			Modules: map[string]rsyncd.Module{
-				"interop": rsyncd.Module{
-					Path: nonExistant,
-				},
-			},
-		}
-		ln, err := net.Listen("tcp", "localhost:0")
-		if err != nil {
-			t.Fatal(err)
-		}
-		log.Printf("listening on %s", ln.Addr())
-		_, port, err = net.SplitHostPort(ln.Addr().String())
-		if err != nil {
-			t.Fatal(err)
-		}
-		go srv.Serve(ln)
-	}
+	srv := rsynctest.New(t, rsynctest.InteropModMap(nonExistant))
 
 	// TODO: verify error message when requesting a module that is not configured
 
@@ -55,7 +34,7 @@ func TestErrors(t *testing.T) {
 		//		"--debug=all4",
 		"--archive",
 		"-v", "-v", "-v", "-v",
-		"--port="+port,
+		"--port="+srv.Port,
 		"rsync://localhost/interop/", // copy contents of interop
 		//source+"/", // sync from local directory
 		dest) // directly into dest
@@ -107,26 +86,7 @@ func TestNoReadPermission(t *testing.T) {
 	}
 
 	// start a server to sync from
-	port := "8730"
-	{
-		srv := &rsyncd.Server{
-			Modules: map[string]rsyncd.Module{
-				"interop": rsyncd.Module{
-					Path: source,
-				},
-			},
-		}
-		ln, err := net.Listen("tcp", "localhost:0")
-		if err != nil {
-			t.Fatal(err)
-		}
-		log.Printf("listening on %s", ln.Addr())
-		_, port, err = net.SplitHostPort(ln.Addr().String())
-		if err != nil {
-			t.Fatal(err)
-		}
-		go srv.Serve(ln)
-	}
+	srv := rsynctest.New(t, rsynctest.InteropModMap(source))
 
 	// sync into dest dir
 	var buf bytes.Buffer
@@ -134,7 +94,7 @@ func TestNoReadPermission(t *testing.T) {
 		//		"--debug=all4",
 		"--archive",
 		"-v", "-v", "-v", "-v",
-		"--port="+port,
+		"--port="+srv.Port,
 		"rsync://localhost/interop/", // copy contents of interop
 		dest)                         // directly into dest
 	rsync.Stdout = &buf
