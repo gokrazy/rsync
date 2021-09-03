@@ -63,6 +63,11 @@ func (s *Server) sendFileList(c *rsyncConn, root string, opts rsyncOpts) ([]file
 	uidMap := make(map[int32]string)
 	gidMap := make(map[int32]string)
 
+	// TODO: flush in between to keep the pipes filled when traversal takes long
+
+	// TODO: handle info == nil case (permission denied?): should set an i/o
+	// error flag, but traversal should continue
+
 	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
 		// log.Printf("filepath.WalkFn(path=%s)", path)
 		if err != nil {
@@ -110,6 +115,9 @@ func (s *Server) sendFileList(c *rsyncConn, root string, opts rsyncOpts) ([]file
 		} else if info.Mode().IsRegular() {
 			mode |= 0o0100000 // S_IFREG from /usr/include/bits/stat.h
 			// log.Printf("mode reg: %v (%o)", uint32(mode), uint32(mode))
+		} else if info.Mode().Type()&os.ModeSymlink != 0 {
+			mode |= 0o0120000 // S_IFLNK from /usr/include/bits/stat.h
+
 		}
 		fec.writeInt32(mode)
 
@@ -154,8 +162,16 @@ func (s *Server) sendFileList(c *rsyncConn, root string, opts rsyncOpts) ([]file
 			fec.writeInt32(0)
 		}
 
-		// 11.  if a symbolic link and -l, the link target's length (integer)
-		// 12.  if a symbolic link and -l, the link target (byte array)
+		if opts.PreserveLinks && info.Mode().Type()&os.ModeSymlink != 0 {
+			// 11.  if a symbolic link and -l, the link target's length (integer)
+			// 12.  if a symbolic link and -l, the link target (byte array)
+			target, err := os.Readlink(path)
+			if err != nil {
+				return err // TODO
+			}
+			fec.writeInt32(int32(len(target)))
+			fec.writeString(target)
+		}
 
 		// The status byte may consist of the following bits and determines which of the optional fields are transmitted.
 

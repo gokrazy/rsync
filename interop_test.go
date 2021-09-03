@@ -60,6 +60,11 @@ func TestInterop(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	linkToDummy := filepath.Join(source, "link_to_dummy")
+	if err := os.Symlink("dummy", linkToDummy); err != nil {
+		t.Fatal(err)
+	}
+
 	// start a server to sync from
 	srv := rsynctest.New(t, rsynctest.InteropModMap(source))
 
@@ -132,12 +137,24 @@ func TestInterop(t *testing.T) {
 		t.Fatalf("%v: %v", rsync.Args, err)
 	}
 
-	got, err := ioutil.ReadFile(filepath.Join(dest, "dummy"))
-	if err != nil {
-		t.Fatal(err)
+	{
+		got, err := ioutil.ReadFile(filepath.Join(dest, "dummy"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if diff := cmp.Diff(want, got); diff != "" {
+			t.Fatalf("unexpected file contents: diff (-want +got):\n%s", diff)
+		}
 	}
-	if diff := cmp.Diff(want, got); diff != "" {
-		t.Fatalf("unexpected file contents: diff (-want +got):\n%s", diff)
+
+	{
+		got, err := os.Readlink(filepath.Join(dest, "link_to_dummy"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if want := "dummy"; got != want {
+			t.Fatalf("unexpected symlink target: got %q, want %q", got, want)
+		}
 	}
 
 	// Run rsync again. This should not modify any files, but will result in
