@@ -260,6 +260,7 @@ type rsyncOpts struct {
 	PreserveTimes    bool
 	Recurse          bool
 	IgnoreTimes      bool
+	DryRun           bool
 }
 
 func (c *rsyncConn) sendFile(fileIndex int32, fl file) error {
@@ -322,7 +323,7 @@ func (c *rsyncConn) sendFile(fileIndex int32, fl file) error {
 }
 
 // rsync/sender.c:send_files()
-func (c *rsyncConn) sendFiles(fileList []file) error {
+func (c *rsyncConn) sendFiles(fileList []file, dryRun bool) error {
 	for {
 		// receive data about receiver’s copy of the file list contents (not
 		// ordered)
@@ -338,6 +339,14 @@ func (c *rsyncConn) sendFiles(fileList []file) error {
 			}
 			break
 		}
+
+		if dryRun {
+			if err := c.writeInt32(fileIndex); err != nil {
+				return err
+			}
+			continue
+		}
+
 		// log.Printf("fileIndex: %v (hex %x)", fileIndex, fileIndex)
 		sumHead, err := c.readSumHead()
 		if err != nil {
@@ -464,6 +473,7 @@ func (s *Server) handleConn(conn net.Conn) (err error) {
 	opt.Bool("v", false)     // verbosity; ignored
 	opt.Bool("debug", false) // debug; ignored
 	opt.BoolVar(&opts.IgnoreTimes, "ignore-times", false, opt.Alias("I"))
+	opt.BoolVar(&opts.DryRun, "dry-run", false, opt.Alias("n"))
 
 	//getoptions.Debug.SetOutput(os.Stderr)
 	remaining, err := opt.Parse(flags)
@@ -541,7 +551,7 @@ func (s *Server) handleConn(conn net.Conn) (err error) {
 
 	log.Printf("exclusion list read")
 
-	if err := c.sendFiles(fileList); err != nil {
+	if err := c.sendFiles(fileList, opts.DryRun); err != nil {
 		return err
 	}
 

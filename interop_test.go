@@ -16,8 +16,6 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-// TODO: test dry-run
-
 // TODO: non-empty exclusion list
 
 func TestModuleListing(t *testing.T) {
@@ -142,6 +140,22 @@ func TestInterop(t *testing.T) {
 
 	rsync := exec.Command("rsync", //"/home/michael/src/openrsync/openrsync",
 		"--version")
+	rsync.Stdout = os.Stdout
+	rsync.Stderr = os.Stderr
+	if err := rsync.Run(); err != nil {
+		t.Fatalf("%v: %v", rsync.Args, err)
+	}
+
+	// dry run (slight differences in protocol)
+	rsync = exec.Command("rsync", //"/home/michael/src/openrsync/openrsync",
+		//		"--debug=all4",
+		"--archive",
+		"-v", "-v", "-v", "-v",
+		"--port="+srv.Port,
+		"--dry-run",
+		"rsync://localhost/interop/", // copy contents of interop
+		//source+"/", // sync from local directory
+		dest) // directly into dest
 	rsync.Stdout = os.Stdout
 	rsync.Stderr = os.Stderr
 	if err := rsync.Run(); err != nil {
