@@ -56,8 +56,13 @@ type file struct {
 	regular bool
 }
 
-func (s *Server) sendFileList(c *rsyncConn, root string, opts rsyncOpts) ([]file, error) {
-	var fileList []file
+type fileList struct {
+	totalSize int64
+	files     []file
+}
+
+func (s *Server) sendFileList(c *rsyncConn, root string, opts rsyncOpts) (*fileList, error) {
+	var fileList fileList
 	fec := &rsyncBuffer{}
 
 	uidMap := make(map[int32]string)
@@ -74,7 +79,7 @@ func (s *Server) sendFileList(c *rsyncConn, root string, opts rsyncOpts) ([]file
 			return err
 		}
 
-		fileList = append(fileList, file{
+		fileList.files = append(fileList.files, file{
 			path:    path,
 			regular: info.Mode().IsRegular(),
 		})
@@ -101,6 +106,8 @@ func (s *Server) sendFileList(c *rsyncConn, root string, opts rsyncOpts) ([]file
 
 		// 5.   file length (long)
 		fec.writeInt64(info.Size())
+
+		fileList.totalSize += info.Size()
 
 		// 6.   file modification time (optional, integer)
 		// TODO: this will overflow in 2038! :(
@@ -245,7 +252,7 @@ func (s *Server) sendFileList(c *rsyncConn, root string, opts rsyncOpts) ([]file
 		return nil, err
 	}
 
-	return fileList, nil
+	return &fileList, nil
 }
 
 type rsyncOpts struct {
@@ -323,7 +330,7 @@ func (c *rsyncConn) sendFile(fileIndex int32, fl file) error {
 }
 
 // rsync/sender.c:send_files()
-func (c *rsyncConn) sendFiles(fileList []file, dryRun bool) error {
+func (c *rsyncConn) sendFiles(fileList *fileList, dryRun bool) error {
 	for {
 		// receive data about receiver’s copy of the file list contents (not
 		// ordered)
@@ -371,13 +378,13 @@ func (c *rsyncConn) sendFiles(fileList []file, dryRun bool) error {
 		// TODO(optimization): only send data that has changed (based on the
 		// checksums received above)
 
-		if err := c.sendFile(fileIndex, fileList[fileIndex]); err != nil {
+		if err := c.sendFile(fileIndex, fileList.files[fileIndex]); err != nil {
 			if _, ok := err.(*os.PathError); ok {
 				// OpenFile() failed. Log the error (server side only) and
 				// proceed. Only starting with protocol 30, an I/O error flag is
 				// sent after the file transfer phase.
 				if os.IsNotExist(err) {
-					log.Printf("file has vanished: %s", fileList[fileIndex].path)
+					log.Printf("file has vanished: %s", fileList.files[fileIndex].path)
 				} else {
 					log.Printf("sendFiles: %v", err)
 				}
@@ -396,16 +403,40 @@ func (c *rsyncConn) sendFiles(fileList []file, dryRun bool) error {
 	return nil
 }
 
+type countingReader struct {
+	r    io.Reader
+	read int64
+}
+
+func (r *countingReader) Read(p []byte) (n int, err error) {
+	n, err = r.r.Read(p)
+	r.read += int64(n)
+	return n, err
+}
+
+type countingWriter struct {
+	w       io.Writer
+	written int64
+}
+
+func (w *countingWriter) Write(p []byte) (n int, err error) {
+	n, err = w.w.Write(p)
+	w.written += int64(n)
+	return n, err
+}
+
 func (s *Server) handleConn(conn net.Conn) (err error) {
 	const terminationCommand = "@RSYNCD: OK\n"
-	rd := bufio.NewReader(conn)
+	crd := &countingReader{r: conn}
+	cwr := &countingWriter{w: conn}
+	rd := bufio.NewReader(crd)
 	// send server greeting
 
 	// protocol version 27 seems to be the safest bet for wide compatibility:
 	// version 27 was introduced by rsync 2.6.0 (released 2004), and is
 	// supported by openrsync and rsyn.
 	const protocolVersion = "27"
-	fmt.Fprintf(conn, "@RSYNCD: %s\n", protocolVersion)
+	fmt.Fprintf(cwr, "@RSYNCD: %s\n", protocolVersion)
 
 	// read client greeting
 	clientGreeting, err := rd.ReadString('\n')
@@ -424,18 +455,18 @@ func (s *Server) handleConn(conn net.Conn) (err error) {
 	requestedModule = strings.TrimSpace(requestedModule)
 	if requestedModule == "" || requestedModule == "#list" {
 		log.Printf("client requested rsync module listing")
-		io.WriteString(conn, s.formatModuleList())
-		io.WriteString(conn, "@RSYNCD: EXIT\n")
+		io.WriteString(cwr, s.formatModuleList())
+		io.WriteString(cwr, "@RSYNCD: EXIT\n")
 		return nil
 	}
 	log.Printf("client requested rsync module %q", requestedModule)
 	module, err := s.getModule(requestedModule)
 	if err != nil {
-		fmt.Fprintf(conn, "@ERROR: Unknown module '%s'\n", requestedModule)
+		fmt.Fprintf(cwr, "@ERROR: Unknown module '%s'\n", requestedModule)
 		return err
 	}
 
-	io.WriteString(conn, terminationCommand)
+	io.WriteString(cwr, terminationCommand)
 
 	// read requested flags
 	var flags []string
@@ -499,7 +530,7 @@ func (s *Server) handleConn(conn net.Conn) (err error) {
 	c := &rsyncConn{
 		seed: sessionChecksumSeed,
 		rd:   rd,
-		wr:   conn,
+		wr:   cwr,
 	}
 
 	if err := c.writeInt32(c.seed); err != nil {
@@ -555,15 +586,17 @@ func (s *Server) handleConn(conn net.Conn) (err error) {
 		return err
 	}
 
-	// TODO: make this conditional
-	// send statistics
-	if err := c.writeInt64(1234); err != nil {
+	// send statistics:
+	// total bytes read (from network connection)
+	if err := c.writeInt64(crd.read); err != nil {
 		return err
 	}
-	if err := c.writeInt64(5678); err != nil {
+	// total bytes written (to network connection)
+	if err := c.writeInt64(cwr.written); err != nil {
 		return err
 	}
-	if err := c.writeInt64(666); err != nil {
+	// total size of files
+	if err := c.writeInt64(fileList.totalSize); err != nil {
 		return err
 	}
 
