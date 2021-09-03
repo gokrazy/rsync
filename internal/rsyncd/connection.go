@@ -6,12 +6,23 @@ import (
 	"io"
 )
 
+const (
+	msgData  uint8 = 0
+	msgInfo  uint8 = 2
+	msgError uint8 = 1
+)
+
 type multiplexWriter struct {
 	underlying io.Writer
 }
 
 func (w *multiplexWriter) Write(p []byte) (n int, err error) {
-	header := uint32(7)<<24 | uint32(len(p))
+	return w.WriteMsg(msgData, p)
+}
+
+func (w *multiplexWriter) WriteMsg(tag uint8, p []byte) (n int, err error) {
+	const mplexBase = 7
+	header := uint32(mplexBase+tag)<<24 | uint32(len(p))
 	// log.Printf("len %d (hex %x)", len(p), uint32(len(p)))
 	// log.Printf("header=%v (%x)", header, header)
 	if err := binary.Write(w.underlying, binary.LittleEndian, header); err != nil {

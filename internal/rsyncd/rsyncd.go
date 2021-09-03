@@ -327,7 +327,7 @@ func (c *rsyncConn) sendFiles(fileList []file) error {
 	return nil
 }
 
-func (s *Server) handleConn(conn net.Conn) error {
+func (s *Server) handleConn(conn net.Conn) (err error) {
 	const terminationCommand = "@RSYNCD: OK\n"
 	rd := bufio.NewReader(conn)
 	// send server greeting
@@ -437,7 +437,14 @@ func (s *Server) handleConn(conn net.Conn) error {
 
 	// Switch to multiplexing protocol, but only for server-side transmissions.
 	// Transmissions received from the client are not multiplexed.
-	c.wr = &multiplexWriter{underlying: c.wr}
+	mpx := &multiplexWriter{underlying: c.wr}
+	c.wr = mpx
+	// If returning an error, send the error to the client for display, too:
+	defer func() {
+		if err != nil {
+			mpx.WriteMsg(msgError, []byte(fmt.Sprintf("gokr-rsync [sender]: %v\n", err)))
+		}
+	}()
 
 	// receive the exclusion list (openrsync’s is always empty)
 	const exclusionListEnd = 0
