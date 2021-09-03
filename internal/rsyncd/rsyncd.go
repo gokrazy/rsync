@@ -108,17 +108,44 @@ func (s *Server) sendFileList(c *rsyncConn, root string, opts rsyncOpts) ([]file
 
 		// 7.   file mode (optional, mode_t, integer)
 		mode := int32(info.Mode() & os.ModePerm)
-		// log.Printf("mode before: %v (%o)", uint32(mode), uint32(mode))
+		isDev := false
+		isSpecial := false
+		// as per /usr/include/bits/stat.h:
+		const (
+			S_IFDIR  = 0o0040000 // Directory
+			S_IFCHR  = 0o0020000 // Character device
+			S_IFBLK  = 0o0060000 // Block device
+			S_IFREG  = 0o0100000 // Regular file
+			S_IFIFO  = 0o0010000 // FIFO
+			S_IFLNK  = 0o0120000 // Symbolic link
+			S_IFSOCK = 0o0140000 // Socket
+		)
 		if info.Mode().IsDir() {
-			mode |= 0o0040000 // S_IFDIR from /usr/include/bits/stat.h
-			// log.Printf("mode dir: %v (%o)", uint32(mode), uint32(mode))
+			mode |= S_IFDIR
 		} else if info.Mode().IsRegular() {
-			mode |= 0o0100000 // S_IFREG from /usr/include/bits/stat.h
-			// log.Printf("mode reg: %v (%o)", uint32(mode), uint32(mode))
+			mode |= S_IFREG
 		} else if info.Mode().Type()&os.ModeSymlink != 0 {
-			mode |= 0o0120000 // S_IFLNK from /usr/include/bits/stat.h
-
+			mode |= S_IFLNK
 		}
+
+		if info.Mode().Type()&os.ModeCharDevice != 0 {
+			mode |= S_IFCHR
+			isDev = true
+		} else if info.Mode().Type()&os.ModeDevice != 0 {
+			mode |= S_IFBLK
+			isDev = true
+		}
+
+		if info.Mode().Type()&os.ModeNamedPipe != 0 {
+			mode |= S_IFIFO
+			isSpecial = true
+		}
+
+		if info.Mode().Type()&os.ModeSocket != 0 {
+			mode |= S_IFSOCK
+			isSpecial = true
+		}
+
 		fec.writeInt32(mode)
 
 		if opts.PreserveUid {
@@ -155,11 +182,14 @@ func (s *Server) sendFileList(c *rsyncConn, root string, opts rsyncOpts) ([]file
 			fec.writeInt32(gid)
 		}
 
-		const isSpecial = false // TODO
-		if opts.PreserveSpecials && isSpecial {
+		if (opts.PreserveDevices && isDev) ||
+			(opts.PreserveSpecials && isSpecial) {
 			// 10.  if a special file and -D, the device “rdev” type (integer)
-			// TODO: what to send here?
-			fec.writeInt32(0)
+			sys, ok := info.Sys().(*syscall.Stat_t)
+			if !ok {
+				return fmt.Errorf("stat does not contain rdev")
+			}
+			fec.writeInt32(int32(sys.Rdev))
 		}
 
 		if opts.PreserveLinks && info.Mode().Type()&os.ModeSymlink != 0 {

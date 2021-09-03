@@ -123,8 +123,12 @@ func TestNoReadPermission(t *testing.T) {
 		t.Fatalf("%v: %v", rsync.Args, err)
 	}
 
-	if _, err := ioutil.ReadFile(filepath.Join(dest, "dummy")); err == nil {
-		t.Fatalf("dummy file unexpectedly created in the destination")
+	if os.Getuid() > 0 {
+		// uid 0 can read the file despite chmod(0), so skip this check:
+
+		if _, err := ioutil.ReadFile(filepath.Join(dest, "dummy")); err == nil {
+			t.Fatalf("dummy file unexpectedly created in the destination")
+		}
 	}
 
 	got, err := ioutil.ReadFile(filepath.Join(dest, "other"))

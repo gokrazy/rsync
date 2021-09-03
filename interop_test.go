@@ -3,17 +3,18 @@ package rsync_test
 import (
 	"bytes"
 	"io/ioutil"
+	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"testing"
 
 	"github.com/gokrazy/rsync/internal/rsynctest"
 	"github.com/google/go-cmp/cmp"
+	"golang.org/x/sys/unix"
 )
-
-// TODO: add a symbolic link and verify it
 
 // TODO: test dry-run
 
@@ -63,6 +64,31 @@ func TestInterop(t *testing.T) {
 	linkToDummy := filepath.Join(source, "link_to_dummy")
 	if err := os.Symlink("dummy", linkToDummy); err != nil {
 		t.Fatal(err)
+	}
+
+	if os.Getuid() == 0 {
+		char := filepath.Join(source, "char")
+		// major 1, minor 5, like /dev/zero
+		if err := unix.Mknod(char, 0600|syscall.S_IFCHR, int(unix.Mkdev(1, 5))); err != nil {
+			t.Fatal(err)
+		}
+		block := filepath.Join(source, "block")
+		// major 242, minor 9, like /dev/nvme0
+		if err := unix.Mknod(block, 0600|syscall.S_IFBLK, int(unix.Mkdev(242, 9))); err != nil {
+			t.Fatal(err)
+		}
+
+		fifo := filepath.Join(source, "fifo")
+		if err := unix.Mkfifo(fifo, 0600); err != nil {
+			t.Fatal(err)
+		}
+
+		sock := filepath.Join(source, "sock")
+		ln, err := net.Listen("unix", sock)
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { ln.Close() })
 	}
 
 	// start a server to sync from
@@ -154,6 +180,63 @@ func TestInterop(t *testing.T) {
 		}
 		if want := "dummy"; got != want {
 			t.Fatalf("unexpected symlink target: got %q, want %q", got, want)
+		}
+	}
+
+	if os.Getuid() == 0 {
+		{
+			st, err := os.Stat(filepath.Join(dest, "char"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if st.Mode().Type()&os.ModeCharDevice == 0 {
+				t.Fatalf("unexpected type: got %v, want character device", st.Mode())
+			}
+			sys, ok := st.Sys().(*syscall.Stat_t)
+			if !ok {
+				t.Fatal("stat does not contain rdev")
+			}
+			if got, want := sys.Rdev, unix.Mkdev(1, 5); got != want {
+				t.Fatalf("unexpected rdev: got %v, want %v", got, want)
+			}
+		}
+
+		{
+			st, err := os.Stat(filepath.Join(dest, "block"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if st.Mode().Type()&os.ModeDevice == 0 ||
+				st.Mode().Type()&os.ModeCharDevice != 0 {
+				t.Fatalf("unexpected type: got %v, want block device", st.Mode())
+			}
+			sys, ok := st.Sys().(*syscall.Stat_t)
+			if !ok {
+				t.Fatal("stat does not contain rdev")
+			}
+			if got, want := sys.Rdev, unix.Mkdev(242, 9); got != want {
+				t.Fatalf("unexpected rdev: got %v, want %v", got, want)
+			}
+		}
+
+		{
+			st, err := os.Stat(filepath.Join(dest, "fifo"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if st.Mode().Type()&os.ModeNamedPipe == 0 {
+				t.Fatalf("unexpected type: got %v, want fifo", st.Mode())
+			}
+		}
+
+		{
+			st, err := os.Stat(filepath.Join(dest, "sock"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if st.Mode().Type()&os.ModeSocket == 0 {
+				t.Fatalf("unexpected type: got %v, want socket", st.Mode())
+			}
 		}
 	}
 
