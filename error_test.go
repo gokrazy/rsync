@@ -26,8 +26,6 @@ func TestErrors(t *testing.T) {
 	// start a server to sync from
 	srv := rsynctest.New(t, rsynctest.InteropModMap(nonExistant))
 
-	// TODO: verify error message when requesting a module that is not configured
-
 	// sync into dest dir
 	var buf bytes.Buffer
 	rsync := exec.Command("rsync", //"/home/michael/src/openrsync/openrsync",
@@ -44,19 +42,41 @@ func TestErrors(t *testing.T) {
 		t.Fatalf("rsync unexpectedly did not return with an error exit code, output:\n%s", buf.String())
 	}
 
-	// got, err := ioutil.ReadFile(filepath.Join(dest, "dummy"))
-	// if err != nil {
-	// 	t.Fatal(err)
-	// }
-	// if diff := cmp.Diff(want, got); diff != "" {
-	// 	t.Fatalf("unexpected file contents: diff (-want +got):\n%s", diff)
-	// }
-
 	output := buf.String()
 	if want := "no such file or directory"; !strings.Contains(output, want) {
 		t.Fatalf("rsync output unexpectedly did not contain %q:\n%s", want, output)
 	}
 	if want := nonExistant; !strings.Contains(output, want) {
+		t.Fatalf("rsync output unexpectedly did not contain %q:\n%s", want, output)
+	}
+}
+
+func TestNoSuchModule(t *testing.T) {
+	tmp := t.TempDir()
+
+	dest := filepath.Join(tmp, "dest")
+
+	// start a server to sync from
+	srv := rsynctest.New(t, nil)
+
+	// sync into dest dir
+	var buf bytes.Buffer
+	rsync := exec.Command("rsync", //"/home/michael/src/openrsync/openrsync",
+		//		"--debug=all4",
+		"--archive",
+		"-v", "-v", "-v", "-v",
+		"--port="+srv.Port,
+		"rsync://localhost/requesting-nonsense/", // copy contents of interop
+		//source+"/", // sync from local directory
+		dest) // directly into dest
+	rsync.Stdout = &buf
+	rsync.Stderr = &buf
+	if err := rsync.Run(); err == nil {
+		t.Fatalf("rsync unexpectedly did not return with an error exit code, output:\n%s", buf.String())
+	}
+
+	output := buf.String()
+	if want := "Unknown module"; !strings.Contains(output, want) {
 		t.Fatalf("rsync output unexpectedly did not contain %q:\n%s", want, output)
 	}
 }

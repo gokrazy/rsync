@@ -346,7 +346,6 @@ func (s *Server) handleConn(conn net.Conn) (err error) {
 	if !strings.HasPrefix(clientGreeting, "@RSYNCD: ") {
 		return fmt.Errorf("invalid client greeting: got %q", clientGreeting)
 	}
-	io.WriteString(conn, terminationCommand)
 
 	// read requested module(s), if any
 	requestedModule, err := rd.ReadString('\n')
@@ -362,10 +361,11 @@ func (s *Server) handleConn(conn net.Conn) (err error) {
 	log.Printf("client requested rsync module %q", requestedModule)
 	module, err := s.getModule(requestedModule)
 	if err != nil {
-		// TODO: add a test to verify our human-readable error message is
-		// displayed by the client.
+		fmt.Fprintf(conn, "@ERROR: Unknown module '%s'\n", requestedModule)
 		return err
 	}
+
+	io.WriteString(conn, terminationCommand)
 
 	// read requested flags
 	var flags []string
