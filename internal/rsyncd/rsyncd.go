@@ -16,8 +16,8 @@ import (
 	"syscall"
 
 	"github.com/DavidGamba/go-getoptions"
+	"github.com/mmcloughlin/md4"
 	"github.com/stapelberg/rsync-os/rsync"
-	"golang.org/x/crypto/md4"
 )
 
 type Module struct {
