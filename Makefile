@@ -24,6 +24,12 @@ docker:
 	CGO_ENABLED=0 GOBIN=$$PWD/docker go install github.com/gokrazy/rsync/cmd/gokr-rsyncd
 	(cd docker && docker build -t=stapelberg/gokrazy-rsync .)
 
+router7:
+	GOARCH=amd64 CGO_ENABLED=0 go install github.com/gokrazy/rsync/cmd/gokr-rsyncd && \
+	(ssh router7.lan killall gokr-rsyncd || true) && \
+	cp ~/go/bin/gokr-rsyncd /mnt/loop/ && \
+	ssh router7.lan /perm/gokr-rsyncd -modulemap distri=/perm/srv/repo.distr1.org/distri/ -listen=10.0.0.1:8730 -monitoring_listen=10.0.0.1:8780
+
 raspi:
 	# -tags nonamespacing
 	GOARCH=arm64 CGO_ENABLED=0 go install github.com/gokrazy/rsync/cmd/gokr-rsyncd && \
