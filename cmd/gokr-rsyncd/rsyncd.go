@@ -49,6 +49,7 @@ func rsyncdMain() error {
 		}
 		modMap = map[string]rsyncd.Module{
 			parts[0]: rsyncd.Module{
+				Name: parts[0],
 				Path: parts[1],
 			},
 		}

@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/user"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"syscall"
@@ -22,6 +23,7 @@ import (
 )
 
 type Module struct {
+	Name string
 	Path string
 }
 
@@ -54,6 +56,7 @@ func (s *Server) formatModuleList() string {
 type file struct {
 	// TODO: store relative to the root to conserve RAM
 	path    string
+	wpath   string
 	regular bool
 }
 
@@ -62,7 +65,7 @@ type fileList struct {
 	files     []file
 }
 
-func (s *Server) sendFileList(c *rsyncConn, root string, opts rsyncOpts) (*fileList, error) {
+func (s *Server) sendFileList(c *rsyncConn, mod Module, opts rsyncOpts, paths []string) (*fileList, error) {
 	var fileList fileList
 	fec := &rsyncBuffer{}
 
@@ -74,159 +77,175 @@ func (s *Server) sendFileList(c *rsyncConn, root string, opts rsyncOpts) (*fileL
 	// TODO: handle info == nil case (permission denied?): should set an i/o
 	// error flag, but traversal should continue
 
-	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
-		// log.Printf("filepath.WalkFn(path=%s)", path)
-		if err != nil {
-			return err
+	log.Printf("sendFileList(module=%q)", mod.Name)
+	// TODO: handle |root| referring to an individual file, symlink or special (skip)
+	for _, requested := range paths {
+		modRoot := mod.Path
+		log.Printf("  path %q (module root %q)", requested, modRoot)
+		root := strings.TrimPrefix(requested, mod.Name+"/")
+		root = filepath.Clean(mod.Path + "/" + root)
+		// log.Printf("  filepath.Walk(%q)", root)
+		strip := filepath.Dir(filepath.Clean(root)) + "/"
+		if strings.HasSuffix(requested, "/") {
+			strip = filepath.Clean(root) + "/"
 		}
-
-		fileList.files = append(fileList.files, file{
-			path:    path,
-			regular: info.Mode().IsRegular(),
-		})
-
-		// Only ever transmit long names, like openrsync
-		flags := byte(rsync.FLIST_NAME_LONG)
-
-		name := strings.TrimPrefix(path, root+"/")
-		if path == root {
-			name = "."
-			flags |= rsync.FLIST_TOP_LEVEL
-		}
-		// log.Printf("flags for %s: %v", name, flags)
-
-		// 1.   status byte (integer)
-		fec.writeByte(flags)
-
-		// 2.   inherited filename length (optional, byte)
-		// 3.   filename length (integer or byte)
-		fec.writeInt32(int32(len(name)))
-
-		// 4.   file (byte array)
-		fec.writeString(name)
-
-		// 5.   file length (long)
-		fec.writeInt64(info.Size())
-
-		fileList.totalSize += info.Size()
-
-		// 6.   file modification time (optional, integer)
-		// TODO: this will overflow in 2038! :(
-		fec.writeInt32(int32(info.ModTime().Unix()))
-
-		// 7.   file mode (optional, mode_t, integer)
-		mode := int32(info.Mode() & os.ModePerm)
-		isDev := false
-		isSpecial := false
-		// as per /usr/include/bits/stat.h:
-		const (
-			S_IFDIR  = 0o0040000 // Directory
-			S_IFCHR  = 0o0020000 // Character device
-			S_IFBLK  = 0o0060000 // Block device
-			S_IFREG  = 0o0100000 // Regular file
-			S_IFIFO  = 0o0010000 // FIFO
-			S_IFLNK  = 0o0120000 // Symbolic link
-			S_IFSOCK = 0o0140000 // Socket
-		)
-		if info.Mode().IsDir() {
-			mode |= S_IFDIR
-		} else if info.Mode().IsRegular() {
-			mode |= S_IFREG
-		} else if info.Mode().Type()&os.ModeSymlink != 0 {
-			mode |= S_IFLNK
-		}
-
-		if info.Mode().Type()&os.ModeCharDevice != 0 {
-			mode |= S_IFCHR
-			isDev = true
-		} else if info.Mode().Type()&os.ModeDevice != 0 {
-			mode |= S_IFBLK
-			isDev = true
-		}
-
-		if info.Mode().Type()&os.ModeNamedPipe != 0 {
-			mode |= S_IFIFO
-			isSpecial = true
-		}
-
-		if info.Mode().Type()&os.ModeSocket != 0 {
-			mode |= S_IFSOCK
-			isSpecial = true
-		}
-
-		fec.writeInt32(mode)
-
-		if opts.PreserveUid {
-			var uid int32
-			if st, ok := info.Sys().(*syscall.Stat_t); ok {
-				uid = int32(st.Uid)
-				if _, ok := uidMap[uid]; !ok && uid != 0 {
-					u, err := user.LookupId(strconv.Itoa(int(uid)))
-					if err != nil {
-						log.Printf("lookup(%d) = %v", uid, err)
-					} else {
-						uidMap[uid] = u.Username
-					}
-				}
-			}
-			// 8.   if -o, the user id (integer)
-			fec.writeInt32(uid)
-		}
-
-		if opts.PreserveGid {
-			var gid int32
-			if st, ok := info.Sys().(*syscall.Stat_t); ok {
-				gid = int32(st.Gid)
-				if _, ok := gidMap[gid]; !ok && gid != 0 {
-					g, err := user.LookupGroupId(strconv.Itoa(int(gid)))
-					if err != nil {
-						log.Printf("lookupgroup(%d) = %v", gid, err)
-					} else {
-						gidMap[gid] = g.Name
-					}
-				}
-			}
-			// 9.   if -g, the group id (integer)
-			fec.writeInt32(gid)
-		}
-
-		if (opts.PreserveDevices && isDev) ||
-			(opts.PreserveSpecials && isSpecial) {
-			// 10.  if a special file and -D, the device “rdev” type (integer)
-			sys, ok := info.Sys().(*syscall.Stat_t)
-			if !ok {
-				return fmt.Errorf("stat does not contain rdev")
-			}
-			fec.writeInt32(int32(sys.Rdev))
-		}
-
-		if opts.PreserveLinks && info.Mode().Type()&os.ModeSymlink != 0 {
-			// 11.  if a symbolic link and -l, the link target's length (integer)
-			// 12.  if a symbolic link and -l, the link target (byte array)
-			target, err := os.Readlink(path)
+		err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+			// log.Printf("filepath.WalkFn(path=%s)", path)
 			if err != nil {
-				return err // TODO
+				return err
 			}
-			fec.writeInt32(int32(len(target)))
-			fec.writeString(target)
+
+			// Only ever transmit long names, like openrsync
+			flags := byte(rsync.FLIST_NAME_LONG)
+
+			name := strings.TrimPrefix(path, strip)
+			// log.Printf("Trim(path=%q, %q) = %q", path, strip, name)
+			if name == root {
+				name = "."
+				flags |= rsync.FLIST_TOP_LEVEL
+			}
+			// log.Printf("flags for %q: %v", name, flags)
+
+			fileList.files = append(fileList.files, file{
+				path:    path,
+				regular: info.Mode().IsRegular(),
+				wpath:   name,
+			})
+
+			// 1.   status byte (integer)
+			fec.writeByte(flags)
+
+			// 2.   inherited filename length (optional, byte)
+			// 3.   filename length (integer or byte)
+			fec.writeInt32(int32(len(name)))
+
+			// 4.   file (byte array)
+			fec.writeString(name)
+
+			// 5.   file length (long)
+			fec.writeInt64(info.Size())
+
+			fileList.totalSize += info.Size()
+
+			// 6.   file modification time (optional, integer)
+			// TODO: this will overflow in 2038! :(
+			fec.writeInt32(int32(info.ModTime().Unix()))
+
+			// 7.   file mode (optional, mode_t, integer)
+			mode := int32(info.Mode() & os.ModePerm)
+			isDev := false
+			isSpecial := false
+			// as per /usr/include/bits/stat.h:
+			const (
+				S_IFDIR  = 0o0040000 // Directory
+				S_IFCHR  = 0o0020000 // Character device
+				S_IFBLK  = 0o0060000 // Block device
+				S_IFREG  = 0o0100000 // Regular file
+				S_IFIFO  = 0o0010000 // FIFO
+				S_IFLNK  = 0o0120000 // Symbolic link
+				S_IFSOCK = 0o0140000 // Socket
+			)
+			if info.Mode().IsDir() {
+				mode |= S_IFDIR
+			} else if info.Mode().IsRegular() {
+				mode |= S_IFREG
+			} else if info.Mode().Type()&os.ModeSymlink != 0 {
+				mode |= S_IFLNK
+				// TODO: skip symlink if PreserveSymlinks is not set
+			}
+
+			if info.Mode().Type()&os.ModeCharDevice != 0 {
+				mode |= S_IFCHR
+				isDev = true
+			} else if info.Mode().Type()&os.ModeDevice != 0 {
+				mode |= S_IFBLK
+				isDev = true
+			}
+
+			if info.Mode().Type()&os.ModeNamedPipe != 0 {
+				mode |= S_IFIFO
+				isSpecial = true
+			}
+
+			if info.Mode().Type()&os.ModeSocket != 0 {
+				mode |= S_IFSOCK
+				isSpecial = true
+			}
+
+			fec.writeInt32(mode)
+
+			if opts.PreserveUid {
+				var uid int32
+				if st, ok := info.Sys().(*syscall.Stat_t); ok {
+					uid = int32(st.Uid)
+					if _, ok := uidMap[uid]; !ok && uid != 0 {
+						u, err := user.LookupId(strconv.Itoa(int(uid)))
+						if err != nil {
+							log.Printf("lookup(%d) = %v", uid, err)
+						} else {
+							uidMap[uid] = u.Username
+						}
+					}
+				}
+				// 8.   if -o, the user id (integer)
+				fec.writeInt32(uid)
+			}
+
+			if opts.PreserveGid {
+				var gid int32
+				if st, ok := info.Sys().(*syscall.Stat_t); ok {
+					gid = int32(st.Gid)
+					if _, ok := gidMap[gid]; !ok && gid != 0 {
+						g, err := user.LookupGroupId(strconv.Itoa(int(gid)))
+						if err != nil {
+							log.Printf("lookupgroup(%d) = %v", gid, err)
+						} else {
+							gidMap[gid] = g.Name
+						}
+					}
+				}
+				// 9.   if -g, the group id (integer)
+				fec.writeInt32(gid)
+			}
+
+			if (opts.PreserveDevices && isDev) ||
+				(opts.PreserveSpecials && isSpecial) {
+				// 10.  if a special file and -D, the device “rdev” type (integer)
+				sys, ok := info.Sys().(*syscall.Stat_t)
+				if !ok {
+					return fmt.Errorf("stat does not contain rdev")
+				}
+				fec.writeInt32(int32(sys.Rdev))
+			}
+
+			if opts.PreserveLinks && info.Mode().Type()&os.ModeSymlink != 0 {
+				// 11.  if a symbolic link and -l, the link target's length (integer)
+				// 12.  if a symbolic link and -l, the link target (byte array)
+				target, err := os.Readlink(path)
+				if err != nil {
+					return err // TODO
+				}
+				fec.writeInt32(int32(len(target)))
+				fec.writeString(target)
+			}
+
+			// The status byte may consist of the following bits and determines which of the optional fields are transmitted.
+
+			// 0x01    A top-level directory.  (Only applies to directory files.)  If specified, the matching local directory is for deletions.
+			// 0x02    Do not send the file mode: it is a repeat of the last file's mode.
+			// 0x08    Like 0x02, but for the user id.
+			// 0x10    Like 0x02, but for the group id.
+			// 0x20    Inherit some of the prior file name.  Enables the inherited filename length transmission.
+			// 0x40    Use full integer length for file name.  Otherwise, use only the byte length.
+			// 0x80    Do not send the file modification time: it is a repeat of the last file's.
+
+			// If the status byte is zero, the file-list has terminated.
+
+			return nil
+		})
+		if err != nil {
+			return nil, err
 		}
-
-		// The status byte may consist of the following bits and determines which of the optional fields are transmitted.
-
-		// 0x01    A top-level directory.  (Only applies to directory files.)  If specified, the matching local directory is for deletions.
-		// 0x02    Do not send the file mode: it is a repeat of the last file's mode.
-		// 0x08    Like 0x02, but for the user id.
-		// 0x10    Like 0x02, but for the group id.
-		// 0x20    Inherit some of the prior file name.  Enables the inherited filename length transmission.
-		// 0x40    Use full integer length for file name.  Otherwise, use only the byte length.
-		// 0x80    Do not send the file modification time: it is a repeat of the last file's.
-
-		// If the status byte is zero, the file-list has terminated.
-
-		return nil
-	})
-	if err != nil {
-		return nil, err
 	}
 
 	const endOfFileList = 0
@@ -545,6 +564,16 @@ func (s *Server) handleConn(conn net.Conn) (err error) {
 		opts.PreserveSpecials = true
 	}
 	log.Printf("remaining: %q", remaining)
+	// remaining[0] is always "."
+	// remaining[1] is the first directory
+	if len(remaining) < 2 {
+		return fmt.Errorf("invalid args: at least one directory required")
+	}
+	if got, want := remaining[0], "."; got != want {
+		return fmt.Errorf("protocol error: got %q, expected %q", got, want)
+	}
+	paths := remaining[1:]
+
 	// TODO: verify --sender is set and error out otherwise
 
 	// “SHOULD be unique to each connection” as per
@@ -591,12 +620,19 @@ func (s *Server) handleConn(conn net.Conn) (err error) {
 	// https://github.com/kristapsdz/openrsync/blob/master/rsync.5
 
 	// send file list
-	fileList, err := s.sendFileList(c, module.Path, opts)
+	fileList, err := s.sendFileList(c, module, opts, paths)
 	if err != nil {
 		return err
 	}
 
 	log.Printf("file list sent")
+
+	// Sort the file list. The client sorts, so we need to sort, too (in the
+	// same way!), otherwise our indices do not match what the client will
+	// request.
+	sort.Slice(fileList.files, func(i, j int) bool {
+		return fileList.files[i].wpath < fileList.files[j].wpath
+	})
 
 	// TODO: read exclusion list (always zero)
 	got, err := c.readInt32()

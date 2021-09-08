@@ -19,6 +19,7 @@ type TestServer struct {
 func InteropModMap(path string) map[string]rsyncd.Module {
 	return map[string]rsyncd.Module{
 		"interop": rsyncd.Module{
+			Name: "interop",
 			Path: path,
 		},
 	}
