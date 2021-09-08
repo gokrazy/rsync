@@ -271,7 +271,9 @@ type rsyncOpts struct {
 }
 
 func (c *rsyncConn) sendFile(fileIndex int32, fl file) error {
-	const chunkSize = 32 * 1024 // rsync/rsync.h
+	// rsync/rsync.h defines chunkSize as 32 * 1024, but increasing it to 256K
+	// increases throughput with “tridge” rsync as client by 50 Mbit/s.
+	const chunkSize = 256 * 1024
 
 	f, err := os.Open(fl.path)
 	if err != nil {
