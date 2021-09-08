@@ -18,6 +18,7 @@ import (
 	"github.com/DavidGamba/go-getoptions"
 	"github.com/mmcloughlin/md4"
 	"github.com/stapelberg/rsync-os/rsync"
+	"golang.org/x/sync/errgroup"
 )
 
 type Module struct {
@@ -298,6 +299,28 @@ func (c *rsyncConn) sendFile(fileIndex int32, fl file) error {
 
 	h := md4.New()
 	binary.Write(h, binary.LittleEndian, c.seed)
+
+	// Calculate the md4 hash in a goroutine.
+	//
+	// This allows an rsync connection to benefit from more than 1 core!
+	//
+	// We calculate the hash by opening the same file again and reading
+	// independently. This keeps the hot loop below focused on shoveling data
+	// into the network socket as quickly as possible.
+	var eg errgroup.Group
+	eg.Go(func() error {
+		f, err := os.Open(fl.path)
+		if err != nil {
+			return err
+		}
+		defer f.Close()
+		var buf [chunkSize]byte
+		if _, err := io.CopyBuffer(h, f, buf[:]); err != nil {
+			return err
+		}
+		return nil
+	})
+
 	buf := make([]byte, chunkSize)
 	for {
 		n, err := f.Read(buf)
@@ -315,7 +338,6 @@ func (c *rsyncConn) sendFile(fileIndex int32, fl file) error {
 		if _, err := c.wr.Write(chunk); err != nil {
 			return err
 		}
-		h.Write(chunk)
 	}
 	// transfer finished:
 	if err := c.writeInt32(0); err != nil {
@@ -323,6 +345,9 @@ func (c *rsyncConn) sendFile(fileIndex int32, fl file) error {
 	}
 
 	// whole file long checksum (16 bytes)
+	if err := eg.Wait(); err != nil {
+		return err
+	}
 	sum := h.Sum(nil)
 	// log.Printf("sum: %x (len = %d)", sum, len(sum))
 	if _, err := c.wr.Write(sum); err != nil {
