@@ -81,9 +81,11 @@ Transfer complete: 5.5 KB sent, 1.2 KB read, 666 B file size
 
 ### Bandwidth
 
-In my tests, `gokr-rsyncd` can easily transfer data at ≈ 2 Gbit/s. The current
-bottleneck is the `golang.org/x/crypto/md4` implementation. With a faster
-implementation, we would be able to fill a 10 Gbit/s link!
+In my tests, `gokr-rsyncd` can easily transfer data at > 6 Gbit/s. The current
+bottleneck is the MD4 algorithm itself (not sure whether in the “tridge” rsync
+client, or in `gokr-rsyncd`). Implementing support for more recent protocol
+versions would help here, as these include hash algorithm negotiation with more
+recent choices.
 
 ### Protocol related limitations
 
