@@ -1,7 +1,7 @@
 //go:build !linux || nonamespacing
 // +build !linux nonamespacing
 
-package main
+package maincmd
 
 import (
 	"errors"
