@@ -5,6 +5,7 @@ import (
 	"net"
 	"testing"
 
+	"github.com/gokrazy/rsync/internal/config"
 	"github.com/gokrazy/rsync/internal/rsyncd"
 )
 
@@ -16,16 +17,16 @@ type TestServer struct {
 
 // InteropModMap is a convenience function to define an rsync module named
 // “interop” with the specified path.
-func InteropModMap(path string) map[string]rsyncd.Module {
-	return map[string]rsyncd.Module{
-		"interop": rsyncd.Module{
+func InteropModMap(path string) map[string]config.Module {
+	return map[string]config.Module{
+		"interop": config.Module{
 			Name: "interop",
 			Path: path,
 		},
 	}
 }
 
-func New(t *testing.T, modMap map[string]rsyncd.Module) *TestServer {
+func New(t *testing.T, modMap map[string]config.Module) *TestServer {
 	srv := &rsyncd.Server{
 		Modules: modMap,
 	}

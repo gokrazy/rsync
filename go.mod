@@ -3,6 +3,7 @@ module github.com/gokrazy/rsync
 go 1.17
 
 require (
+	github.com/BurntSushi/toml v0.4.1
 	github.com/DavidGamba/go-getoptions v0.23.0
 	github.com/coreos/go-systemd v0.0.0-20191104093116-d3cd4ed1dbcf
 	github.com/google/go-cmp v0.5.6

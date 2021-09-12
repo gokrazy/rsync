@@ -3,6 +3,7 @@ package rsync_test
 import (
 	"bytes"
 	"io/ioutil"
+	"log"
 	"net"
 	"os"
 	"os/exec"
@@ -11,12 +12,40 @@ import (
 	"syscall"
 	"testing"
 
+	"github.com/BurntSushi/toml"
+	"github.com/gokrazy/rsync/internal/config"
+	"github.com/gokrazy/rsync/internal/maincmd"
 	"github.com/gokrazy/rsync/internal/rsynctest"
 	"github.com/google/go-cmp/cmp"
 	"golang.org/x/sys/unix"
 )
 
+func TestMain(m *testing.M) {
+	if len(os.Args) > 1 && os.Args[1] == "localhost" {
+		// Strip first 2 args (./rsync.test localhost) from command line:
+		// rsync(1) is calling this process as a remote shell.
+		os.Args = os.Args[2:]
+		if err := maincmd.Main(); err != nil {
+			log.Fatal(err)
+		}
+	} else {
+		os.Exit(m.Run())
+	}
+}
+
 // TODO: non-empty exclusion list
+
+func TestRsyncVersion(t *testing.T) {
+	// This function is not an actual test, just used to include the rsync
+	// version in test output.
+	rsync := exec.Command("rsync", //"/home/michael/src/openrsync/openrsync",
+		"--version")
+	rsync.Stdout = os.Stdout
+	rsync.Stderr = os.Stderr
+	if err := rsync.Run(); err != nil {
+		t.Fatalf("%v: %v", rsync.Args, err)
+	}
+}
 
 func TestModuleListing(t *testing.T) {
 	tmp := t.TempDir()
@@ -138,16 +167,8 @@ func TestInterop(t *testing.T) {
 	//      time.Sleep(1 * time.Second)
 	// 	}
 
-	rsync := exec.Command("rsync", //"/home/michael/src/openrsync/openrsync",
-		"--version")
-	rsync.Stdout = os.Stdout
-	rsync.Stderr = os.Stderr
-	if err := rsync.Run(); err != nil {
-		t.Fatalf("%v: %v", rsync.Args, err)
-	}
-
 	// dry run (slight differences in protocol)
-	rsync = exec.Command("rsync", //"/home/michael/src/openrsync/openrsync",
+	rsync := exec.Command("rsync", //"/home/michael/src/openrsync/openrsync",
 		//		"--debug=all4",
 		"--archive",
 		"-v", "-v", "-v", "-v",
@@ -294,16 +315,8 @@ func TestInteropSubdir(t *testing.T) {
 	// start a server to sync from
 	srv := rsynctest.New(t, rsynctest.InteropModMap(source))
 
-	rsync := exec.Command("rsync", //"/home/michael/src/openrsync/openrsync",
-		"--version")
-	rsync.Stdout = os.Stdout
-	rsync.Stderr = os.Stderr
-	if err := rsync.Run(); err != nil {
-		t.Fatalf("%v: %v", rsync.Args, err)
-	}
-
 	// sync into dest dir
-	rsync = exec.Command("rsync", //"/home/michael/src/openrsync/openrsync",
+	rsync := exec.Command("rsync", //"/home/michael/src/openrsync/openrsync",
 		//		"--debug=all4",
 		"--archive",
 		"-v", "-v", "-v", "-v",
@@ -313,6 +326,148 @@ func TestInteropSubdir(t *testing.T) {
 		dest)                                   // directly into dest
 	rsync.Stdout = os.Stdout
 	rsync.Stderr = os.Stderr
+	if err := rsync.Run(); err != nil {
+		t.Fatalf("%v: %v", rsync.Args, err)
+	}
+
+	{
+		want := []byte("expensive")
+		got, err := ioutil.ReadFile(filepath.Join(dest, "dummy"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if diff := cmp.Diff(want, got); diff != "" {
+			t.Fatalf("unexpected file contents: diff (-want +got):\n%s", diff)
+		}
+	}
+
+	{
+		want := []byte("cheap")
+		got, err := ioutil.ReadFile(filepath.Join(dest, "cheap", "dummy"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if diff := cmp.Diff(want, got); diff != "" {
+			t.Fatalf("unexpected file contents: diff (-want +got):\n%s", diff)
+		}
+	}
+}
+
+func TestInteropRemoteCommand(t *testing.T) {
+	tmp := t.TempDir()
+	source := filepath.Join(tmp, "source")
+	dest := filepath.Join(tmp, "dest")
+
+	// create files in source to be copied
+	subDirs := []string{"expensive", "cheap"}
+	for _, subdir := range subDirs {
+		dummy := filepath.Join(source, subdir, "dummy")
+		if err := os.MkdirAll(filepath.Dir(dummy), 0755); err != nil {
+			t.Fatal(err)
+		}
+		if err := ioutil.WriteFile(dummy, []byte(subdir), 0644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// sync into dest dir
+	rsync := exec.Command("rsync", //*/ "/home/michael/src/openrsync/openrsync",
+		//		"--debug=all4",
+		"--archive",
+		"--protocol=27",
+		"-v", "-v", "-v", "-v",
+		"-e", os.Args[0],
+		"localhost:"+source+"/expensive/", // copy contents of interop
+		":"+source+"/cheap",               // copy cheap directory
+		dest)                              // directly into dest
+	rsync.Stdout = os.Stdout
+	rsync.Stderr = os.Stderr
+	if err := rsync.Run(); err != nil {
+		t.Fatalf("%v: %v", rsync.Args, err)
+	}
+
+	{
+		want := []byte("expensive")
+		got, err := ioutil.ReadFile(filepath.Join(dest, "dummy"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if diff := cmp.Diff(want, got); diff != "" {
+			t.Fatalf("unexpected file contents: diff (-want +got):\n%s", diff)
+		}
+	}
+
+	{
+		want := []byte("cheap")
+		got, err := ioutil.ReadFile(filepath.Join(dest, "cheap", "dummy"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if diff := cmp.Diff(want, got); diff != "" {
+			t.Fatalf("unexpected file contents: diff (-want +got):\n%s", diff)
+		}
+	}
+}
+
+func TestInteropRemoteDaemon(t *testing.T) {
+	tmp := t.TempDir()
+	source := filepath.Join(tmp, "source")
+	dest := filepath.Join(tmp, "dest")
+
+	// create files in source to be copied
+	subDirs := []string{"expensive", "cheap"}
+	for _, subdir := range subDirs {
+		dummy := filepath.Join(source, subdir, "dummy")
+		if err := os.MkdirAll(filepath.Dir(dummy), 0755); err != nil {
+			t.Fatal(err)
+		}
+		if err := ioutil.WriteFile(dummy, []byte(subdir), 0644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	homeDir := filepath.Join(tmp, "home")
+	{
+		// in remote daemon mode, rsync needs a config file, so we create one and
+		// set the HOME environment variable such that gokr-rsyncd will pick it up.
+		cfg := config.Config{
+			Modules: []config.Module{
+				{Name: "interop", Path: source},
+			},
+		}
+		configPath := filepath.Join(homeDir, ".config", "gokr-rsyncd.toml")
+		if err := os.MkdirAll(filepath.Dir(configPath), 0755); err != nil {
+			t.Fatal(err)
+		}
+		f, err := os.Create(configPath)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer f.Close()
+		if err := toml.NewEncoder(f).Encode(&cfg); err != nil {
+			t.Fatal(err)
+		}
+		if err := f.Close(); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// TODO: this does not seem to work when using openrsync?
+	// does openrsync send the wrong command?
+
+	// sync into dest dir
+	rsync := exec.Command("rsync", //*/ "/home/michael/src/openrsync/openrsync",
+		//		"--debug=all4",
+		"--archive",
+		"-v", "-v", "-v", "-v",
+		"-e", os.Args[0],
+		"rsync://localhost/interop/expensive/", // copy contents of interop
+		"rsync://localhost/interop/cheap",      // copy cheap directory
+		dest)                                   // directly into dest
+	rsync.Stdout = os.Stdout
+	rsync.Stderr = os.Stderr
+	rsync.Env = append(os.Environ(),
+		"HOME="+homeDir)
 	if err := rsync.Run(); err != nil {
 		t.Fatalf("%v: %v", rsync.Args, err)
 	}

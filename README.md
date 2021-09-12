@@ -35,7 +35,7 @@ To serve the current directory via rsync on `localhost:8730`, use:
 
 ```
 go install github.com/gokrazy/rsync/cmd/gokr-rsyncd
-gokr-rsyncd -modulemap=pwd=$PWD
+gokr-rsyncd --daemon --gokr.listen=localhost:8730 --gokr.modulemap=pwd=$PWD
 ```
 
 You can then copy the contents of the current directory with clients such as

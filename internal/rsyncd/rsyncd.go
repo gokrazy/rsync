@@ -17,24 +17,20 @@ import (
 	"syscall"
 
 	"github.com/DavidGamba/go-getoptions"
+	"github.com/gokrazy/rsync/internal/config"
 	"github.com/mmcloughlin/md4"
 	"github.com/stapelberg/rsync-os/rsync"
 	"golang.org/x/sync/errgroup"
 )
 
-type Module struct {
-	Name string
-	Path string
-}
-
 type Server struct {
-	Modules map[string]Module
+	Modules map[string]config.Module
 }
 
-func (s *Server) getModule(requestedModule string) (Module, error) {
+func (s *Server) getModule(requestedModule string) (config.Module, error) {
 	m, ok := s.Modules[requestedModule]
 	if !ok {
-		return Module{}, fmt.Errorf("no such module")
+		return config.Module{}, fmt.Errorf("no such module")
 	}
 	return m, nil
 }
@@ -65,7 +61,7 @@ type fileList struct {
 	files     []file
 }
 
-func (s *Server) sendFileList(c *rsyncConn, mod Module, opts rsyncOpts, paths []string) (*fileList, error) {
+func (s *Server) sendFileList(c *rsyncConn, mod config.Module, opts *Opts, paths []string) (*fileList, error) {
 	var fileList fileList
 	fec := &rsyncBuffer{}
 
@@ -275,7 +271,14 @@ func (s *Server) sendFileList(c *rsyncConn, mod Module, opts rsyncOpts, paths []
 	return &fileList, nil
 }
 
-type rsyncOpts struct {
+type Opts struct {
+	Gokrazy struct {
+		Listen           string
+		MonitoringListen string
+		ModuleMap        string
+	}
+
+	Daemon           bool
 	Server           bool
 	Sender           bool
 	PreserveGid      bool
@@ -288,6 +291,45 @@ type rsyncOpts struct {
 	Recurse          bool
 	IgnoreTimes      bool
 	DryRun           bool
+	D                bool
+}
+
+func NewGetOpt() (*Opts, *getoptions.GetOpt) {
+	var opts Opts
+	// rsync itself uses /usr/include/popt.h for option parsing
+	opt := getoptions.New()
+
+	// rsync (but not openrsync) bundles short options together, i.e. it sends
+	// e.g. -logDtpr
+	opt.SetMode(getoptions.Bundling)
+
+	opt.Bool("help", false, opt.Alias("h"))
+
+	// gokr-rsyncd flags
+	opt.StringVar(&opts.Gokrazy.Listen, "gokr.listen", "", opt.Description("[host]:port listen address for the rsync daemon protocol"))
+	opt.StringVar(&opts.Gokrazy.MonitoringListen, "gokr.monitoring_listen", "", opt.Description("optional [host]:port listen address for a HTTP debug interface"))
+	opt.StringVar(&opts.Gokrazy.ModuleMap, "gokr.modulemap", "nonex=/nonexistant/path", opt.Description("<modulename>=<path> pairs for quick setup of the server, without a config file"))
+
+	// rsync-compatible flags
+	opt.BoolVar(&opts.Daemon, "daemon", false, opt.Description("run as an rsync daemon"))
+	opt.BoolVar(&opts.Server, "server", false)
+	opt.BoolVar(&opts.Sender, "sender", false)
+	opt.BoolVar(&opts.PreserveGid, "group", false, opt.Alias("g"))
+	opt.BoolVar(&opts.PreserveUid, "owner", false, opt.Alias("o"))
+	opt.BoolVar(&opts.PreserveLinks, "links", false, opt.Alias("l"))
+	// TODO: implement PreservePerms
+	opt.BoolVar(&opts.PreservePerms, "perms", false, opt.Alias("p"))
+	opt.BoolVar(&opts.D, "D", false)
+	opt.BoolVar(&opts.Recurse, "recursive", false, opt.Alias("r"))
+	// TODO: implement PreserveTimes
+	opt.BoolVar(&opts.PreserveTimes, "times", false, opt.Alias("t"))
+	opt.Bool("v", false)     // verbosity; ignored
+	opt.Bool("debug", false) // debug; ignored
+	// TODO: implement IgnoreTimes
+	opt.BoolVar(&opts.IgnoreTimes, "ignore-times", false, opt.Alias("I"))
+	opt.BoolVar(&opts.DryRun, "dry-run", false, opt.Alias("n"))
+
+	return &opts, opt
 }
 
 func (c *rsyncConn) sendFile(fileIndex int32, fl file) error {
@@ -471,18 +513,25 @@ func (w *countingWriter) Write(p []byte) (n int, err error) {
 	return n, err
 }
 
-func (s *Server) handleConn(conn net.Conn) (err error) {
+func CounterPair(r io.Reader, w io.Writer) (*countingReader, *countingWriter) {
+	crd := &countingReader{r: r}
+	cwr := &countingWriter{w: w}
+	return crd, cwr
+}
+
+// protocol version 27 seems to be the safest bet for wide compatibility:
+// version 27 was introduced by rsync 2.6.0 (released 2004), and is
+// supported by openrsync and rsyn.
+const protocolVersion = 27
+
+func (s *Server) HandleDaemonConn(conn io.ReadWriter) (err error) {
 	const terminationCommand = "@RSYNCD: OK\n"
 	crd := &countingReader{r: conn}
 	cwr := &countingWriter{w: conn}
 	rd := bufio.NewReader(crd)
 	// send server greeting
 
-	// protocol version 27 seems to be the safest bet for wide compatibility:
-	// version 27 was introduced by rsync 2.6.0 (released 2004), and is
-	// supported by openrsync and rsyn.
-	const protocolVersion = "27"
-	fmt.Fprintf(cwr, "@RSYNCD: %s\n", protocolVersion)
+	fmt.Fprintf(cwr, "@RSYNCD: %d\n", protocolVersion)
 
 	// read client greeting
 	clientGreeting, err := rd.ReadString('\n')
@@ -492,6 +541,7 @@ func (s *Server) handleConn(conn net.Conn) (err error) {
 	if !strings.HasPrefix(clientGreeting, "@RSYNCD: ") {
 		return fmt.Errorf("invalid client greeting: got %q", clientGreeting)
 	}
+	// TODO: protocol negotiation
 
 	// read requested module(s), if any
 	requestedModule, err := rd.ReadString('\n')
@@ -530,27 +580,7 @@ func (s *Server) handleConn(conn net.Conn) (err error) {
 	}
 
 	log.Printf("flags: %+v", flags)
-	var opts rsyncOpts
-	// rsync itself uses /usr/include/popt.h for option parsing
-	opt := getoptions.New()
-
-	// rsync (but not openrsync) bundles short options together, i.e. it sends
-	// e.g. -logDtpr
-	opt.SetMode(getoptions.Bundling)
-
-	opt.BoolVar(&opts.Server, "server", false)
-	opt.BoolVar(&opts.Sender, "sender", false)
-	opt.BoolVar(&opts.PreserveGid, "group", false, opt.Alias("g"))
-	opt.BoolVar(&opts.PreserveUid, "owner", false, opt.Alias("o"))
-	opt.BoolVar(&opts.PreserveLinks, "links", false, opt.Alias("l"))
-	opt.BoolVar(&opts.PreservePerms, "perms", false, opt.Alias("p"))
-	dOpt := opt.Bool("D", false)
-	opt.BoolVar(&opts.Recurse, "recursive", false, opt.Alias("r"))
-	opt.BoolVar(&opts.PreserveTimes, "times", false, opt.Alias("t"))
-	opt.Bool("v", false)     // verbosity; ignored
-	opt.Bool("debug", false) // debug; ignored
-	opt.BoolVar(&opts.IgnoreTimes, "ignore-times", false, opt.Alias("I"))
-	opt.BoolVar(&opts.DryRun, "dry-run", false, opt.Alias("n"))
+	opts, opt := NewGetOpt()
 
 	//getoptions.Debug.SetOutput(os.Stderr)
 	remaining, err := opt.Parse(flags)
@@ -559,7 +589,7 @@ func (s *Server) handleConn(conn net.Conn) (err error) {
 		// supported
 		return fmt.Errorf("opt.Parse: %v", err)
 	}
-	if *dOpt {
+	if opts.D {
 		opts.PreserveDevices = true
 		opts.PreserveSpecials = true
 	}
@@ -576,6 +606,11 @@ func (s *Server) handleConn(conn net.Conn) (err error) {
 
 	// TODO: verify --sender is set and error out otherwise
 
+	return s.HandleConn(module, rd, crd, cwr, paths, opts, false)
+}
+
+// handleConn is equivalent to rsync/main.c:start_server
+func (s *Server) HandleConn(module config.Module, rd io.Reader, crd *countingReader, cwr *countingWriter, paths []string, opts *Opts, negotiate bool) (err error) {
 	// “SHOULD be unique to each connection” as per
 	// https://github.com/JohannesBuchner/Jarsync/blob/master/jarsync/rsync.txt
 	//
@@ -587,6 +622,17 @@ func (s *Server) handleConn(conn net.Conn) (err error) {
 		seed: sessionChecksumSeed,
 		rd:   rd,
 		wr:   cwr,
+	}
+
+	if negotiate {
+		remoteProtocol, err := c.readInt32()
+		if err != nil {
+			return err
+		}
+		log.Printf("remote protocol: %d", remoteProtocol)
+		if err := c.writeInt32(protocolVersion); err != nil {
+			return err
+		}
 	}
 
 	if err := c.writeInt32(c.seed); err != nil {
@@ -681,7 +727,7 @@ func (s *Server) Serve(ln net.Listener) error {
 		}
 		go func() {
 			defer conn.Close()
-			if err := s.handleConn(conn); err != nil {
+			if err := s.HandleDaemonConn(conn); err != nil {
 				log.Printf("[%s] handle: %v", conn.RemoteAddr(), err)
 			}
 		}()
