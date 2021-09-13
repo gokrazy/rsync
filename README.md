@@ -77,6 +77,70 @@ Transfer complete: 5.5 KB sent, 1.2 KB read, 666 B file size
 
 ```
 
+## Usage / Setup
+
+ | setup                                   | encrypted | authenticated      | private files?         | privileges                                                      | protocol version | config required                       |
+ |-----------------------------------------|-----------|--------------------|------------------------|-----------------------------------------------------------------|------------------|---------------------------------------|
+ | 1. rsync daemon protocol (TCP port 873) | ❌ no     | ⚠ rsync (insecure) | ❌ only world-readable | ✔ dropped + [namespace](#privileged-linux-including-gokrazyorg) | ✔ negotiated     | config required                       |
+ | 2. anon SSH (daemon)                    | ✔ yes     | ✔ rsync            | ❌ only world-readable | ✔ dropped + [namespace](#privileged-linux-including-gokrazyorg) | ✔ negotiated     | config required                       |
+ | 3. SSH (command)                        | ✔ yes     | ✔ SSH              | ✔ yes                  | ⚠ full user                                                     | ❌ assumed       | no config                             |
+ | 4. SSH (daemon)                         | ✔ yes     | ✔ SSH (+ rsync)    | ✔ yes                  | ⚠ full user                                                     | ✔ negotiated     | `~/.config/gokr-rsyncd.toml` required |
+
+### Setup 1: rsync daemon protocol (TCP port 873)
+
+Serving rsync daemon protocol on TCP port 873 is only safe where the network
+layer ensures trusted communication, e.g. in a local network (LAN), or when
+using [Tailscale](https://tailscale.com/) or similar. In untrusted networks,
+attackers can eavesdrop on file transfers and possibly even modify file
+contents.
+
+Prefer setup 2 instead.
+
+Example:
+* Server: `gokr-rsyncd --daemon --gokr.modulemap=module=/srv/rsync-module`
+* Client: `rsync rsync://webserver/module/path`
+
+### Setup 2: anon SSH (daemon)
+
+This setup is well suited for serving world-readable files without
+authentication.
+
+Example:
+* Server: `gokr-rsyncd --daemon --gokr.modulemap=module=/srv/rsync-module --gokr.anonssh_listen=:22873`
+* Client: `rsync -e ssh rsync://webserver/module/path`
+
+
+### Setup 3: SSH (command)
+
+This setup is well suited for interactive one-off transfers or regular backups,
+and uses SSH for both encryption and authentication.
+
+Note that because `gokr-rsyncd` is invoked with user privileges (not root
+privileges), it cannot do [namespacing](#privileged-linux-including-gokrazyorg)
+and hence retains more privileges. When serving public data, it is generally
+preferable to use setup 2 instead.
+
+Note that `rsync(1)` assumes the server process understands all flags that it
+sends, i.e. is running the same version on client and server, or at least a
+compatible-enough version. You can either specify `--protocol=27` on the client,
+or use setup 4, which negotiates the protocol version, side-stepping possible
+compatibility gaps between rsync clients and `gokr-rsyncd`.
+
+Example:
+* Server will be started via SSH
+* Client: `rsync --rsync-path=gokr-rsyncd webserver:path`
+
+### Setup 4: SSH (daemon)
+
+This setup is more reliable than setup 3 because the rsync protocol version will
+be negotiated between client and server. This setup is slightly inconvenient
+because it requires a config file to be present on the server in
+`~/.config/gokr-rsyncd.toml`.
+
+Example:
+* Server will be started via SSH
+* Client: `rsync -e ssh --rsync-path=gokr-rsyncd rsync://webserver/module/path`
+
 ## Limitations
 
 ### Bandwidth
@@ -184,10 +248,11 @@ Additional hardening recommendations:
 
 ### privileged Linux (including gokrazy.org)
 
-When started as `root` on Linux, `gokr-rsyncd` will create a mount namespace,
-mount all configured rsync modules read-only into the namespace, then change
-into the namespace using [`chroot(2)`](https://manpages.debian.org/chroot.2) and
-drop privileges using [`setuid(2)`](https://manpages.debian.org/setuid.2).
+When started as `root` on Linux, `gokr-rsyncd` will create a [Linux mount
+namespace](https://manpages.debian.org/mount_namespaces.7), mount all configured
+rsync modules read-only into the namespace, then change into the namespace using
+[`chroot(2)`](https://manpages.debian.org/chroot.2) and drop privileges using
+[`setuid(2)`](https://manpages.debian.org/setuid.2).
 
 **Tip:** you can verify which file system objects the daemon process can see by
 using `ls -l /proc/$(pidof gokr-rsyncd)/root/`.

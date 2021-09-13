@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/coreos/go-systemd/activation"
+	"github.com/gokrazy/rsync/internal/anonssh"
 	"github.com/gokrazy/rsync/internal/config"
 	"github.com/gokrazy/rsync/internal/rsyncd"
 
@@ -29,11 +30,11 @@ type readWriter struct {
 func (r *readWriter) Read(p []byte) (n int, err error)  { return r.r.Read(p) }
 func (r *readWriter) Write(p []byte) (n int, err error) { return r.w.Write(p) }
 
-func Main() error {
+func Main(args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer, cfg *config.Config) error {
 	opts, opt := rsyncd.NewGetOpt()
-	remaining, err := opt.Parse(os.Args[1:])
+	remaining, err := opt.Parse(args[1:])
 	if opt.Called("help") {
-		fmt.Fprintf(os.Stderr, opt.Help())
+		fmt.Fprintf(stderr, opt.Help())
 		os.Exit(1)
 	}
 	if err != nil {
@@ -45,16 +46,19 @@ func Main() error {
 	// Example: --server --daemon .
 	if opts.Daemon && opts.Server {
 		// start_daemon()
-		cfg, _, err := config.FromDefaultFiles()
-		if err != nil {
-			return err
+		if cfg == nil {
+			var err error
+			cfg, _, err = config.FromDefaultFiles()
+			if err != nil {
+				return err
+			}
 		}
 		srv := &rsyncd.Server{
 			Modules: cfg.ModuleMap,
 		}
 		rw := readWriter{
-			r: os.Stdin,
-			w: os.Stdout,
+			r: stdin,
+			w: stdout,
 		}
 		return srv.HandleDaemonConn(&rw)
 	}
@@ -78,7 +82,7 @@ func Main() error {
 		}
 		paths := remaining[1:]
 
-		crd, cwr := rsyncd.CounterPair(os.Stdin, os.Stdout)
+		crd, cwr := rsyncd.CounterPair(stdin, stdout)
 		rd := crd
 		return srv.HandleConn(mod, rd, crd, cwr, paths, opts, true)
 	}
@@ -92,31 +96,47 @@ func Main() error {
 	// calling convention: start a daemon in TCP listening mode (or with systemd
 	// socket activation)
 
-	cfg, cfgfn, err := config.FromDefaultFiles()
-	if err != nil {
-		if os.IsNotExist(err) {
-			// a non-existant config file is not an error: users can start
-			// gokr-rsyncd with e.g. the -gokr.listen and -gokr.modulemap flags.
-			cfg = &config.Config{
-				Listeners: []config.Listener{
-					{Rsyncd: opts.Gokrazy.Listen},
-				},
-				ModuleMap: make(map[string]config.Module),
+	if cfg == nil {
+		var cfgfn string
+		var err error
+		cfg, cfgfn, err = config.FromDefaultFiles()
+		if err != nil {
+			if os.IsNotExist(err) {
+				// a non-existant config file is not an error: users can start
+				// gokr-rsyncd with e.g. the -gokr.listen and -gokr.modulemap flags.
+				cfg = &config.Config{
+					Listeners: []config.Listener{
+						{
+							Rsyncd:  opts.Gokrazy.Listen,
+							AnonSSH: opts.Gokrazy.AnonSSHListen,
+						},
+					},
+					ModuleMap: make(map[string]config.Module),
+				}
+			} else {
+				return err
 			}
 		} else {
-			return err
+			log.Printf("config file %s loaded", cfgfn)
 		}
-	} else {
-		log.Printf("config file %s loaded", cfgfn)
 	}
 
-	if os.IsNotExist(err) && opts.Gokrazy.Listen == "" {
-		return fmt.Errorf("-gokr.listen not specified, and config file not found: %v", err)
+	if os.IsNotExist(err) &&
+		opts.Gokrazy.Listen == "" &&
+		opts.Gokrazy.AnonSSHListen == "" {
+		return fmt.Errorf("neither -gokr.listen nor -gokr.anonssh_listen specified, and config file not found: %v", err)
 	}
 
 	// TODO: loosen this restriction, create multiple listeners
-	if len(cfg.Listeners) != 1 || cfg.Listeners[0].Rsyncd == "" {
+	if len(cfg.Listeners) != 1 ||
+		(cfg.Listeners[0].Rsyncd == "" &&
+			cfg.Listeners[0].AnonSSH == "") {
 		return fmt.Errorf("not precisely 1 rsyncd listener specified")
+	}
+
+	listenAddr := cfg.Listeners[0].Rsyncd
+	if listenAddr == "" {
+		listenAddr = cfg.Listeners[0].AnonSSH
 	}
 
 	if moduleMap := opts.Gokrazy.ModuleMap; moduleMap != "" {
@@ -129,7 +149,7 @@ func Main() error {
 			Path: parts[1],
 		}
 	}
-	if err := namespace(cfg.ModuleMap, cfg.Listeners[0].Rsyncd); err == errIsParent {
+	if err := namespace(cfg.ModuleMap, listenAddr); err == errIsParent {
 		return nil
 	} else if err != nil {
 		return fmt.Errorf("namespace: %v", err)
@@ -160,11 +180,19 @@ func Main() error {
 		ln = listeners[0]
 	} else if err != nil || len(listeners) == 0 {
 		log.Printf("could not obtain listeners from systemd, creating listener")
-		ln, err = net.Listen("tcp", cfg.Listeners[0].Rsyncd)
+		ln, err = net.Listen("tcp", listenAddr)
 		if err != nil {
 			return err
 		}
 	}
+
+	if cfg.Listeners[0].AnonSSH != "" {
+		log.Printf("rsync daemon listening (anon SSH) on %s", ln.Addr())
+		return anonssh.Serve(ln, cfg, func(args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer) error {
+			return Main(args, stdin, stdout, stderr, cfg)
+		})
+	}
+
 	log.Printf("rsync daemon listening on rsync://%s", ln.Addr())
 	return srv.Serve(ln)
 }

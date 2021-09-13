@@ -1,15 +1,20 @@
 package rsynctest
 
 import (
+	"io"
 	"log"
 	"net"
 	"testing"
 
+	"github.com/gokrazy/rsync/internal/anonssh"
 	"github.com/gokrazy/rsync/internal/config"
+	"github.com/gokrazy/rsync/internal/maincmd"
 	"github.com/gokrazy/rsync/internal/rsyncd"
 )
 
 type TestServer struct {
+	listeners []config.Listener
+
 	// Port is the port on which the test server is listening on. Useful to pass
 	// to rsync’s --port option.
 	Port string
@@ -19,14 +24,31 @@ type TestServer struct {
 // “interop” with the specified path.
 func InteropModMap(path string) map[string]config.Module {
 	return map[string]config.Module{
-		"interop": config.Module{
+		"interop": {
 			Name: "interop",
 			Path: path,
 		},
 	}
 }
 
-func New(t *testing.T, modMap map[string]config.Module) *TestServer {
+type Option func(ts *TestServer)
+
+func Listeners(lns []config.Listener) Option {
+	return func(ts *TestServer) {
+		ts.listeners = lns
+	}
+}
+
+func New(t *testing.T, modMap map[string]config.Module, opts ...Option) *TestServer {
+	ts := &TestServer{}
+	for _, opt := range opts {
+		opt(ts)
+	}
+	if len(ts.listeners) == 0 {
+		ts.listeners = []config.Listener{
+			{Rsyncd: "localhost:0"},
+		}
+	}
 	srv := &rsyncd.Server{
 		Modules: modMap,
 	}
@@ -42,10 +64,18 @@ func New(t *testing.T, modMap map[string]config.Module) *TestServer {
 	if err != nil {
 		t.Fatal(err)
 	}
+	ts.Port = port
 
-	go srv.Serve(ln)
-
-	return &TestServer{
-		Port: port,
+	if ts.listeners[0].AnonSSH != "" {
+		cfg := &config.Config{
+			ModuleMap: modMap,
+		}
+		go anonssh.Serve(ln, cfg, func(args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer) error {
+			return maincmd.Main(args, stdin, stdout, stderr, cfg)
+		})
+	} else {
+		go srv.Serve(ln)
 	}
+
+	return ts
 }

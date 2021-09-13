@@ -9,12 +9,13 @@ package main
 
 import (
 	"log"
+	"os"
 
 	"github.com/gokrazy/rsync/internal/maincmd"
 )
 
 func main() {
-	if err := maincmd.Main(); err != nil {
+	if err := maincmd.Main(os.Args, os.Stdin, os.Stdout, os.Stderr, nil); err != nil {
 		log.Fatal(err)
 	}
 }

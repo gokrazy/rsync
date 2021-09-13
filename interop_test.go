@@ -25,7 +25,7 @@ func TestMain(m *testing.M) {
 		// Strip first 2 args (./rsync.test localhost) from command line:
 		// rsync(1) is calling this process as a remote shell.
 		os.Args = os.Args[2:]
-		if err := maincmd.Main(); err != nil {
+		if err := maincmd.Main(os.Args, os.Stdin, os.Stdout, os.Stderr, nil); err != nil {
 			log.Fatal(err)
 		}
 	} else {
@@ -468,6 +468,71 @@ func TestInteropRemoteDaemon(t *testing.T) {
 	rsync.Stderr = os.Stderr
 	rsync.Env = append(os.Environ(),
 		"HOME="+homeDir)
+	if err := rsync.Run(); err != nil {
+		t.Fatalf("%v: %v", rsync.Args, err)
+	}
+
+	{
+		want := []byte("expensive")
+		got, err := ioutil.ReadFile(filepath.Join(dest, "dummy"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if diff := cmp.Diff(want, got); diff != "" {
+			t.Fatalf("unexpected file contents: diff (-want +got):\n%s", diff)
+		}
+	}
+
+	{
+		want := []byte("cheap")
+		got, err := ioutil.ReadFile(filepath.Join(dest, "cheap", "dummy"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if diff := cmp.Diff(want, got); diff != "" {
+			t.Fatalf("unexpected file contents: diff (-want +got):\n%s", diff)
+		}
+	}
+}
+
+func TestInteropRemoteDaemonAnonSSH(t *testing.T) {
+	tmp := t.TempDir()
+	source := filepath.Join(tmp, "source")
+	dest := filepath.Join(tmp, "dest")
+
+	// create files in source to be copied
+	subDirs := []string{"expensive", "cheap"}
+	for _, subdir := range subDirs {
+		dummy := filepath.Join(source, subdir, "dummy")
+		if err := os.MkdirAll(filepath.Dir(dummy), 0755); err != nil {
+			t.Fatal(err)
+		}
+		if err := ioutil.WriteFile(dummy, []byte(subdir), 0644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// start a server to sync from
+	srv := rsynctest.New(t,
+		rsynctest.InteropModMap(source),
+		rsynctest.Listeners([]config.Listener{
+			{AnonSSH: "localhost:0"},
+		}))
+
+	// TODO: this does not seem to work when using openrsync?
+	// does openrsync send the wrong command?
+
+	// sync into dest dir
+	rsync := exec.Command("rsync", //*/ "/home/michael/src/openrsync/openrsync",
+		//		"--debug=all4",
+		"--archive",
+		"-v", "-v", "-v", "-v",
+		"-e", "ssh -o StrictHostKeyChecking=no -o CheckHostIP=no -o UserKnownHostsFile=/dev/null -p "+srv.Port,
+		"rsync://localhost/interop/expensive/", // copy contents of interop
+		"rsync://localhost/interop/cheap",      // copy cheap directory
+		dest)                                   // directly into dest
+	rsync.Stdout = os.Stdout
+	rsync.Stderr = os.Stderr
 	if err := rsync.Run(); err != nil {
 		t.Fatalf("%v: %v", rsync.Args, err)
 	}
