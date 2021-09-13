@@ -467,7 +467,8 @@ func TestInteropRemoteDaemon(t *testing.T) {
 	rsync.Stdout = os.Stdout
 	rsync.Stderr = os.Stderr
 	rsync.Env = append(os.Environ(),
-		"HOME="+homeDir)
+		"HOME="+homeDir,
+		"XDG_CONFIG_HOME="+homeDir+"/.config")
 	if err := rsync.Run(); err != nil {
 		t.Fatalf("%v: %v", rsync.Args, err)
 	}
