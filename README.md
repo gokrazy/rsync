@@ -167,8 +167,9 @@ Supported environments:
 
 In all environments, the default instructions will take care that:
 
-* (On Linux only) The host file system is made **read-only** for `gokr-rsyncd`,
-  to guard against accidental data exfiltration.
+* (On Linux only) Only configured rsync modules from the host file system are
+  mounted **read-only** into a Linux mount namespace for `gokr-rsyncd`, to guard
+  against data modification and data exfiltration.
 * `gokr-rsyncd` is running without privileges, as user `nobody`, to limit the
   scope of what an attacker can do when exploiting a vulnerability.
 
