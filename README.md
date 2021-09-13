@@ -1,7 +1,7 @@
 # gokrazy rsync
 
 [![tests](https://github.com/gokrazy/rsync/actions/workflows/main.yml/badge.svg)](https://github.com/gokrazy/rsync/actions/workflows/main.yml)
-[![Sourcegraph](https://sourcegraph.com/github.com/gokrazy/gokrazy/-/badge.svg)](https://sourcegraph.com/github.com/gokrazy/gokrazy?badge)
+[![Sourcegraph](https://sourcegraph.com/github.com/gokrazy/rsync/-/badge.svg)](https://sourcegraph.com/github.com/gokrazy/rsync??badge)
 
 Package rsync contains a native Go rsync implementation.
 
