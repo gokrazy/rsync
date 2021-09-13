@@ -198,7 +198,7 @@ In the opened editor, change the file to:
 ```
 [Service]
 ExecStart=
-ExecStart=/usr/bin/gokr-rsyncd -modulemap=pwd=/etc/tmpfiles.d
+ExecStart=/usr/bin/gokr-rsyncd --gokr.modulemap=pwd=/etc/tmpfiles.d
 ```
 
 Close the editor and install the service using:
@@ -236,7 +236,7 @@ docker run \
   -p 127.0.0.1:8730:8730 \
   -v /etc/tmpfiles.d:/srv/rsync:ro \
   stapelberg/gokrazy-rsync:latest \
-    -modulemap=pwd=/srv/rsync
+    --gokr.modulemap=pwd=/srv/rsync
 ```
 
 Additional hardening recommendations:
