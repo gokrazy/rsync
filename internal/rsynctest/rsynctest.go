@@ -70,9 +70,14 @@ func New(t *testing.T, modMap map[string]config.Module, opts ...Option) *TestSer
 		cfg := &config.Config{
 			ModuleMap: modMap,
 		}
-		go anonssh.Serve(ln, cfg, func(args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer) error {
-			return maincmd.Main(args, stdin, stdout, stderr, cfg)
-		})
+		go func() {
+			err := anonssh.Serve(ln, cfg, func(args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer) error {
+				return maincmd.Main(args, stdin, stdout, stderr, cfg)
+			})
+			if err != nil {
+				log.Print(err)
+			}
+		}()
 	} else {
 		go srv.Serve(ln)
 	}

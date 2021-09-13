@@ -1,8 +1,13 @@
 package anonssh
 
 import (
+	"bytes"
 	"context"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
 	"encoding/binary"
+	"encoding/pem"
 	"errors"
 	"fmt"
 	"io"
@@ -10,6 +15,7 @@ import (
 	"log"
 	"net"
 	"os"
+	"path/filepath"
 
 	"github.com/gokrazy/rsync/internal/config"
 	"github.com/google/shlex"
@@ -177,12 +183,57 @@ func (as *anonssh) handleChannel(newChan ssh.NewChannel) {
 	}
 }
 
-func loadHostKey(path string) (ssh.Signer, error) {
-	b, err := ioutil.ReadFile(path)
+func genHostKey(keyPath string) ([]byte, error) {
+	privateKey, err := rsa.GenerateKey(rand.Reader, 4096)
 	if err != nil {
 		return nil, err
 	}
 
+	privateKeyPEM := &pem.Block{
+		Type:  "RSA PRIVATE KEY",
+		Bytes: x509.MarshalPKCS1PrivateKey(privateKey),
+	}
+	f, err := os.OpenFile(keyPath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0600)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+
+	var buf bytes.Buffer
+	if err := pem.Encode(&buf, privateKeyPEM); err != nil {
+		return nil, err
+	}
+	if _, err := f.Write(buf.Bytes()); err != nil {
+		return nil, err
+	}
+	if err := f.Close(); err != nil {
+		return nil, err
+	}
+
+	return buf.Bytes(), nil
+}
+
+func loadHostKey() (ssh.Signer, error) {
+	dir, err := os.UserConfigDir()
+	if err != nil {
+		return nil, err
+	}
+	path := filepath.Join(dir, "gokr-rsyncd", "ssh_host_rsa_key")
+	b, err := ioutil.ReadFile(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+				return nil, err
+			}
+			b, err = genHostKey(path)
+			if err != nil {
+				return nil, err
+			}
+			// fall-through
+		} else {
+			return nil, err
+		}
+	}
 	return ssh.ParsePrivateKey(b)
 }
 
@@ -197,7 +248,7 @@ func Serve(ln net.Listener, cfg *config.Config, main mainFunc) error {
 		},
 	}
 
-	signer, err := loadHostKey("/tmp/rsync.host_key") // TODO: generate one and store it in ~/.config
+	signer, err := loadHostKey()
 	if err != nil {
 		return err
 	}
