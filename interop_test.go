@@ -519,15 +519,25 @@ func TestInteropRemoteDaemonAnonSSH(t *testing.T) {
 			{AnonSSH: "localhost:0"},
 		}))
 
-	// TODO: this does not seem to work when using openrsync?
-	// does openrsync send the wrong command?
+	// ensure the user running the tests (root when doing the privileged run!)
+	// has an SSH private key:
+	privKeyPath := filepath.Join(tmp, "ssh_private_key")
+	genKey := exec.Command("ssh-keygen",
+		"-N", "",
+		"-t", "rsa",
+		"-f", privKeyPath)
+	genKey.Stdout = os.Stdout
+	genKey.Stderr = os.Stderr
+	if err := genKey.Run(); err != nil {
+		t.Fatalf("%v: %v", genKey.Args, err)
+	}
 
 	// sync into dest dir
 	rsync := exec.Command("rsync", //*/ "/home/michael/src/openrsync/openrsync",
 		//		"--debug=all4",
 		"--archive",
 		"-v", "-v", "-v", "-v",
-		"-e", "ssh -o StrictHostKeyChecking=no -o CheckHostIP=no -o UserKnownHostsFile=/dev/null -p "+srv.Port,
+		"-e", "ssh -vv -o IdentityFile="+privKeyPath+" -o StrictHostKeyChecking=no -o CheckHostIP=no -o UserKnownHostsFile=/dev/null -p "+srv.Port,
 		"rsync://localhost/interop/expensive/", // copy contents of interop
 		"rsync://localhost/interop/cheap",      // copy cheap directory
 		dest)                                   // directly into dest
