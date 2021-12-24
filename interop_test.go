@@ -525,7 +525,7 @@ func TestInteropRemoteDaemonAnonSSH(t *testing.T) {
 	privKeyPath := filepath.Join(tmp, "ssh_private_key")
 	genKey := exec.Command("ssh-keygen",
 		"-N", "",
-		"-t", "rsa",
+		"-t", "ed25519",
 		"-f", privKeyPath)
 	genKey.Stdout = os.Stdout
 	genKey.Stderr = os.Stderr
