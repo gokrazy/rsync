@@ -20,5 +20,8 @@ jobs:
       run: |
         [ "$(gofmt -l $(find . -name '*.go') 2>&1)" = "" ]
 
+    - name: install rsync
+      run: sudo apt-get update && sudo apt-get install -y rsync
+
     - name: run tests
       run: go test -v ./internal/... && go test -c && sudo ./rsync.test -test.v
