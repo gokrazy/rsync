@@ -13,10 +13,10 @@ import (
 	"strconv"
 	"syscall"
 
-	"github.com/gokrazy/rsync/internal/rsyncd"
+	"github.com/gokrazy/rsync/internal/config"
 )
 
-func namespace(modMap map[string]rsyncd.Module, listen string) error {
+func namespace(modMap map[string]config.Module, listen string) error {
 	if os.Getenv("GOKRAZY_RSYNC_PRIVDROP") != "" {
 		log.Printf("pid %d (privileges dropped)", os.Getpid())
 
