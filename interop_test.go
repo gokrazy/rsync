@@ -231,7 +231,7 @@ func TestInterop(t *testing.T) {
 			if !ok {
 				t.Fatal("stat does not contain rdev")
 			}
-			if got, want := sys.Rdev, unix.Mkdev(1, 5); got != want {
+			if got, want := uint64(sys.Rdev), unix.Mkdev(1, 5); got != want {
 				t.Fatalf("unexpected rdev: got %v, want %v", got, want)
 			}
 		}
@@ -249,7 +249,7 @@ func TestInterop(t *testing.T) {
 			if !ok {
 				t.Fatal("stat does not contain rdev")
 			}
-			if got, want := sys.Rdev, unix.Mkdev(242, 9); got != want {
+			if got, want := uint64(sys.Rdev), unix.Mkdev(242, 9); got != want {
 				t.Fatalf("unexpected rdev: got %v, want %v", got, want)
 			}
 		}
