@@ -221,36 +221,52 @@ func TestInterop(t *testing.T) {
 
 	if os.Getuid() == 0 {
 		{
-			st, err := os.Stat(filepath.Join(dest, "char"))
+			sourcest, err := os.Stat(filepath.Join(source, "char"))
 			if err != nil {
 				t.Fatal(err)
 			}
-			if st.Mode().Type()&os.ModeCharDevice == 0 {
-				t.Fatalf("unexpected type: got %v, want character device", st.Mode())
+			destst, err := os.Stat(filepath.Join(dest, "char"))
+			if err != nil {
+				t.Fatal(err)
 			}
-			sys, ok := st.Sys().(*syscall.Stat_t)
+			if destst.Mode().Type()&os.ModeCharDevice == 0 {
+				t.Fatalf("unexpected type: got %v, want character device", destst.Mode())
+			}
+			destsys, ok := destst.Sys().(*syscall.Stat_t)
 			if !ok {
 				t.Fatal("stat does not contain rdev")
 			}
-			if got, want := uint64(sys.Rdev), unix.Mkdev(1, 5); got != want {
+			sourcesys, ok := sourcest.Sys().(*syscall.Stat_t)
+			if !ok {
+				t.Fatal("stat does not contain rdev")
+			}
+			if got, want := destsys.Rdev, sourcesys.Rdev; got != want {
 				t.Fatalf("unexpected rdev: got %v, want %v", got, want)
 			}
 		}
 
 		{
-			st, err := os.Stat(filepath.Join(dest, "block"))
+			sourcest, err := os.Stat(filepath.Join(source, "block"))
 			if err != nil {
 				t.Fatal(err)
 			}
-			if st.Mode().Type()&os.ModeDevice == 0 ||
-				st.Mode().Type()&os.ModeCharDevice != 0 {
-				t.Fatalf("unexpected type: got %v, want block device", st.Mode())
+			destst, err := os.Stat(filepath.Join(dest, "block"))
+			if err != nil {
+				t.Fatal(err)
 			}
-			sys, ok := st.Sys().(*syscall.Stat_t)
+			if destst.Mode().Type()&os.ModeDevice == 0 ||
+				destst.Mode().Type()&os.ModeCharDevice != 0 {
+				t.Fatalf("unexpected type: got %v, want block device", destst.Mode())
+			}
+			destsys, ok := destst.Sys().(*syscall.Stat_t)
 			if !ok {
 				t.Fatal("stat does not contain rdev")
 			}
-			if got, want := uint64(sys.Rdev), unix.Mkdev(242, 9); got != want {
+			sourcesys, ok := sourcest.Sys().(*syscall.Stat_t)
+			if !ok {
+				t.Fatal("stat does not contain rdev")
+			}
+			if got, want := destsys.Rdev, sourcesys.Rdev; got != want {
 				t.Fatalf("unexpected rdev: got %v, want %v", got, want)
 			}
 		}
