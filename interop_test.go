@@ -295,7 +295,9 @@ func TestInterop(t *testing.T) {
 
 }
 
-func TestInteropSubdir(t *testing.T) {
+func createSourceFiles(t *testing.T) (string, string, string) {
+	t.Helper()
+
 	tmp := t.TempDir()
 	source := filepath.Join(tmp, "source")
 	dest := filepath.Join(tmp, "dest")
@@ -311,6 +313,12 @@ func TestInteropSubdir(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
+
+	return tmp, source, dest
+}
+
+func TestInteropSubdir(t *testing.T) {
+	_, source, dest := createSourceFiles(t)
 
 	// start a server to sync from
 	srv := rsynctest.New(t, rsynctest.InteropModMap(source))
@@ -354,21 +362,7 @@ func TestInteropSubdir(t *testing.T) {
 }
 
 func TestInteropRemoteCommand(t *testing.T) {
-	tmp := t.TempDir()
-	source := filepath.Join(tmp, "source")
-	dest := filepath.Join(tmp, "dest")
-
-	// create files in source to be copied
-	subDirs := []string{"expensive", "cheap"}
-	for _, subdir := range subDirs {
-		dummy := filepath.Join(source, subdir, "dummy")
-		if err := os.MkdirAll(filepath.Dir(dummy), 0755); err != nil {
-			t.Fatal(err)
-		}
-		if err := ioutil.WriteFile(dummy, []byte(subdir), 0644); err != nil {
-			t.Fatal(err)
-		}
-	}
+	_, source, dest := createSourceFiles(t)
 
 	// sync into dest dir
 	rsync := exec.Command("rsync", //*/ "/home/michael/src/openrsync/openrsync",
@@ -410,21 +404,7 @@ func TestInteropRemoteCommand(t *testing.T) {
 }
 
 func TestInteropRemoteDaemon(t *testing.T) {
-	tmp := t.TempDir()
-	source := filepath.Join(tmp, "source")
-	dest := filepath.Join(tmp, "dest")
-
-	// create files in source to be copied
-	subDirs := []string{"expensive", "cheap"}
-	for _, subdir := range subDirs {
-		dummy := filepath.Join(source, subdir, "dummy")
-		if err := os.MkdirAll(filepath.Dir(dummy), 0755); err != nil {
-			t.Fatal(err)
-		}
-		if err := ioutil.WriteFile(dummy, []byte(subdir), 0644); err != nil {
-			t.Fatal(err)
-		}
-	}
+	tmp, source, dest := createSourceFiles(t)
 
 	homeDir := filepath.Join(tmp, "home")
 	{
@@ -497,21 +477,7 @@ func TestInteropRemoteDaemon(t *testing.T) {
 }
 
 func TestInteropRemoteDaemonAnonSSH(t *testing.T) {
-	tmp := t.TempDir()
-	source := filepath.Join(tmp, "source")
-	dest := filepath.Join(tmp, "dest")
-
-	// create files in source to be copied
-	subDirs := []string{"expensive", "cheap"}
-	for _, subdir := range subDirs {
-		dummy := filepath.Join(source, subdir, "dummy")
-		if err := os.MkdirAll(filepath.Dir(dummy), 0755); err != nil {
-			t.Fatal(err)
-		}
-		if err := ioutil.WriteFile(dummy, []byte(subdir), 0644); err != nil {
-			t.Fatal(err)
-		}
-	}
+	tmp, source, dest := createSourceFiles(t)
 
 	// start a server to sync from
 	srv := rsynctest.New(t,
