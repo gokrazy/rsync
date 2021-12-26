@@ -14,7 +14,6 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"syscall"
 
 	"github.com/DavidGamba/go-getoptions"
 	"github.com/gokrazy/rsync/internal/config"
@@ -171,9 +170,8 @@ func (s *Server) sendFileList(c *rsyncConn, mod config.Module, opts *Opts, paths
 			fec.writeInt32(mode)
 
 			if opts.PreserveUid {
-				var uid int32
-				if st, ok := info.Sys().(*syscall.Stat_t); ok {
-					uid = int32(st.Uid)
+				uid, ok := uidFromFileInfo(info)
+				if ok {
 					if _, ok := uidMap[uid]; !ok && uid != 0 {
 						u, err := user.LookupId(strconv.Itoa(int(uid)))
 						if err != nil {
@@ -188,9 +186,8 @@ func (s *Server) sendFileList(c *rsyncConn, mod config.Module, opts *Opts, paths
 			}
 
 			if opts.PreserveGid {
-				var gid int32
-				if st, ok := info.Sys().(*syscall.Stat_t); ok {
-					gid = int32(st.Gid)
+				gid, ok := gidFromFileInfo(info)
+				if ok {
 					if _, ok := gidMap[gid]; !ok && gid != 0 {
 						g, err := user.LookupGroupId(strconv.Itoa(int(gid)))
 						if err != nil {
@@ -207,11 +204,8 @@ func (s *Server) sendFileList(c *rsyncConn, mod config.Module, opts *Opts, paths
 			if (opts.PreserveDevices && isDev) ||
 				(opts.PreserveSpecials && isSpecial) {
 				// 10.  if a special file and -D, the device “rdev” type (integer)
-				sys, ok := info.Sys().(*syscall.Stat_t)
-				if !ok {
-					return fmt.Errorf("stat does not contain rdev")
-				}
-				fec.writeInt32(int32(sys.Rdev))
+				rdev, _ := rdevFromFileInfo(info)
+				fec.writeInt32(rdev)
 			}
 
 			if opts.PreserveLinks && info.Mode().Type()&os.ModeSymlink != 0 {
