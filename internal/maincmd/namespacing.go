@@ -11,7 +11,6 @@ import (
 	"os"
 	"os/exec"
 	"strconv"
-	"syscall"
 
 	"github.com/gokrazy/rsync/internal/config"
 )
@@ -64,12 +63,7 @@ func namespace(modMap map[string]config.Module, listen string) error {
 		return err
 	}
 	cmd.ExtraFiles = []*os.File{lnFile}
-	cmd.SysProcAttr = &syscall.SysProcAttr{
-		Credential: &syscall.Credential{
-			Uid: 65534,
-			Gid: 65534,
-		},
-	}
+	runAsUnprivilegedUser(cmd)
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("%v: %v", cmd.Args, err)
 	}
