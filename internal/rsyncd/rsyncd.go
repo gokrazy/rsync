@@ -711,6 +711,8 @@ func (s *Server) HandleConn(module config.Module, rd io.Reader, crd *countingRea
 		return err
 	}
 
+	log.Printf("reading final int32")
+
 	finish, err := c.readInt32()
 	if err != nil {
 		return err
@@ -718,6 +720,9 @@ func (s *Server) HandleConn(module config.Module, rd io.Reader, crd *countingRea
 	if finish != -1 {
 		return fmt.Errorf("protocol error: expected final -1, got %d", finish)
 	}
+
+	log.Printf("HandleConn done")
+
 	return nil
 }
 
