@@ -421,6 +421,7 @@ func (c *rsyncConn) sendFile(fileIndex int32, fl file) error {
 
 // rsync/sender.c:send_files()
 func (c *rsyncConn) sendFiles(fileList *fileList, dryRun bool) error {
+	phase := 0
 	for {
 		// receive data about receiver’s copy of the file list contents (not
 		// ordered)
@@ -430,9 +431,13 @@ func (c *rsyncConn) sendFiles(fileList *fileList, dryRun bool) error {
 			return err
 		}
 		if fileIndex == -1 {
-			// acknowledge phase change by sending -1
-			if err := c.writeInt32(-1); err != nil {
-				return err
+			if phase == 0 {
+				phase++
+				// acknowledge phase change by sending -1
+				if err := c.writeInt32(-1); err != nil {
+					return err
+				}
+				continue
 			}
 			break
 		}
@@ -654,15 +659,15 @@ func (s *Server) HandleConn(module config.Module, rd io.Reader, crd *countingRea
 
 	// receive the exclusion list (openrsync’s is always empty)
 	const exclusionListEnd = 0
-	// got, err := c.readInt32()
-	// if err != nil {
-	// 	return err
-	// }
-	// if want := int32(exclusionListEnd); got != want {
-	// 	return fmt.Errorf("protocol error: non-empty exclusion list received")
-	// }
+	got, err := c.readInt32()
+	if err != nil {
+		return err
+	}
+	if want := int32(exclusionListEnd); got != want {
+		return fmt.Errorf("protocol error: non-empty exclusion list received")
+	}
 
-	// log.Printf("exclusion list read")
+	log.Printf("exclusion list read")
 
 	// “Update exchange” as per
 	// https://github.com/kristapsdz/openrsync/blob/master/rsync.5
@@ -681,17 +686,6 @@ func (s *Server) HandleConn(module config.Module, rd io.Reader, crd *countingRea
 	sort.Slice(fileList.files, func(i, j int) bool {
 		return fileList.files[i].wpath < fileList.files[j].wpath
 	})
-
-	// TODO: read exclusion list (always zero)
-	got, err := c.readInt32()
-	if err != nil {
-		return err
-	}
-	if want := int32(exclusionListEnd); got != want {
-		return fmt.Errorf("protocol error: non-empty exclusion list received")
-	}
-
-	log.Printf("exclusion list read")
 
 	if err := c.sendFiles(fileList, opts.DryRun); err != nil {
 		return err
