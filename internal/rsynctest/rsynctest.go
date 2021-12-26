@@ -1,6 +1,7 @@
 package rsynctest
 
 import (
+	"errors"
 	"io"
 	"log"
 	"net"
@@ -74,6 +75,11 @@ func New(t *testing.T, modMap map[string]config.Module, opts ...Option) *TestSer
 			err := anonssh.Serve(ln, cfg, func(args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer) error {
 				return maincmd.Main(args, stdin, stdout, stderr, cfg)
 			})
+
+			if errors.Is(err, net.ErrClosed) {
+				return
+			}
+
 			if err != nil {
 				log.Print(err)
 			}
