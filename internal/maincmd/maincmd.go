@@ -9,7 +9,6 @@ import (
 	"os"
 	"strings"
 
-	"github.com/coreos/go-systemd/activation"
 	"github.com/gokrazy/rsync/internal/anonssh"
 	"github.com/gokrazy/rsync/internal/config"
 	"github.com/gokrazy/rsync/internal/rsyncd"
@@ -173,12 +172,13 @@ func Main(args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer, cf
 
 	srv := &rsyncd.Server{Modules: cfg.ModuleMap}
 	var ln net.Listener
-	if listeners, err := activation.Listeners(); err == nil && len(listeners) > 0 {
-		if got, want := len(listeners), 1; got != want {
-			return fmt.Errorf("unexpected number of sockets received from systemd: got %d, want %d", got, want)
-		}
+	listeners, err := systemdListeners()
+	if err != nil {
+		return err
+	}
+	if len(listeners) > 0 {
 		ln = listeners[0]
-	} else if err != nil || len(listeners) == 0 {
+	} else {
 		log.Printf("could not obtain listeners from systemd, creating listener")
 		ln, err = net.Listen("tcp", listenAddr)
 		if err != nil {
