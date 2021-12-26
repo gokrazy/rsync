@@ -424,6 +424,11 @@ func TestInteropRemoteDaemon(t *testing.T) {
 	tmp, source, dest := createSourceFiles(t)
 
 	homeDir := filepath.Join(tmp, "home")
+	// Use os.Setenv so that the os.UserConfigDir() call below returns the
+	// correct path.
+	os.Setenv("HOME", homeDir)
+	os.Setenv("XDG_CONFIG_HOME", homeDir+"/.config")
+
 	{
 		// in remote daemon mode, rsync needs a config file, so we create one and
 		// set the HOME environment variable such that gokr-rsyncd will pick it up.
@@ -432,7 +437,11 @@ func TestInteropRemoteDaemon(t *testing.T) {
 				{Name: "interop", Path: source},
 			},
 		}
-		configPath := filepath.Join(homeDir, ".config", "gokr-rsyncd.toml")
+		configDir, err := os.UserConfigDir()
+		if err != nil {
+			t.Fatal(err)
+		}
+		configPath := filepath.Join(configDir, "gokr-rsyncd.toml")
 		if err := os.MkdirAll(filepath.Dir(configPath), 0755); err != nil {
 			t.Fatal(err)
 		}
@@ -464,6 +473,7 @@ func TestInteropRemoteDaemon(t *testing.T) {
 			dest)...)
 	rsync.Stdout = os.Stdout
 	rsync.Stderr = os.Stderr
+	// TODO: does os.Environ() reflect changes by os.Setenv()?
 	rsync.Env = append(os.Environ(),
 		"HOME="+homeDir,
 		"XDG_CONFIG_HOME="+homeDir+"/.config")
