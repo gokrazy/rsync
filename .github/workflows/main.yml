@@ -36,4 +36,9 @@ jobs:
       run: choco install rsync
 
     - name: run tests
+      if: matrix.os != 'windows-latest'
       run: go test -v ./internal/... && go test -c && sudo ./rsync.test -test.v
+
+    - name: run tests
+      if: matrix.os == 'windows-latest'
+      run: go install ./cmd/...
