@@ -318,7 +318,21 @@ func createSourceFiles(t *testing.T) (string, string, string) {
 	return tmp, source, dest
 }
 
-func sourceFullySyncedTo(dest string) error {
+func sourcesArgs(t *testing.T) []string {
+	if strings.HasPrefix(rsynctest.RsyncVersion(t), "3.") {
+		// rsync 3.0.0 (March 2008) introduced multiple source args.
+		return []string{
+			"rsync://localhost/interop/expensive/", // copy contents of interop
+			"rsync://localhost/interop/cheap",      // copy cheap directory
+		}
+	}
+	// Older rsync only supports a single source arg.
+	return []string{
+		"rsync://localhost/interop/expensive/", // copy contents of interop
+	}
+}
+
+func sourceFullySyncedTo(t *testing.T, dest string) error {
 	{
 		want := []byte("expensive")
 		got, err := ioutil.ReadFile(filepath.Join(dest, "dummy"))
@@ -328,6 +342,10 @@ func sourceFullySyncedTo(dest string) error {
 		if diff := cmp.Diff(want, got); diff != "" {
 			return fmt.Errorf("unexpected file contents: diff (-want +got):\n%s", diff)
 		}
+	}
+
+	if !strings.HasPrefix(rsynctest.RsyncVersion(t), "3.") {
+		return nil
 	}
 
 	{
@@ -351,20 +369,21 @@ func TestInteropSubdir(t *testing.T) {
 
 	// sync into dest dir
 	rsync := exec.Command("rsync", //"/home/michael/src/openrsync/openrsync",
-		//		"--debug=all4",
-		"--archive",
-		"-v", "-v", "-v", "-v",
-		"--port="+srv.Port,
-		"rsync://localhost/interop/expensive/", // copy contents of interop
-		"rsync://localhost/interop/cheap",      // copy cheap directory
-		dest)                                   // directly into dest
+		append(
+			append([]string{
+				//		"--debug=all4",
+				"--archive",
+				"-v", "-v", "-v", "-v",
+				"--port=" + srv.Port,
+			}, sourcesArgs(t)...),
+			dest)...)
 	rsync.Stdout = os.Stdout
 	rsync.Stderr = os.Stderr
 	if err := rsync.Run(); err != nil {
 		t.Fatalf("%v: %v", rsync.Args, err)
 	}
 
-	if err := sourceFullySyncedTo(dest); err != nil {
+	if err := sourceFullySyncedTo(t, dest); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -372,23 +391,31 @@ func TestInteropSubdir(t *testing.T) {
 func TestInteropRemoteCommand(t *testing.T) {
 	_, source, dest := createSourceFiles(t)
 
+	sourcesArgs := []string{
+		"localhost:" + source + "/expensive/", // copy contents of interop
+	}
+	if strings.HasPrefix(rsynctest.RsyncVersion(t), "3.") {
+		sourcesArgs = append(sourcesArgs, ":"+source+"/cheap") // copy cheap directory
+	}
+
 	// sync into dest dir
 	rsync := exec.Command("rsync", //*/ "/home/michael/src/openrsync/openrsync",
-		//		"--debug=all4",
-		"--archive",
-		"--protocol=27",
-		"-v", "-v", "-v", "-v",
-		"-e", os.Args[0],
-		"localhost:"+source+"/expensive/", // copy contents of interop
-		":"+source+"/cheap",               // copy cheap directory
-		dest)                              // directly into dest
+		append(
+			append([]string{
+				//		"--debug=all4",
+				"--archive",
+				"--protocol=27",
+				"-v", "-v", "-v", "-v",
+				"-e", os.Args[0],
+			}, sourcesArgs...),
+			dest)...)
 	rsync.Stdout = os.Stdout
 	rsync.Stderr = os.Stderr
 	if err := rsync.Run(); err != nil {
 		t.Fatalf("%v: %v", rsync.Args, err)
 	}
 
-	if err := sourceFullySyncedTo(dest); err != nil {
+	if err := sourceFullySyncedTo(t, dest); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -427,13 +454,14 @@ func TestInteropRemoteDaemon(t *testing.T) {
 
 	// sync into dest dir
 	rsync := exec.Command("rsync", //*/ "/home/michael/src/openrsync/openrsync",
-		//		"--debug=all4",
-		"--archive",
-		"-v", "-v", "-v", "-v",
-		"-e", os.Args[0],
-		"rsync://localhost/interop/expensive/", // copy contents of interop
-		"rsync://localhost/interop/cheap",      // copy cheap directory
-		dest)                                   // directly into dest
+		append(
+			append([]string{
+				//		"--debug=all4",
+				"--archive",
+				"-v", "-v", "-v", "-v",
+				"-e", os.Args[0],
+			}, sourcesArgs(t)...),
+			dest)...)
 	rsync.Stdout = os.Stdout
 	rsync.Stderr = os.Stderr
 	rsync.Env = append(os.Environ(),
@@ -443,7 +471,7 @@ func TestInteropRemoteDaemon(t *testing.T) {
 		t.Fatalf("%v: %v", rsync.Args, err)
 	}
 
-	if err := sourceFullySyncedTo(dest); err != nil {
+	if err := sourceFullySyncedTo(t, dest); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -473,20 +501,21 @@ func TestInteropRemoteDaemonAnonSSH(t *testing.T) {
 
 	// sync into dest dir
 	rsync := exec.Command("rsync", //*/ "/home/michael/src/openrsync/openrsync",
-		//		"--debug=all4",
-		"--archive",
-		"-v", "-v", "-v", "-v",
-		"-e", "ssh -vv -o IdentityFile="+privKeyPath+" -o StrictHostKeyChecking=no -o CheckHostIP=no -o UserKnownHostsFile=/dev/null -p "+srv.Port,
-		"rsync://localhost/interop/expensive/", // copy contents of interop
-		"rsync://localhost/interop/cheap",      // copy cheap directory
-		dest)                                   // directly into dest
+		append(
+			append([]string{
+				//		"--debug=all4",
+				"--archive",
+				"-v", "-v", "-v", "-v",
+				"-e", "ssh -vv -o IdentityFile=" + privKeyPath + " -o StrictHostKeyChecking=no -o CheckHostIP=no -o UserKnownHostsFile=/dev/null -p " + srv.Port,
+			}, sourcesArgs(t)...),
+			dest)...)
 	rsync.Stdout = os.Stdout
 	rsync.Stderr = os.Stderr
 	if err := rsync.Run(); err != nil {
 		t.Fatalf("%v: %v", rsync.Args, err)
 	}
 
-	if err := sourceFullySyncedTo(dest); err != nil {
+	if err := sourceFullySyncedTo(t, dest); err != nil {
 		t.Fatal(err)
 	}
 }

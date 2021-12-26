@@ -5,6 +5,10 @@ import (
 	"io"
 	"log"
 	"net"
+	"os"
+	"os/exec"
+	"regexp"
+	"strings"
 	"testing"
 
 	"github.com/gokrazy/rsync/internal/anonssh"
@@ -89,4 +93,22 @@ func New(t *testing.T, modMap map[string]config.Module, opts ...Option) *TestSer
 	}
 
 	return ts
+}
+
+var rsyncVersionRe = regexp.MustCompile(`rsync\s*version ([v0-9.]+)`)
+
+func RsyncVersion(t *testing.T) string {
+	version := exec.Command("rsync", "--version")
+	version.Stderr = os.Stderr
+	b, err := version.Output()
+	if err != nil {
+		t.Fatalf("%v: %v", version.Args, err)
+	}
+	matches := rsyncVersionRe.FindStringSubmatch(string(b))
+	if len(matches) == 0 {
+		t.Fatalf("rsync: version number not found in rsync --version output")
+	}
+	// rsync 2.6.9 does not print a v prefix,
+	// but rsync v3.2.3 does print a v prefix.
+	return strings.TrimPrefix(matches[1], "v")
 }
