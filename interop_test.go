@@ -2,6 +2,7 @@ package rsync_test
 
 import (
 	"bytes"
+	"fmt"
 	"io/ioutil"
 	"log"
 	"net"
@@ -317,6 +318,31 @@ func createSourceFiles(t *testing.T) (string, string, string) {
 	return tmp, source, dest
 }
 
+func sourceFullySyncedTo(dest string) error {
+	{
+		want := []byte("expensive")
+		got, err := ioutil.ReadFile(filepath.Join(dest, "dummy"))
+		if err != nil {
+			return err
+		}
+		if diff := cmp.Diff(want, got); diff != "" {
+			return fmt.Errorf("unexpected file contents: diff (-want +got):\n%s", diff)
+		}
+	}
+
+	{
+		want := []byte("cheap")
+		got, err := ioutil.ReadFile(filepath.Join(dest, "cheap", "dummy"))
+		if err != nil {
+			return err
+		}
+		if diff := cmp.Diff(want, got); diff != "" {
+			return fmt.Errorf("unexpected file contents: diff (-want +got):\n%s", diff)
+		}
+	}
+	return nil
+}
+
 func TestInteropSubdir(t *testing.T) {
 	_, source, dest := createSourceFiles(t)
 
@@ -338,26 +364,8 @@ func TestInteropSubdir(t *testing.T) {
 		t.Fatalf("%v: %v", rsync.Args, err)
 	}
 
-	{
-		want := []byte("expensive")
-		got, err := ioutil.ReadFile(filepath.Join(dest, "dummy"))
-		if err != nil {
-			t.Fatal(err)
-		}
-		if diff := cmp.Diff(want, got); diff != "" {
-			t.Fatalf("unexpected file contents: diff (-want +got):\n%s", diff)
-		}
-	}
-
-	{
-		want := []byte("cheap")
-		got, err := ioutil.ReadFile(filepath.Join(dest, "cheap", "dummy"))
-		if err != nil {
-			t.Fatal(err)
-		}
-		if diff := cmp.Diff(want, got); diff != "" {
-			t.Fatalf("unexpected file contents: diff (-want +got):\n%s", diff)
-		}
+	if err := sourceFullySyncedTo(dest); err != nil {
+		t.Fatal(err)
 	}
 }
 
@@ -380,26 +388,8 @@ func TestInteropRemoteCommand(t *testing.T) {
 		t.Fatalf("%v: %v", rsync.Args, err)
 	}
 
-	{
-		want := []byte("expensive")
-		got, err := ioutil.ReadFile(filepath.Join(dest, "dummy"))
-		if err != nil {
-			t.Fatal(err)
-		}
-		if diff := cmp.Diff(want, got); diff != "" {
-			t.Fatalf("unexpected file contents: diff (-want +got):\n%s", diff)
-		}
-	}
-
-	{
-		want := []byte("cheap")
-		got, err := ioutil.ReadFile(filepath.Join(dest, "cheap", "dummy"))
-		if err != nil {
-			t.Fatal(err)
-		}
-		if diff := cmp.Diff(want, got); diff != "" {
-			t.Fatalf("unexpected file contents: diff (-want +got):\n%s", diff)
-		}
+	if err := sourceFullySyncedTo(dest); err != nil {
+		t.Fatal(err)
 	}
 }
 
@@ -453,26 +443,8 @@ func TestInteropRemoteDaemon(t *testing.T) {
 		t.Fatalf("%v: %v", rsync.Args, err)
 	}
 
-	{
-		want := []byte("expensive")
-		got, err := ioutil.ReadFile(filepath.Join(dest, "dummy"))
-		if err != nil {
-			t.Fatal(err)
-		}
-		if diff := cmp.Diff(want, got); diff != "" {
-			t.Fatalf("unexpected file contents: diff (-want +got):\n%s", diff)
-		}
-	}
-
-	{
-		want := []byte("cheap")
-		got, err := ioutil.ReadFile(filepath.Join(dest, "cheap", "dummy"))
-		if err != nil {
-			t.Fatal(err)
-		}
-		if diff := cmp.Diff(want, got); diff != "" {
-			t.Fatalf("unexpected file contents: diff (-want +got):\n%s", diff)
-		}
+	if err := sourceFullySyncedTo(dest); err != nil {
+		t.Fatal(err)
 	}
 }
 
@@ -514,25 +486,7 @@ func TestInteropRemoteDaemonAnonSSH(t *testing.T) {
 		t.Fatalf("%v: %v", rsync.Args, err)
 	}
 
-	{
-		want := []byte("expensive")
-		got, err := ioutil.ReadFile(filepath.Join(dest, "dummy"))
-		if err != nil {
-			t.Fatal(err)
-		}
-		if diff := cmp.Diff(want, got); diff != "" {
-			t.Fatalf("unexpected file contents: diff (-want +got):\n%s", diff)
-		}
-	}
-
-	{
-		want := []byte("cheap")
-		got, err := ioutil.ReadFile(filepath.Join(dest, "cheap", "dummy"))
-		if err != nil {
-			t.Fatal(err)
-		}
-		if diff := cmp.Diff(want, got); diff != "" {
-			t.Fatalf("unexpected file contents: diff (-want +got):\n%s", diff)
-		}
+	if err := sourceFullySyncedTo(dest); err != nil {
+		t.Fatal(err)
 	}
 }
