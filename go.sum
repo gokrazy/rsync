@@ -182,6 +182,8 @@ github.com/spf13/pflag v1.0.3/go.mod h1:DYY7MBk1bdzusC3SYhjObp+wFpr4gzcvqqNjLnIn
 github.com/spf13/viper v1.7.1/go.mod h1:8WkrPz2fc9jxqZNCJI/76HCieCp4Q8HaLFoCha5qpdg=
 github.com/stapelberg/rsync-os v0.3.0 h1:fcgPQZ6GtLHiyTqKNkWBIwDYVDisoC7B2L3l7UJSWBY=
 github.com/stapelberg/rsync-os v0.3.0/go.mod h1:Zw+JNIdoeRIyH56KEzw9stlPEJVPDmZ4/pp6y5tz4PE=
+github.com/stapelberg/rsyncparse v0.0.0-20211228091344-84a4474990ee h1:wuLUw6Da+JIYpnaHTF6lTI4sUXf5WPXAbf8meDNYLu0=
+github.com/stapelberg/rsyncparse v0.0.0-20211228091344-84a4474990ee/go.mod h1:EEcIYHDFjCLD6qdDQ0XofqFAMIUGioghhZBIcWX6+is=
 github.com/stretchr/objx v0.1.0/go.mod h1:HFkY916IF+rwdDfMAkV7OtwuqBVzrE8GR6GFx+wExME=
 github.com/stretchr/objx v0.1.1/go.mod h1:HFkY916IF+rwdDfMAkV7OtwuqBVzrE8GR6GFx+wExME=
 github.com/stretchr/testify v1.2.2/go.mod h1:a8OnRcib4nhh0OaRAV+Yts87kKdq0PP7pXfy6kDkUVs=

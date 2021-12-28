@@ -2,8 +2,10 @@ package rsyncd
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/binary"
 	"fmt"
+	"hash"
 	"io"
 	"log"
 	"math"
@@ -413,6 +415,369 @@ func (c *rsyncConn) sendFile(fileIndex int32, fl file) error {
 	return nil
 }
 
+// rsync/rsync.h:struct sum_buf
+type sumBuf struct {
+	offset int64
+	len    int64
+	index  int32
+	sum1   uint32
+	sum2   [16]byte
+}
+
+// rsync/sender.c:receive_sums()
+func (c *rsyncConn) receiveSums() (sumHead, error) {
+	head, err := c.readSumHead()
+	if err != nil {
+		return sumHead{}, err
+	}
+	var offset int64
+	head.Sums = make([]sumBuf, int(head.ChecksumCount))
+	for i := int32(0); i < head.ChecksumCount; i++ {
+		shortChecksum, err := c.readInt32()
+		if err != nil {
+			return sumHead{}, err
+		}
+		sb := sumBuf{
+			index:  i,
+			offset: offset,
+			sum1:   uint32(shortChecksum),
+		}
+		if i == head.ChecksumCount-1 && head.RemainderLength != 0 {
+			sb.len = int64(head.RemainderLength)
+		} else {
+			sb.len = int64(head.BlockLength)
+		}
+		offset += sb.len
+		n, err := io.ReadFull(c.rd, sb.sum2[:head.ChecksumLength])
+		if err != nil {
+			return sumHead{}, err
+		}
+		_ = n
+		// log.Printf("chunk[%d] len=%d offset=%.0f sum1=%08x, sum2=%x",
+		// 	i, sb.len, float64(sb.offset), sb.sum1, sb.sum2[:n])
+		head.Sums[i] = sb
+	}
+	return head, nil
+}
+
+// rsync/rsync.h defines chunkSize as 32 * 1024, but increasing it to 256K
+// increases throughput with “tridge” rsync as client by 50 Mbit/s.
+const chunkSize = 256 * 1024
+
+// rsync/match.c:hash_search
+func (c *rsyncConn) hashSearch(targets []target, tagTable map[uint16]int, head sumHead, fileIndex int32, fl file) error {
+	f, err := os.Open(fl.path)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	fi, err := f.Stat()
+	if err != nil {
+		return err
+	}
+
+	if err := c.writeInt32(fileIndex); err != nil {
+		return err
+	}
+
+	if err := c.writeSumHead(head); err != nil {
+		return err
+	}
+
+	// sum_init()
+	h := md4.New()
+	binary.Write(h, binary.LittleEndian, c.seed)
+
+	// The following quotes are citations from
+	// https://www.samba.org/~tridge/phd_thesis.pdf, section 3.2.6 The
+	// signature search algorithm (PDF page 64).
+
+	// “Once the sorted signature table and the index table have been formed the
+	// signature search process can begin. For each byte offset in a_i the fast
+	// signature is computed, along with the 16 bit hash of the fast
+	// signature. The 16 bit hash is then used to lookup the signature index,
+	// giving the index in the signature table of the first fast signature with
+	// that hash.”
+
+	var k int
+	var sum uint32
+	var s1, s2 uint16
+	var chunk []byte
+	var offset int64
+	end := fi.Size() + 1 - head.Sums[len(head.Sums)-1].len
+	log.Printf("last block len=%d, end=%d", head.Sums[len(head.Sums)-1].len, end)
+
+	readChunk := func() error {
+		k = int(head.BlockLength)
+		if remaining := int(fi.Size() - offset); remaining < k {
+			k = remaining
+		}
+
+		buf := make([]byte, k)
+		// TODO: here and below: do we need io.ReadFull?
+		n, err := f.ReadAt(buf, offset)
+		// log.Printf("reading chunk at offset=%d with len=%d (ret=%d)", offset, len(buf), n)
+		if err != nil {
+			return err
+		}
+		chunk = buf[:n]
+		sum = getChecksum1(chunk)
+		s1 = uint16(sum & 0xFFFF)
+		s2 = uint16(sum >> 16)
+		return nil
+	}
+	if err := readChunk(); err != nil {
+		return err
+	}
+
+	tagHits := 0
+Outer:
+	for {
+		tag := gettag2(s1, s2)
+		var sum2 []byte
+		doneCsum2 := false
+		j, ok := tagTable[tag]
+		if ok {
+			// “A linear search is then performed through the signature table, stopping
+			// when an entry is found with a 16 bit hash which doesn’t match. For each
+			// entry the current 32 bit fast signature is compared to the entry in the
+			// signature table, and if that matches then the full 128 bit strong
+			// signature is computed at the current byte offset and compared to the
+			// strong signature in the signature table”
+			sum = (uint32(s1) & 0xFFFF) | (uint32(s2) << 16)
+			tagHits++
+			for ; j < int(head.ChecksumCount) && targets[j].tag == tag; j++ {
+				i := targets[j].index
+				if sum != head.Sums[i].sum1 {
+					continue
+				}
+
+				l := int64(head.BlockLength)
+				if v := fi.Size() - offset; v < l {
+					l = v
+				}
+				if l != head.Sums[i].len {
+					continue
+				}
+
+				// log.Printf("potential match at %d target=%d %d sum=%08x", offset, j, i, sum)
+
+				if !doneCsum2 {
+					buf := make([]byte, l)
+					n, err := f.ReadAt(buf, offset)
+					if err != nil {
+						return err
+					}
+					sum2 = getChecksum2(c.seed, buf[:n])
+					doneCsum2 = true
+				}
+
+				if local, remote := sum2[:head.ChecksumLength], head.Sums[i].sum2[:head.ChecksumLength]; !bytes.Equal(local, remote) {
+					log.Printf("false alarm: local %x, remote %x", local, remote)
+					//falseAlarms++
+					continue
+				}
+
+				// TODO(optimization): tridge rsync locates adjacent matches
+				// here for better run-length encoding, but I’m not sure where
+				// (if at all) we currently use run-length encoding:
+				// https://github.com/WayneD/rsync/commit/923fa978088f4c044eec528d9472962d9c9d13c3
+
+				// “If the strong signature is found to match then A emits a
+				// token telling B that a match was found and which block in bi
+				// was matched12. The search then continues at the byte after
+				// the matching block.”
+
+				if err := c.matched(h, f, head, offset, i); err != nil {
+					return err
+				}
+
+				offset += head.Sums[i].len
+				if err := readChunk(); err != nil {
+					return fmt.Errorf("readChunk: %v", err)
+				}
+
+				if offset >= end {
+					break
+				}
+
+				continue Outer
+
+				// rsync doesn’t read the next chunk (offset+sums[i].len),
+				// rsync starts reading one byte before the next chunk
+				// (offset+sums[i].len-1), because the code path starting at
+				// “null_tag” removes the chunk’s first byte and adds the
+				// next byte after the chunk.
+				offset += head.Sums[i].len - 1
+				if err := readChunk(); err != nil {
+					return fmt.Errorf("readChunk: %v", err)
+				}
+				break
+			}
+		}
+		// null_tag
+		offset++
+		if offset >= end {
+			break
+		}
+
+		if err := readChunk(); err != nil {
+			return fmt.Errorf("readChunk: %v", err)
+		}
+
+		continue Outer
+
+		// TODO: make the rolling checksum below work:
+
+		//log.Printf("null_tag, k=%d", k)
+		readk := k + 1
+		add := k < int(fi.Size()-offset)
+		if !add {
+			readk--
+		}
+
+		if readk > 0 {
+			buf := make([]byte, readk)
+			n, err := f.ReadAt(buf, offset)
+			//log.Printf("ReadAt(offset=%d, len=%d, ret=%d)", offset, len(buf), n)
+			if err != nil {
+				return fmt.Errorf("[resync] ReadAt(%v, len=%d): %v", offset, len(buf), err)
+			}
+			update := buf[:n]
+			s1 -= uint16(update[0])
+			s2 -= uint16(k) * uint16(update[0])
+
+			if add {
+				s1 += uint16(update[k])
+				s2 += s1
+			} else {
+				log.Printf("WARNING: not enough bytes available")
+				k--
+			}
+
+			// TODO: match early
+			// if err := c.matched(h, f, head, offset-int64(head.BlockLength), -2); err != nil {
+			// 	return err
+			// }
+		}
+
+		offset++
+		if offset >= end {
+			break
+		}
+	}
+
+	if err := c.matched(h, f, head, fi.Size(), -1); err != nil {
+		return err
+	}
+
+	{
+		sum := h.Sum(nil)
+		log.Printf("sum: %x (len = %d)", sum, len(sum))
+		if _, err := c.wr.Write(sum); err != nil {
+			return err
+		}
+	}
+
+	return nil
+
+}
+
+// rsync/token.c:simple_send_token
+func (c *rsyncConn) simpleSendToken(f *os.File, token int32, offset int64, n int64) error {
+	if n > 0 {
+		log.Printf("sending unmatched chunks")
+		l := int64(0)
+		for l < n {
+			n1 := int64(chunkSize)
+			if n-l < n1 {
+				n1 = n - l
+			}
+
+			buf := make([]byte, n1)
+			n, err := f.ReadAt(buf, offset+l)
+			if err != nil {
+				return fmt.Errorf("ReadAt(%v): %v", offset+l, err)
+			}
+			chunk := buf[:n]
+
+			if err := c.writeInt32(int32(n1)); err != nil {
+				return err
+			}
+
+			if _, err := c.wr.Write(chunk); err != nil {
+				return err
+			}
+
+			l += n1
+		}
+	}
+	if token != -2 {
+		return c.writeInt32(-(int32(token) + 1))
+	}
+	return nil
+}
+
+// rsync/token.c:send_token
+func (c *rsyncConn) sendToken(f *os.File, i int32, offset int64, n int64, toklen int64) error {
+	// TODO(compression): send deflated token
+	return c.simpleSendToken(f, i, offset, n)
+}
+
+type target struct {
+	index int32
+	tag   uint16
+}
+
+func (c *rsyncConn) matched(h hash.Hash, f *os.File, head sumHead, offset int64, i int32) error {
+	n := offset - c.lastMatch
+
+	transmitAccumulated := i < 0
+
+	if !transmitAccumulated {
+		log.Printf("match at offset=%d last_match=%d i=%d len=%d n=%d",
+			offset, c.lastMatch, i, head.Sums[i].len, n)
+	}
+
+	l := int64(0)
+	if !transmitAccumulated {
+		l = head.Sums[i].len
+	}
+
+	if err := c.sendToken(f, i, c.lastMatch, n, l); err != nil {
+		return fmt.Errorf("sendToken: %v", err)
+	}
+	// TODO: data_transfer += n;
+
+	if !transmitAccumulated {
+		// stats.matched_data += s->sums[i].len;
+		n += head.Sums[i].len
+	}
+
+	for j := int64(0); j < n; j += chunkSize {
+		n1 := int64(chunkSize)
+		if n-j < n1 {
+			n1 = n - j
+		}
+
+		buf := make([]byte, n1)
+		n, err := f.ReadAt(buf, c.lastMatch+j)
+		if err != nil {
+			return fmt.Errorf("ReadAt(%d): %v", c.lastMatch+j, err)
+		}
+		chunk := buf[:n]
+		h.Write(chunk)
+	}
+
+	if !transmitAccumulated {
+		c.lastMatch = offset + head.Sums[i].len
+	} else {
+		c.lastMatch = offset
+	}
+	return nil
+}
+
 // rsync/sender.c:send_files()
 func (c *rsyncConn) sendFiles(fileList *fileList, dryRun bool) error {
 	phase := 0
@@ -443,31 +808,47 @@ func (c *rsyncConn) sendFiles(fileList *fileList, dryRun bool) error {
 			continue
 		}
 
-		// log.Printf("fileIndex: %v (hex %x)", fileIndex, fileIndex)
-		sumHead, err := c.readSumHead()
+		head, err := c.receiveSums()
 		if err != nil {
 			return err
 		}
-		// log.Printf("sum head: %+v", sumHead)
-		longChecksum := make([]byte, sumHead.ChecksumLength)
-		for i := int32(0); i < sumHead.ChecksumCount; i++ {
-			shortChecksum, err := c.readInt32()
-			if err != nil {
-				return err
+
+		// The following quotes are citations from
+		// https://www.samba.org/~tridge/phd_thesis.pdf, section 3.2.6 The
+		// signature search algorithm (PDF page 64).
+
+		// rsync/match.c:build_hash_table
+		targets := make([]target, len(head.Sums))
+		tagTable := make(map[uint16]int) // TODO: or int32 more specifically?
+		{
+			// “The first step in the algorithm is to sort the received
+			// signatures by a 16 bit hash of the fast signature.”
+			for idx, sum := range head.Sums {
+				targets[idx] = target{
+					index: int32(idx),
+					tag:   gettag(sum.sum1),
+				}
 			}
-			n, err := c.rd.Read(longChecksum)
-			if err != nil {
-				return err
+			sort.Slice(targets, func(i, j int) bool {
+				return targets[i].tag < targets[j].tag
+			})
+
+			// “A 16 bit index table is then formed which takes a 16 bit hash
+			// value and gives an index into the sorted signature table which
+			// points to the first entry in the table which has a matching
+			// hash.”
+			for idx := range head.Sums {
+				tagTable[targets[idx].tag] = idx
 			}
-			_ = shortChecksum
-			_ = n
-			// log.Printf("short %d, long %x", shortChecksum, longChecksum[:n])
 		}
 
-		// TODO(optimization): only send data that has changed (based on the
-		// checksums received above)
-
-		if err := c.sendFile(fileIndex, fileList.files[fileIndex]); err != nil {
+		if len(head.Sums) == 0 {
+			// fast path: send the whole file
+			err = c.sendFile(fileIndex, fileList.files[fileIndex])
+		} else {
+			err = c.hashSearch(targets, tagTable, head, fileIndex, fileList.files[fileIndex])
+		}
+		if err != nil {
 			if _, ok := err.(*os.PathError); ok {
 				// OpenFile() failed. Log the error (server side only) and
 				// proceed. Only starting with protocol 30, an I/O error flag is

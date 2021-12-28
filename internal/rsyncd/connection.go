@@ -63,6 +63,8 @@ type rsyncConn struct {
 	seed int32
 	wr   io.Writer
 	rd   io.Reader
+
+	lastMatch int64
 }
 
 func (c *rsyncConn) writeByte(data byte) error {
@@ -121,6 +123,8 @@ type sumHead struct {
 	// “terminal (remainder) block length” (openrsync)
 	// RemainderLength is flength % BlockLength
 	RemainderLength int32
+
+	Sums []sumBuf
 }
 
 func (c *rsyncConn) readSumHead() (sumHead, error) {
