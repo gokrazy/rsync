@@ -1,7 +1,7 @@
 .PHONY: all run systemd test docker raspi mac
 
 all:
-	CGO_ENABLED=0 go install github.com/gokrazy/rsync/cmd/gokr-rsyncd
+	CGO_ENABLED=0 go install github.com/gokrazy/rsync/cmd/...
 
 run: all
 	sudo ~/go/bin/gokr-rsyncd -modulemap=default=/etc/default
