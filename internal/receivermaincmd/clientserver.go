@@ -14,10 +14,10 @@ import (
 )
 
 // rsync/clientserver.c:start_socket_client
-func socketClient(osenv osenv, opts *Opts, src, dest string) error {
+func socketClient(osenv osenv, opts *Opts, src, dest string) (*Stats, error) {
 	u, err := url.Parse(src)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	host := u.Host
 	if _, _, err := net.SplitHostPort(host); err != nil {
@@ -26,11 +26,11 @@ func socketClient(osenv osenv, opts *Opts, src, dest string) error {
 	log.Printf("Opening TCP connection to %s", host)
 	conn, err := net.Dial("tcp", host)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	path := strings.TrimPrefix(u.Path, "/")
 	if path == "" {
-		return fmt.Errorf("empty remote path")
+		return nil, fmt.Errorf("empty remote path")
 	}
 	module := path
 	if idx := strings.IndexByte(module, '/'); idx > -1 {
@@ -38,12 +38,13 @@ func socketClient(osenv osenv, opts *Opts, src, dest string) error {
 	}
 	log.Printf("rsync module %q, path %q", module, path)
 	if err := startInbandExchange(opts, conn, module, path); err != nil {
-		return err
+		return nil, err
 	}
-	if err := clientRun(osenv, opts, conn, dest); err != nil {
-		return err
+	stats, err := clientRun(osenv, opts, conn, dest)
+	if err != nil {
+		return nil, err
 	}
-	return nil
+	return stats, nil
 }
 
 // rsync/clientserver.c:start_inband_exchange

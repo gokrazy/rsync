@@ -122,8 +122,9 @@ func serverOptions(clientOptions *Opts) []string {
 	if clientOptions.PreserveGid {
 		argstr += "g"
 	}
-	// if (preserve_devices)
-	// 	argstr[x++] = 'D';
+	if clientOptions.PreserveDevices {
+		argstr += "D"
+	}
 	if clientOptions.PreserveTimes {
 		argstr += "t"
 	}

@@ -32,27 +32,35 @@ type recvTransfer struct {
 
 func (rt *recvTransfer) listOnly() bool { return rt.dest == "" }
 
+type Stats struct {
+	Read    int64 // total bytes read (from network connection)
+	Written int64 // total bytes written (to network connection)
+	Size    int64 // total size of files
+}
+
 // rsync/main.c:start_client
-func rsyncMain(osenv osenv, opts *Opts, sources []string, dest string) error {
+func rsyncMain(osenv osenv, opts *Opts, sources []string, dest string) (*Stats, error) {
 	log.Printf("dest: %q, sources: %q", dest, sources)
 	log.Printf("opts: %+v", opts)
 	for _, src := range sources {
 		log.Printf("processing src=%s", src)
 		if strings.HasPrefix(src, "rsync://") {
 			// rsync://[USER@]HOST[:PORT]/SRC
-			if err := socketClient(osenv, opts, src, dest); err != nil {
-				return err
+			stats, err := socketClient(osenv, opts, src, dest)
+			if err != nil {
+				return nil, err
 			}
+			return stats, nil
 		} else {
 			// [USER@]HOST:SRC (remote shell)
 			// [USER@]HOST::SRC (rsync daemon)
 		}
 	}
-	return nil
+	return nil, nil
 }
 
 // rsync/main.c:client_run
-func clientRun(osenv osenv, opts *Opts, conn io.ReadWriter, dest string) error {
+func clientRun(osenv osenv, opts *Opts, conn io.ReadWriter, dest string) (*Stats, error) {
 	c := &rsyncwire.Conn{
 		Reader: conn,
 		Writer: conn,
@@ -60,7 +68,7 @@ func clientRun(osenv osenv, opts *Opts, conn io.ReadWriter, dest string) error {
 
 	seed, err := c.ReadInt32()
 	if err != nil {
-		return fmt.Errorf("reading seed: %v", err)
+		return nil, fmt.Errorf("reading seed: %v", err)
 	}
 
 	mrd := &rsyncwire.MultiplexReader{
@@ -82,7 +90,7 @@ func clientRun(osenv osenv, opts *Opts, conn io.ReadWriter, dest string) error {
 	// TODO: implement support for exclusion, send exclusion list here
 	const exclusionListEnd = 0
 	if err := c.WriteInt32(exclusionListEnd); err != nil {
-		return err
+		return nil, err
 	}
 
 	log.Printf("exclusion list sent")
@@ -91,7 +99,7 @@ func clientRun(osenv osenv, opts *Opts, conn io.ReadWriter, dest string) error {
 	log.Printf("receiving file list")
 	fileList, err := rt.receiveFileList()
 	if err != nil {
-		return err
+		return nil, err
 	}
 	log.Printf("received %d names", len(fileList))
 
@@ -100,7 +108,7 @@ func clientRun(osenv osenv, opts *Opts, conn io.ReadWriter, dest string) error {
 	// receive the uid/gid list
 	users, groups, err := rt.recvIdList()
 	if err != nil {
-		return err
+		return nil, err
 	}
 	_ = users
 	_ = groups
@@ -108,7 +116,7 @@ func clientRun(osenv osenv, opts *Opts, conn io.ReadWriter, dest string) error {
 	// read the i/o error flag
 	ioErrors, err := c.ReadInt32()
 	if err != nil {
-		return err
+		return nil, err
 	}
 	log.Printf("ioErrors: %v", ioErrors)
 
@@ -132,15 +140,37 @@ func clientRun(osenv osenv, opts *Opts, conn io.ReadWriter, dest string) error {
 		}
 	})
 	if err := eg.Wait(); err != nil {
-		return err
+		return nil, err
 	}
+
+	// read statistics:
+	// total bytes read (from network connection)
+	read, err := c.ReadInt64()
+	if err != nil {
+		return nil, err
+	}
+	// total bytes written (to network connection)
+	written, err := c.ReadInt64()
+	if err != nil {
+		return nil, err
+	}
+	// total size of files
+	size, err := c.ReadInt64()
+	if err != nil {
+		return nil, err
+	}
+	log.Printf("server sent stats: read=%d, written=%d, size=%d", read, written, size)
 
 	// send final goodbye message
 	if err := c.WriteInt32(-1); err != nil {
-		return err
+		return nil, err
 	}
 
-	return nil
+	return &Stats{
+		Read:    read,
+		Written: written,
+		Size:    size,
+	}, nil
 }
 
 // rsync/token.c:recvToken
@@ -160,7 +190,7 @@ func (rt *recvTransfer) recvToken() (token int32, data []byte, _ error) {
 	return token, data, nil
 }
 
-func Main(args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer) error {
+func Main(args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer) (*Stats, error) {
 	osenv := osenv{
 		stdin:  stdin,
 		stdout: stdout,
@@ -169,10 +199,10 @@ func Main(args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer) er
 	opts, opt := NewGetOpt()
 	remaining, err := opt.Parse(args[1:])
 	if opt.Called("help") {
-		return errors.New(opt.Help())
+		return nil, errors.New(opt.Help())
 	}
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	if opts.Archive {
@@ -186,8 +216,13 @@ func Main(args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer) er
 		opts.D = true             // -D
 	}
 
+	if opts.D {
+		opts.PreserveDevices = true
+		opts.PreserveSpecials = true
+	}
+
 	if len(remaining) == 0 {
-		return errors.New(opt.Help())
+		return nil, errors.New(opt.Help())
 	}
 	if len(remaining) == 1 {
 		// Usages with just one SRC arg and no DEST arg list the source files

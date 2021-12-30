@@ -20,12 +20,14 @@ func sortFileList(fileList []*file) {
 }
 
 type file struct {
-	Name    string
-	Length  int64
-	ModTime time.Time
-	Mode    int32
-	Uid     int32
-	Gid     int32
+	Name       string
+	Length     int64
+	ModTime    time.Time
+	Mode       int32
+	Uid        int32
+	Gid        int32
+	LinkTarget string
+	Rdev       int32
 }
 
 // FileMode converts from the Linux permission bits to Go’s permission bits.
@@ -156,13 +158,14 @@ func (rt *recvTransfer) receiveFileEntry(flags uint16, last *file) (*file, error
 	if rt.opts.PreserveDevices && (isDev || isSpecial) {
 		// TODO(protocol >= 28): rdev/major/minor handling
 		if flags&rsync.XMIT_SAME_RDEV_pre28 != 0 {
-			return nil, fmt.Errorf("XMIT_SAME_GID not yet implemented")
+			f.Rdev = last.Rdev
+		} else {
+			rdev, err := rt.conn.ReadInt32()
+			if err != nil {
+				return nil, err
+			}
+			f.Rdev = rdev
 		}
-		rdev, err := rt.conn.ReadInt32()
-		if err != nil {
-			return nil, err
-		}
-		log.Printf("rdev: %v", rdev)
 	}
 
 	if rt.opts.PreserveLinks && isLink {
@@ -174,8 +177,7 @@ func (rt *recvTransfer) receiveFileEntry(flags uint16, last *file) (*file, error
 		if _, err := io.ReadFull(rt.conn.Reader, b); err != nil {
 			return nil, err
 		}
-		log.Printf("length: %d", length)
-		log.Printf("b: %q", string(b))
+		f.LinkTarget = string(b)
 	}
 
 	return f, nil

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"path/filepath"
 
 	"github.com/gokrazy/rsync"
 	"github.com/mmcloughlin/md4"
@@ -44,10 +45,19 @@ func (rt *recvTransfer) receiveData(f *file) error {
 	if err := sh.ReadFrom(rt.conn); err != nil {
 		return err
 	}
-	log.Printf("sum head: %+v", sh)
+
+	local := filepath.Join(rt.dest, f.Name)
+	log.Printf("creating %s", local)
+	out, err := newPendingFile(local)
+	if err != nil {
+		return err
+	}
+	defer out.Cleanup()
 
 	h := md4.New()
 	binary.Write(h, binary.LittleEndian, rt.seed)
+
+	wr := io.MultiWriter(out, h)
 
 	var offset int64
 	for {
@@ -59,16 +69,15 @@ func (rt *recvTransfer) receiveData(f *file) error {
 			break
 		}
 		if token > 0 {
-			log.Printf("data recv %d at %d", token, offset)
-			h.Write(data)
-			// TODO: write to file
+			if _, err := wr.Write(data); err != nil {
+				return err
+			}
 			offset += int64(token)
 			continue
 		}
 		return fmt.Errorf("re-using existing file parts not yet implemented")
 	}
 	localSum := h.Sum(nil)
-	log.Printf("reading %d checksum bytes", len(localSum))
 	remoteSum := make([]byte, len(localSum))
 	if _, err := io.ReadFull(rt.conn.Reader, remoteSum); err != nil {
 		return err
@@ -77,5 +86,14 @@ func (rt *recvTransfer) receiveData(f *file) error {
 		return fmt.Errorf("file corruption in %s", f.Name)
 	}
 	log.Printf("checksum %x matches!", localSum)
+
+	if err := out.CloseAtomicallyReplace(); err != nil {
+		return err
+	}
+
+	if err := rt.setPerms(f); err != nil {
+		return err
+	}
+
 	return nil
 }

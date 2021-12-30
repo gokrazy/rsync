@@ -7,6 +7,7 @@ require (
 	github.com/DavidGamba/go-getoptions v0.23.0
 	github.com/coreos/go-systemd v0.0.0-20191104093116-d3cd4ed1dbcf
 	github.com/google/go-cmp v0.5.6
+	github.com/google/renameio/v2 v2.0.0
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510
 	github.com/mmcloughlin/md4 v0.1.1
 	github.com/stapelberg/rsyncparse v0.0.0-20211228091344-84a4474990ee
