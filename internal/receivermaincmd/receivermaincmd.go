@@ -2,6 +2,7 @@ package receivermaincmd
 
 import (
 	"bufio"
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -111,12 +112,24 @@ func clientRun(osenv osenv, opts *Opts, conn io.ReadWriter, dest string) error {
 	}
 	log.Printf("ioErrors: %v", ioErrors)
 
-	var eg errgroup.Group
+	ctx := context.Background()
+	eg, ctx := errgroup.WithContext(ctx)
 	eg.Go(func() error {
 		return rt.generateFiles(fileList)
 	})
 	eg.Go(func() error {
-		return rt.recvFiles(fileList)
+		// Ensure we don’t block on the receiver when the generator returns an
+		// error.
+		errChan := make(chan error)
+		go func() {
+			errChan <- rt.recvFiles(fileList)
+		}()
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case err := <-errChan:
+			return err
+		}
 	})
 	if err := eg.Wait(); err != nil {
 		return err
