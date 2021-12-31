@@ -183,3 +183,49 @@ func TestReceiver(t *testing.T) {
 		}
 	}
 }
+
+func TestReceiverSync(t *testing.T) {
+	tmp := t.TempDir()
+	source := filepath.Join(tmp, "source")
+	dest := filepath.Join(tmp, "dest")
+	destLarge := filepath.Join(dest, "large-data-file")
+
+	headPattern := []byte{0x11}
+	bodyPattern := []byte{0xbb}
+	endPattern := []byte{0xee}
+	rsynctest.WriteLargeDataFile(t, source, headPattern, bodyPattern, endPattern)
+
+	// start a server to sync from
+	srv := rsynctest.New(t, rsynctest.InteropModMap(source))
+
+	args := []string{
+		"gokr-rsync",
+		"-aH",
+		"rsync://localhost:" + srv.Port + "/interop/",
+		dest,
+	}
+	firstStats, err := receivermaincmd.Main(args, os.Stdin, os.Stdout, os.Stdout)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Logf("firstStats: %+v", firstStats)
+	//     receiver_test.go:211: firstStats: &{Read:91 Written:3146087 Size:3149824}
+
+	if err := rsynctest.DataFileMatches(destLarge, headPattern, bodyPattern, endPattern); err != nil {
+		t.Fatal(err)
+	}
+
+	// Change the middle of the large data file:
+	bodyPattern = []byte{0x66}
+	// modify the large data file
+	rsynctest.WriteLargeDataFile(t, source, headPattern, bodyPattern, endPattern)
+
+	incrementalStats, err := receivermaincmd.Main(args, os.Stdin, os.Stdout, os.Stdout)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Logf("incrementalStats: %+v", incrementalStats)
+	if got, want := incrementalStats.Written, int64(2*1024*1024); got >= want {
+		t.Fatalf("rsync unexpectedly transferred more data than needed: got %d, want < %d", got, want)
+	}
+}

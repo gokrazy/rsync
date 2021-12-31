@@ -2,6 +2,7 @@ package receivermaincmd
 
 import (
 	"fmt"
+	"io"
 	"io/fs"
 	"log"
 	"os"
@@ -9,6 +10,8 @@ import (
 	"time"
 
 	"github.com/gokrazy/rsync"
+	"github.com/gokrazy/rsync/internal/rsyncchecksum"
+	"github.com/gokrazy/rsync/internal/rsynccommon"
 )
 
 // rsync/generator.c:generate_files()
@@ -241,7 +244,48 @@ func (rt *recvTransfer) recvGenerator(idx int, f *file) error {
 
 	// TODO: if deltas are disabled, request the file in full
 
-	// TODO(rsync algorithm): open file, generate and send sums
-	log.Printf("st: %+v", st)
-	return requestFullFile()
+	in, err := os.Open(local)
+	if err != nil {
+		log.Printf("failed to open %s, continuing: %v", local, err)
+		return requestFullFile()
+	}
+	defer in.Close()
+
+	log.Printf("sending sums for: %s", f.Name)
+	if err := rt.conn.WriteInt32(int32(idx)); err != nil {
+		return err
+	}
+
+	return rt.generateAndSendSums(in, st.Size())
+}
+
+// rsync/generator.c:generate_and_send_sums
+func (rt *recvTransfer) generateAndSendSums(in *os.File, len int64) error {
+	sh := rsynccommon.SumSizesSqroot(len)
+	if err := sh.WriteTo(rt.conn); err != nil {
+		return err
+	}
+	buf := make([]byte, int(sh.BlockLength))
+	remaining := len
+	for i := int32(0); i < sh.ChecksumCount; i++ {
+		n1 := int64(sh.BlockLength)
+		if n1 > remaining {
+			n1 = remaining
+		}
+		b := buf[:n1]
+		if _, err := io.ReadFull(in, b); err != nil {
+			return err
+		}
+
+		sum1 := rsyncchecksum.Checksum1(b)
+		sum2 := rsyncchecksum.Checksum2(rt.seed, b)
+		if err := rt.conn.WriteInt32(int32(sum1)); err != nil {
+			return err
+		}
+		if _, err := rt.conn.Writer.Write(sum2); err != nil {
+			return err
+		}
+		remaining -= n1
+	}
+	return nil
 }

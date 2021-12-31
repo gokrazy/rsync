@@ -1,4 +1,4 @@
-package rsyncd
+package rsyncchecksum_test
 
 import (
 	"bytes"
@@ -6,6 +6,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/gokrazy/rsync/internal/rsyncchecksum"
 )
 
 func constructLargeDataFile(headPattern, bodyPattern, endPattern []byte) []byte {
@@ -64,7 +66,7 @@ func TestSyncExtended(t *testing.T) {
 		}
 
 		chunk := buf[:n]
-		sum := getChecksum1(chunk)
+		sum := rsyncchecksum.Checksum1(chunk)
 		if sum != wantChecksum {
 			t.Fatalf("checksum calculation error: got %08x, want %08x (idx %d), chunk: %#v", sum, wantChecksum, idx, chunk)
 		}

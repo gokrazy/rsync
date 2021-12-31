@@ -1,8 +1,11 @@
 package rsynctest
 
 import (
+	"bytes"
 	"errors"
+	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
 	"net"
 	"os"
@@ -17,6 +20,7 @@ import (
 	"github.com/gokrazy/rsync/internal/config"
 	"github.com/gokrazy/rsync/internal/maincmd"
 	"github.com/gokrazy/rsync/internal/rsyncd"
+	"github.com/google/go-cmp/cmp"
 	"golang.org/x/sys/unix"
 )
 
@@ -217,5 +221,37 @@ func VerifyDummyDeviceFiles(t *testing.T, source, dest string) {
 			t.Fatalf("unexpected type: got %v, want socket", st.Mode())
 		}
 	}
+}
 
+func ConstructLargeDataFile(headPattern, bodyPattern, endPattern []byte) []byte {
+	// create large data file in source directory to be copied
+	head := bytes.Repeat(headPattern, 1*1024*1024)
+	body := bytes.Repeat(bodyPattern, 1*1024*1024)
+	end := bytes.Repeat(endPattern, 1*1024*1024)
+	return append(append(head, body...), end...)
+}
+
+func WriteLargeDataFile(t *testing.T, source string, headPattern, bodyPattern, endPattern []byte) {
+	// create large data file in source directory to be copied
+	content := ConstructLargeDataFile(headPattern, bodyPattern, endPattern)
+	large := filepath.Join(source, "large-data-file")
+	if err := os.MkdirAll(filepath.Dir(large), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := ioutil.WriteFile(large, content, 0644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func DataFileMatches(fn string, headPattern, bodyPattern, endPattern []byte) error {
+	want := ConstructLargeDataFile(headPattern, bodyPattern, endPattern)
+	got, err := ioutil.ReadFile(fn)
+	if err != nil {
+		return err
+	}
+	if diff := cmp.Diff(want, got); diff != "" {
+		return fmt.Errorf("unexpected file contents: diff (-want +got):\n%s", diff)
+	}
+
+	return nil
 }

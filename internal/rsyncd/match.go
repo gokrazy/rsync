@@ -9,6 +9,7 @@ import (
 	"os"
 
 	"github.com/gokrazy/rsync"
+	"github.com/gokrazy/rsync/internal/rsyncchecksum"
 	"github.com/mmcloughlin/md4"
 )
 
@@ -63,14 +64,13 @@ func (st *sendTransfer) hashSearch(targets []target, tagTable map[uint16]int, he
 		}
 
 		buf := make([]byte, k)
-		// TODO: here and below: do we need io.ReadFull?
 		n, err := f.ReadAt(buf, offset)
 		// log.Printf("reading chunk at offset=%d with len=%d (ret=%d)", offset, len(buf), n)
 		if err != nil {
 			return err
 		}
 		chunk = buf[:n]
-		sum = getChecksum1(chunk)
+		sum = rsyncchecksum.Checksum1(chunk)
 		s1 = uint16(sum & 0xFFFF)
 		s2 = uint16(sum >> 16)
 		return nil
@@ -82,7 +82,7 @@ func (st *sendTransfer) hashSearch(targets []target, tagTable map[uint16]int, he
 	tagHits := 0
 Outer:
 	for {
-		tag := gettag2(s1, s2)
+		tag := rsyncchecksum.Tag2(s1, s2)
 		var sum2 []byte
 		doneCsum2 := false
 		j, ok := tagTable[tag]
@@ -117,7 +117,7 @@ Outer:
 					if err != nil {
 						return err
 					}
-					sum2 = getChecksum2(st.seed, buf[:n])
+					sum2 = rsyncchecksum.Checksum2(st.seed, buf[:n])
 					doneCsum2 = true
 				}
 

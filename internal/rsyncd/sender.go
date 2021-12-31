@@ -8,6 +8,8 @@ import (
 	"sort"
 
 	"github.com/gokrazy/rsync"
+	"github.com/gokrazy/rsync/internal/rsyncchecksum"
+	"github.com/gokrazy/rsync/internal/rsynccommon"
 	"github.com/mmcloughlin/md4"
 	"golang.org/x/sync/errgroup"
 )
@@ -60,7 +62,7 @@ func (st *sendTransfer) sendFiles(fileList *fileList) error {
 			for idx, sum := range head.Sums {
 				targets[idx] = target{
 					index: int32(idx),
-					tag:   gettag(sum.Sum1),
+					tag:   rsyncchecksum.Tag(sum.Sum1),
 				}
 			}
 			sort.Slice(targets, func(i, j int) bool {
@@ -163,7 +165,7 @@ func (st *sendTransfer) sendFile(fileIndex int32, fl file) error {
 		return err
 	}
 
-	sh := sumSizesSqroot(fi.Size())
+	sh := rsynccommon.SumSizesSqroot(fi.Size())
 	// log.Printf("sh = %+v", sh)
 	if err := sh.WriteTo(st.conn); err != nil {
 		return err

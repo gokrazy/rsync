@@ -1,4 +1,4 @@
-package rsyncd
+package rsyncchecksum
 
 import (
 	"encoding/binary"
@@ -6,12 +6,12 @@ import (
 	"github.com/mmcloughlin/md4"
 )
 
-func gettag2(s1, s2 uint16) uint16 {
+func Tag2(s1, s2 uint16) uint16 {
 	return (((s1) + (s2)) & 0xFFFF)
 }
 
-func gettag(sum uint32) uint16 {
-	return gettag2(uint16(sum&0xFFFF), uint16(sum>>16))
+func Tag(sum uint32) uint16 {
+	return Tag2(uint16(sum&0xFFFF), uint16(sum>>16))
 }
 
 // signExtend mirrors how C converts from (signed char) to uint32, i.e. using
@@ -22,7 +22,7 @@ func signExtend(b byte) uint32 {
 	return uint32(int32(val<<24) >> 24)
 }
 
-func getChecksum1(buf []byte) uint32 {
+func Checksum1(buf []byte) uint32 {
 	len := len(buf)
 	var s1, s2 uint32
 	var i int
@@ -46,7 +46,7 @@ func getChecksum1(buf []byte) uint32 {
 	return (s1 & 0xffff) + (s2 << 16)
 }
 
-func getChecksum2(seed int32, buf []byte) []byte {
+func Checksum2(seed int32, buf []byte) []byte {
 	h := md4.New()
 	h.Write(buf)
 	binary.Write(h, binary.LittleEndian, seed)

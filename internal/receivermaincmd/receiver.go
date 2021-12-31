@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"os"
 	"path/filepath"
 
 	"github.com/gokrazy/rsync"
@@ -30,8 +31,7 @@ func (rt *recvTransfer) recvFiles(fileList []*file) error {
 			break
 		}
 		log.Printf("receiving file idx=%d: %+v", idx, fileList[idx])
-		// receive_data()
-		if err := rt.receiveData(fileList[idx]); err != nil {
+		if err := rt.recvFile1(fileList[idx]); err != nil {
 			return err
 		}
 	}
@@ -39,14 +39,57 @@ func (rt *recvTransfer) recvFiles(fileList []*file) error {
 	return nil
 }
 
+func (rt *recvTransfer) recvFile1(f *file) error {
+	localFile, err := rt.openLocalFile(f)
+	if err != nil && !os.IsNotExist(err) {
+		log.Printf("opening local file failed, continuing: %v", err)
+	}
+	defer localFile.Close()
+	if err := rt.receiveData(f, localFile); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (rt *recvTransfer) openLocalFile(f *file) (*os.File, error) {
+	local := filepath.Join(rt.dest, f.Name)
+
+	in, err := os.Open(local)
+	if err != nil {
+		return nil, err
+	}
+
+	st, err := in.Stat()
+	if err != nil {
+		return nil, err
+	}
+
+	if st.IsDir() {
+		return nil, fmt.Errorf("%s is a directory", local)
+	}
+
+	if !st.Mode().IsRegular() {
+		return nil, nil
+	}
+
+	if !rt.opts.PreservePerms {
+		// If the file exists already and we are not preserving permissions,
+		// then act as though the remote sent us the existing permissions:
+		f.Mode = int32(st.Mode().Perm())
+	}
+
+	return in, nil
+}
+
 // rsync/receiver.c:receive_data
-func (rt *recvTransfer) receiveData(f *file) error {
+func (rt *recvTransfer) receiveData(f *file, localFile *os.File) error {
 	var sh rsync.SumHead
 	if err := sh.ReadFrom(rt.conn); err != nil {
 		return err
 	}
 
 	local := filepath.Join(rt.dest, f.Name)
+
 	log.Printf("creating %s", local)
 	out, err := newPendingFile(local)
 	if err != nil {
@@ -59,7 +102,6 @@ func (rt *recvTransfer) receiveData(f *file) error {
 
 	wr := io.MultiWriter(out, h)
 
-	var offset int64
 	for {
 		token, data, err := rt.recvToken()
 		if err != nil {
@@ -72,10 +114,25 @@ func (rt *recvTransfer) receiveData(f *file) error {
 			if _, err := wr.Write(data); err != nil {
 				return err
 			}
-			offset += int64(token)
 			continue
 		}
-		return fmt.Errorf("re-using existing file parts not yet implemented")
+		if localFile == nil {
+			return fmt.Errorf("BUG: local file %s not open for copying chunk", local)
+		}
+		token = -(token + 1)
+		offset2 := int64(token) * int64(sh.BlockLength)
+		len := sh.BlockLength
+		if token == sh.ChecksumCount-1 && sh.RemainderLength != 0 {
+			len = sh.RemainderLength
+		}
+		data = make([]byte, len)
+		if _, err := localFile.ReadAt(data, offset2); err != nil {
+			return err
+		}
+
+		if _, err := wr.Write(data); err != nil {
+			return err
+		}
 	}
 	localSum := h.Sum(nil)
 	remoteSum := make([]byte, len(localSum))
