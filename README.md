@@ -5,13 +5,44 @@
 
 Package rsync contains a native Go rsync implementation.
 
-⚠ **Beware:** very fresh. Might eat your data. You have been warned! ⚠
+This repository currently contains:
 
-The only component currently is gokr-rsyncd, a read-only rsync daemon
-sender-only Go implementation of rsyncd. rsync daemon is a custom
-(un-standardized) network protocol, running on port 873 by default.
+1. `gokr-rsyncd`, a read-only rsync daemon sender-only Go implementation of
+   rsyncd. It implements the rsync daemon network protocol (port 873/tcp by
+   default), but can be used over SSH or locally as well.
+2. `gokr-rsync` is an rsync receiver implementation that can download files via
+   rsync (daemon protocol or SSH).
+
+The following known improvements are not yet implemented:
+
+* Providing our rsync implementation not only tools, but also Go packages for
+  others to use ([draft PR](https://github.com/gokrazy/rsync/pull/3)).
+* Making `gokr-rsync` also implement an rsync sender so that it can **push**
+  (upload) files to a remote rsync server (daemon protocol or SSH).
+* Making `gokr-rsync` chroot (and/or Linux mount namespaces when available?)
+  into the destination directory to reduce chances of accidental file system
+  manipulation in case of bugs.
+* Making `gokr-rsyncd` also implement an rsync receiver, so that it can accept
+  files.
+* Merging `gokr-rsyncd` and `gokr-rsync` into a single binary.
 
 This project accepts contributions as time permits to merge them (best effort).
+
+## How do I know this project won’t eat my data?
+
+This rsync implementation is very fresh. It was started in 2021 and doesn’t have
+many users yet.
+
+With that warning out of the way, the rsync protocol uses MD4 checksums over
+file contents, so at least your file contents should never be able to be
+corrupted.
+
+There is enough other functionality (delta transfers, file metadata, special
+files like symlinks or devices, directory structures, etc.) in the rsync
+protocol that provides opportunities for bugs to hide.
+
+I recommend you carefully check that your transfers work, and please do report
+any issues you run into!
 
 ## Existing rsync implementation survey
 
