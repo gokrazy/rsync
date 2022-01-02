@@ -40,7 +40,7 @@ func socketClient(osenv osenv, opts *Opts, src, dest string) (*Stats, error) {
 	if err := startInbandExchange(opts, conn, module, path); err != nil {
 		return nil, err
 	}
-	stats, err := clientRun(osenv, opts, conn, dest)
+	stats, err := clientRun(osenv, opts, conn, dest, false)
 	if err != nil {
 		return nil, err
 	}

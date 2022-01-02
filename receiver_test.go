@@ -3,6 +3,7 @@ package rsync_test
 import (
 	"io/ioutil"
 	"os"
+	"os/exec"
 	"os/user"
 	"path/filepath"
 	"strconv"
@@ -10,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gokrazy/rsync/internal/config"
 	"github.com/gokrazy/rsync/internal/receivermaincmd"
 	"github.com/gokrazy/rsync/internal/rsynctest"
 	"github.com/google/go-cmp/cmp"
@@ -227,5 +229,114 @@ func TestReceiverSync(t *testing.T) {
 	t.Logf("incrementalStats: %+v", incrementalStats)
 	if got, want := incrementalStats.Written, int64(2*1024*1024); got >= want {
 		t.Fatalf("rsync unexpectedly transferred more data than needed: got %d, want < %d", got, want)
+	}
+}
+
+func TestReceiverSSH(t *testing.T) {
+	tmp := t.TempDir()
+	source := filepath.Join(tmp, "source")
+	dest := filepath.Join(tmp, "dest")
+
+	if err := os.MkdirAll(source, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := ioutil.WriteFile(filepath.Join(source, "hello"), []byte("world"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	// start a server to sync from
+	srv := rsynctest.New(t,
+		rsynctest.InteropModMap(source),
+		rsynctest.Listeners([]config.Listener{
+			{AnonSSH: "localhost:0"},
+		}))
+
+	// ensure the user running the tests (root when doing the privileged run!)
+	// has an SSH private key:
+	privKeyPath := filepath.Join(tmp, "ssh_private_key")
+	genKey := exec.Command("ssh-keygen",
+		"-N", "",
+		"-t", "ed25519",
+		"-f", privKeyPath)
+	genKey.Stdout = os.Stdout
+	genKey.Stderr = os.Stderr
+	if err := genKey.Run(); err != nil {
+		t.Fatalf("%v: %v", genKey.Args, err)
+	}
+
+	// sync into dest dir
+	args := []string{
+		"gokr-rsync",
+		"-aH",
+		"-e", "ssh -vv -o IdentityFile=" + privKeyPath + " -o StrictHostKeyChecking=no -o CheckHostIP=no -o UserKnownHostsFile=/dev/null -p " + srv.Port,
+		"rsync://localhost/interop/",
+		dest,
+	}
+	if _, err := receivermaincmd.Main(args, os.Stdin, os.Stdout, os.Stdout); err != nil {
+		t.Fatal(err)
+	}
+
+	{
+		want := []byte("world")
+		got, err := ioutil.ReadFile(filepath.Join(dest, "hello"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if diff := cmp.Diff(want, got); diff != "" {
+			t.Fatalf("unexpected file contents: diff (-want +got):\n%s", diff)
+		}
+	}
+}
+
+func TestReceiverCommand(t *testing.T) {
+	tmp := t.TempDir()
+	source := filepath.Join(tmp, "source")
+	dest := filepath.Join(tmp, "dest")
+
+	if err := os.MkdirAll(source, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := ioutil.WriteFile(filepath.Join(source, "hello"), []byte("world"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	// // sync into dest dir
+	// rsync := exec.Command("rsync", //*/ "/home/michael/src/openrsync/openrsync",
+	// 	append(
+	// 		append([]string{
+	// 			//		"--debug=all4",
+	// 			"--archive",
+	// 			"--protocol=27",
+	// 			"-v", "-v", "-v", "-v",
+	// 			"-e", os.Args[0],
+	// 		}, sourcesArgs...),
+	// 		dest)...)
+	// rsync.Stdout = os.Stdout
+	// rsync.Stderr = os.Stderr
+	// if err := rsync.Run(); err != nil {
+	// 	t.Fatalf("%v: %v", rsync.Args, err)
+	// }
+
+	// sync into dest dir
+	args := []string{
+		"gokr-rsync",
+		"-aH",
+		"-e", os.Args[0],
+		"localhost:" + source + "/",
+		dest,
+	}
+	if _, err := receivermaincmd.Main(args, os.Stdin, os.Stdout, os.Stdout); err != nil {
+		t.Fatal(err)
+	}
+
+	{
+		want := []byte("world")
+		got, err := ioutil.ReadFile(filepath.Join(dest, "hello"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if diff := cmp.Diff(want, got); diff != "" {
+			t.Fatalf("unexpected file contents: diff (-want +got):\n%s", diff)
+		}
 	}
 }

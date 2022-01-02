@@ -72,6 +72,8 @@ func Main(args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer, cf
 			Path: "/",
 		}
 
+		// TODO: copy seed+multiplex error handling from handleDaemonConn
+
 		// TODO: remove duplication with handleDaemonConn
 		if len(remaining) < 2 {
 			return fmt.Errorf("invalid args: at least one directory required")
