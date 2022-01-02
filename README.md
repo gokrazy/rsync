@@ -84,8 +84,13 @@ Transfer complete: 5.5 KB sent, 1.2 KB read, 666 B file size
  |-----------------------------------------|-----------|--------------------|------------------------|-----------------------------------------------------------------|------------------|---------------------------------------|
  | 1. rsync daemon protocol (TCP port 873) | ❌ no     | ⚠ rsync (insecure) | ❌ only world-readable | ✔ dropped + [namespace](#privileged-linux-including-gokrazyorg) | ✔ negotiated     | config required                       |
  | 2. anon SSH (daemon)                    | ✔ yes     | ✔ rsync            | ❌ only world-readable | ✔ dropped + [namespace](#privileged-linux-including-gokrazyorg) | ✔ negotiated     | config required                       |
- | 3. SSH (command)                        | ✔ yes     | ✔ SSH              | ✔ yes                  | ⚠ full user                                                     | ❌ assumed       | no config                             |
+ | 3. SSH (command)                        | ✔ yes     | ✔ SSH              | ✔ yes                  | ⚠ full user                                                     | ⚠ assumed       | no config                             |
  | 4. SSH (daemon)                         | ✔ yes     | ✔ SSH (+ rsync)    | ✔ yes                  | ⚠ full user                                                     | ✔ negotiated     | `~/.config/gokr-rsyncd.toml` required |
+
+Regarding protocol version “assumed”: the flags to send over the network are
+computed *before* starting SSH and hence the remote rsync process. You might
+need to specify `--protocol=27` explicitly on the client. Once the connection is
+established, both sides *do* negotiate the protocol, though.
 
 ### Setup 1: rsync daemon protocol (TCP port 873)
 
