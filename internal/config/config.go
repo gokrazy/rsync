@@ -15,8 +15,9 @@ type Listener struct {
 }
 
 type Module struct {
-	Name string `toml:"name"`
-	Path string `toml:"path"`
+	Name string   `toml:"name"`
+	Path string   `toml:"path"`
+	ACL  []string `toml:"acl"`
 }
 
 type Config struct {

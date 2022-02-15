@@ -25,6 +25,8 @@ import (
 )
 
 type TestServer struct {
+	// config
+	listener  net.Listener
 	listeners []config.Listener
 
 	// Port is the port on which the test server is listening on. Useful to pass
@@ -51,6 +53,12 @@ func Listeners(lns []config.Listener) Option {
 	}
 }
 
+func Listener(ln net.Listener) Option {
+	return func(ts *TestServer) {
+		ts.listener = ln
+	}
+}
+
 func New(t *testing.T, modMap map[string]config.Module, opts ...Option) *TestServer {
 	ts := &TestServer{}
 	for _, opt := range opts {
@@ -65,14 +73,17 @@ func New(t *testing.T, modMap map[string]config.Module, opts ...Option) *TestSer
 		Modules: modMap,
 	}
 
-	ln, err := net.Listen("tcp", "localhost:0")
-	if err != nil {
-		t.Fatal(err)
+	if ts.listener == nil {
+		ln, err := net.Listen("tcp", "localhost:0")
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { ln.Close() })
+		ts.listener = ln
 	}
-	t.Cleanup(func() { ln.Close() })
 
-	log.Printf("listening on %s", ln.Addr())
-	_, port, err := net.SplitHostPort(ln.Addr().String())
+	log.Printf("listening on %s", ts.listener.Addr())
+	_, port, err := net.SplitHostPort(ts.listener.Addr().String())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -83,7 +94,7 @@ func New(t *testing.T, modMap map[string]config.Module, opts ...Option) *TestSer
 			ModuleMap: modMap,
 		}
 		go func() {
-			err := anonssh.Serve(ln, cfg, func(args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer) error {
+			err := anonssh.Serve(ts.listener, cfg, func(args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer) error {
 				return maincmd.Main(args, stdin, stdout, stderr, cfg)
 			})
 
@@ -96,7 +107,7 @@ func New(t *testing.T, modMap map[string]config.Module, opts ...Option) *TestSer
 			}
 		}()
 	} else {
-		go srv.Serve(ln)
+		go srv.Serve(ts.listener)
 	}
 
 	return ts

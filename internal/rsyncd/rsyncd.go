@@ -108,7 +108,51 @@ func CounterPair(r io.Reader, w io.Writer) (*countingReader, *countingWriter) {
 	return crd, cwr
 }
 
-func (s *Server) HandleDaemonConn(conn io.ReadWriter) (err error) {
+func checkACL(acls []string, remoteAddr net.Addr) error {
+	if len(acls) == 0 {
+		return nil
+	}
+	host, _, err := net.SplitHostPort(remoteAddr.String())
+	if err != nil {
+		return fmt.Errorf("BUG: invalid remote address %q", remoteAddr.String())
+	}
+	remoteIP := net.ParseIP(host)
+	if remoteIP == nil {
+		return fmt.Errorf("BUG: invalid remote host %q", host)
+	}
+	for _, acl := range acls {
+		// TODO(performance): move ACL parsing to config-time to make ACL checks
+		// less expensive
+		action, who, ok := strings.Cut(acl, " ")
+		if !ok {
+			return fmt.Errorf("invalid acl: %q (no space found)", acl)
+		}
+		if action != "allow" && action != "deny" {
+			return fmt.Errorf("invalid acl: %q (syntax: allow|deny <all|ipnet>)", acl)
+		}
+		if who == "all" {
+			// The all keyword matches any remote IP address
+		} else {
+			_, net, err := net.ParseCIDR(who)
+			if err != nil {
+				return fmt.Errorf("invalid acl: %q (syntax: allow|deny <all|ipnet>)", acl)
+			}
+			if !net.Contains(remoteIP) {
+				// Skip this instruction, the remote IP does not match
+				continue
+			}
+		}
+		switch action {
+		case "allow":
+			return nil
+		case "deny":
+			return fmt.Errorf("access denied (acl %q)", acl)
+		}
+	}
+	return nil
+}
+
+func (s *Server) HandleDaemonConn(conn io.ReadWriter, remoteAddr net.Addr) (err error) {
 	const terminationCommand = "@RSYNCD: OK\n"
 	crd := &countingReader{r: conn}
 	cwr := &countingWriter{w: conn}
@@ -134,15 +178,20 @@ func (s *Server) HandleDaemonConn(conn io.ReadWriter) (err error) {
 	}
 	requestedModule = strings.TrimSpace(requestedModule)
 	if requestedModule == "" || requestedModule == "#list" {
-		log.Printf("client requested rsync module listing")
+		log.Printf("client %v requested rsync module listing", remoteAddr)
 		io.WriteString(cwr, s.formatModuleList())
 		io.WriteString(cwr, "@RSYNCD: EXIT\n")
 		return nil
 	}
-	log.Printf("client requested rsync module %q", requestedModule)
+	log.Printf("client %v requested rsync module %q", remoteAddr, requestedModule)
 	module, err := s.getModule(requestedModule)
 	if err != nil {
 		fmt.Fprintf(cwr, "@ERROR: Unknown module '%s'\n", requestedModule)
+		return err
+	}
+
+	if err := checkACL(module.ACL, remoteAddr); err != nil {
+		fmt.Fprintf(cwr, "@ERROR: %v\n", err)
 		return err
 	}
 
@@ -323,10 +372,12 @@ func (s *Server) Serve(ln net.Listener) error {
 		if err != nil {
 			return err
 		}
+		remoteAddr := conn.RemoteAddr()
+		log.Printf("remote connection from %s", remoteAddr)
 		go func() {
 			defer conn.Close()
-			if err := s.HandleDaemonConn(conn); err != nil {
-				log.Printf("[%s] handle: %v", conn.RemoteAddr(), err)
+			if err := s.HandleDaemonConn(conn, remoteAddr); err != nil {
+				log.Printf("[%s] handle: %v", remoteAddr, err)
 			}
 		}()
 	}

@@ -59,7 +59,7 @@ func Main(args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer, cf
 			r: stdin,
 			w: stdout,
 		}
-		return srv.HandleDaemonConn(&rw)
+		return srv.HandleDaemonConn(&rw, nil)
 	}
 
 	// calling convention: command mode (over remote shell or locally)
