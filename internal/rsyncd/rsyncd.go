@@ -123,10 +123,11 @@ func checkACL(acls []string, remoteAddr net.Addr) error {
 	for _, acl := range acls {
 		// TODO(performance): move ACL parsing to config-time to make ACL checks
 		// less expensive
-		action, who, ok := strings.Cut(acl, " ")
-		if !ok {
+		i := strings.Index(acl, " ")
+		if i < 0 {
 			return fmt.Errorf("invalid acl: %q (no space found)", acl)
 		}
+		action, who := acl[:i], acl[i+len(" "):]
 		if action != "allow" && action != "deny" {
 			return fmt.Errorf("invalid acl: %q (syntax: allow|deny <all|ipnet>)", acl)
 		}
