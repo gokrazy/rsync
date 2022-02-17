@@ -148,6 +148,8 @@ func checkACL(acls []string, remoteAddr net.Addr) error {
 			return nil
 		case "deny":
 			return fmt.Errorf("access denied (acl %q)", acl)
+		default:
+			return fmt.Errorf("invalid acl: %q (syntax: allow|deny <all|ipnet>)", acl)
 		}
 	}
 	return nil
