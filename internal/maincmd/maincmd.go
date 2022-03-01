@@ -1,6 +1,7 @@
 package maincmd
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"log"
@@ -29,7 +30,7 @@ type readWriter struct {
 func (r *readWriter) Read(p []byte) (n int, err error)  { return r.r.Read(p) }
 func (r *readWriter) Write(p []byte) (n int, err error) { return r.w.Write(p) }
 
-func Main(args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer, cfg *config.Config) error {
+func Main(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer, cfg *config.Config) error {
 	opts, opt := rsyncd.NewGetOpt()
 	remaining, err := opt.Parse(args[1:])
 	if opt.Called("help") {
@@ -59,7 +60,7 @@ func Main(args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer, cf
 			r: stdin,
 			w: stdout,
 		}
-		return srv.HandleDaemonConn(&rw, nil)
+		return srv.HandleDaemonConn(ctx, &rw, nil)
 	}
 
 	// calling convention: command mode (over remote shell or locally)
@@ -191,10 +192,10 @@ func Main(args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer, cf
 	if cfg.Listeners[0].AnonSSH != "" {
 		log.Printf("rsync daemon listening (anon SSH) on %s", ln.Addr())
 		return anonssh.Serve(ln, cfg, func(args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer) error {
-			return Main(args, stdin, stdout, stderr, cfg)
+			return Main(ctx, args, stdin, stdout, stderr, cfg)
 		})
 	}
 
 	log.Printf("rsync daemon listening on rsync://%s", ln.Addr())
-	return srv.Serve(ln)
+	return srv.Serve(ctx, ln)
 }

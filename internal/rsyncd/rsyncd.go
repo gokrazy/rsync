@@ -2,6 +2,7 @@ package rsyncd
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"io"
 	"log"
@@ -155,7 +156,10 @@ func checkACL(acls []string, remoteAddr net.Addr) error {
 	return nil
 }
 
-func (s *Server) HandleDaemonConn(conn io.ReadWriter, remoteAddr net.Addr) (err error) {
+// FIXME: context cancellation not yet implemented
+func (s *Server) HandleDaemonConn(ctx context.Context, conn io.ReadWriter, remoteAddr net.Addr) (err error) {
+	_ = ctx // not implemented. what would be the best thing to do? wrap conn's reader part with cancelable reader?
+
 	const terminationCommand = "@RSYNCD: OK\n"
 	crd := &countingReader{r: conn}
 	cwr := &countingWriter{w: conn}
@@ -369,17 +373,27 @@ func (s *Server) HandleConn(module config.Module, rd io.Reader, crd *countingRea
 	return nil
 }
 
-func (s *Server) Serve(ln net.Listener) error {
+func (s *Server) Serve(ctx context.Context, ln net.Listener) error {
+	go func() {
+		<-ctx.Done()
+		ln.Close() // unblocks Accept()
+	}()
+
 	for {
 		conn, err := ln.Accept()
 		if err != nil {
-			return err
+			select {
+			case <-ctx.Done():
+				return nil // ignore expected 'use of closed network connection' error on context cancel
+			default:
+				return err
+			}
 		}
 		remoteAddr := conn.RemoteAddr()
 		log.Printf("remote connection from %s", remoteAddr)
 		go func() {
 			defer conn.Close()
-			if err := s.HandleDaemonConn(conn, remoteAddr); err != nil {
+			if err := s.HandleDaemonConn(ctx, conn, remoteAddr); err != nil {
 				log.Printf("[%s] handle: %v", remoteAddr, err)
 			}
 		}()
