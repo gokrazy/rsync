@@ -86,7 +86,7 @@ func TestReceiver(t *testing.T) {
 	}
 
 	// start a server to sync from
-	srv := rsynctest.New(t, rsynctest.InteropModMap(source))
+	srv := rsynctest.New(t, rsynctest.InteropModule(source))
 
 	args := []string{
 		"gokr-rsync",
@@ -198,7 +198,7 @@ func TestReceiverSync(t *testing.T) {
 	rsynctest.WriteLargeDataFile(t, source, headPattern, bodyPattern, endPattern)
 
 	// start a server to sync from
-	srv := rsynctest.New(t, rsynctest.InteropModMap(source))
+	srv := rsynctest.New(t, rsynctest.InteropModule(source))
 
 	args := []string{
 		"gokr-rsync",
@@ -246,7 +246,7 @@ func TestReceiverSSH(t *testing.T) {
 
 	// start a server to sync from
 	srv := rsynctest.New(t,
-		rsynctest.InteropModMap(source),
+		rsynctest.InteropModule(source),
 		rsynctest.Listeners([]config.Listener{
 			{AnonSSH: "localhost:0"},
 		}))

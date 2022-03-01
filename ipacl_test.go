@@ -93,7 +93,7 @@ acl = [
 					Port: 1234,
 				},
 			}
-			srv := rsynctest.New(t, cfg.ModuleMap, rsynctest.Listener(ln))
+			srv := rsynctest.New(t, cfg.Modules, rsynctest.Listener(ln))
 
 			// request module list: this should work regardless of the source IP
 			var buf bytes.Buffer

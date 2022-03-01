@@ -24,7 +24,7 @@ func TestErrors(t *testing.T) {
 	nonExistant := filepath.Join(tmp, "non/existant")
 
 	// start a server to sync from
-	srv := rsynctest.New(t, rsynctest.InteropModMap(nonExistant))
+	srv := rsynctest.New(t, rsynctest.InteropModule(nonExistant))
 
 	// sync into dest dir
 	var buf bytes.Buffer
@@ -106,7 +106,7 @@ func TestNoReadPermission(t *testing.T) {
 	}
 
 	// start a server to sync from
-	srv := rsynctest.New(t, rsynctest.InteropModMap(source))
+	srv := rsynctest.New(t, rsynctest.InteropModule(source))
 
 	// sync into dest dir
 	var buf bytes.Buffer

@@ -24,12 +24,21 @@ type sendTransfer struct {
 	lastMatch int64
 }
 
+func NewServer(modules ...config.Module) *Server {
+	moduleMap := map[string]config.Module{}
+	for _, module := range modules {
+		moduleMap[module.Name] = module
+	}
+
+	return &Server{moduleMap}
+}
+
 type Server struct {
-	Modules map[string]config.Module
+	modules map[string]config.Module
 }
 
 func (s *Server) getModule(requestedModule string) (config.Module, error) {
-	m, ok := s.Modules[requestedModule]
+	m, ok := s.modules[requestedModule]
 	if !ok {
 		return config.Module{}, fmt.Errorf("no such module")
 	}
@@ -37,11 +46,11 @@ func (s *Server) getModule(requestedModule string) (config.Module, error) {
 }
 
 func (s *Server) formatModuleList() string {
-	if len(s.Modules) == 0 {
+	if len(s.modules) == 0 {
 		return ""
 	}
 	var list strings.Builder
-	for name := range s.Modules {
+	for name := range s.modules {
 		comment := name // for now
 		fmt.Fprintf(&list, "%s\t%s\n",
 			name,

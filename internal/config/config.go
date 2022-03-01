@@ -21,19 +21,14 @@ type Module struct {
 }
 
 type Config struct {
-	Listeners []Listener        `toml:"listener"`
-	Modules   []Module          `toml:"module"`
-	ModuleMap map[string]Module `toml:"-"`
+	Listeners []Listener `toml:"listener"`
+	Modules   []Module   `toml:"module"`
 }
 
 func FromString(input string) (*Config, error) {
 	var cfg Config
 	if _, err := toml.Decode(input, &cfg); err != nil {
 		return nil, err
-	}
-	cfg.ModuleMap = make(map[string]Module)
-	for _, m := range cfg.Modules {
-		cfg.ModuleMap[m.Name] = m
 	}
 	return &cfg, nil
 }

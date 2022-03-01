@@ -24,7 +24,7 @@ func TestSyncExtended(t *testing.T) {
 	rsynctest.WriteLargeDataFile(t, source, headPattern, bodyPattern, endPattern)
 
 	// start a server to sync from
-	srv := rsynctest.New(t, rsynctest.InteropModMap(source))
+	srv := rsynctest.New(t, rsynctest.InteropModule(source))
 
 	sync := func() *rsyncparse.Stats {
 		rsync := exec.Command("rsync", //"/home/michael/src/openrsync/openrsync",

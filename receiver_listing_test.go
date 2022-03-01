@@ -42,7 +42,7 @@ func TestReceiverListing(t *testing.T) {
 	}
 
 	// start a server to sync from
-	srv := rsynctest.New(t, rsynctest.InteropModMap(source))
+	srv := rsynctest.New(t, rsynctest.InteropModule(source))
 
 	args := []string{
 		"gokr-rsync",

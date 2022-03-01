@@ -52,9 +52,7 @@ func Main(args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer, cf
 				return err
 			}
 		}
-		srv := &rsyncd.Server{
-			Modules: cfg.ModuleMap,
-		}
+		srv := rsyncd.NewServer(cfg.Modules...)
 		rw := readWriter{
 			r: stdin,
 			w: stdout,
@@ -112,7 +110,7 @@ func Main(args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer, cf
 							AnonSSH: opts.Gokrazy.AnonSSHListen,
 						},
 					},
-					ModuleMap: make(map[string]config.Module),
+					Modules: []config.Module{},
 				}
 			} else {
 				return err
@@ -145,22 +143,23 @@ func Main(args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer, cf
 		if len(parts) != 2 {
 			return fmt.Errorf("malformed -gokr.modulemap parameter %q, expected <modulename>=<path>", moduleMap)
 		}
-		cfg.ModuleMap[parts[0]] = config.Module{
+		module := config.Module{
 			Name: parts[0],
 			Path: parts[1],
 		}
+		cfg.Modules = append(cfg.Modules, module)
 	}
-	if err := namespace(cfg.ModuleMap, listenAddr); err == errIsParent {
+	if err := namespace(cfg.Modules, listenAddr); err == errIsParent {
 		return nil
 	} else if err != nil {
 		return fmt.Errorf("namespace: %v", err)
 	}
-	for name, mod := range cfg.ModuleMap {
+	for _, mod := range cfg.Modules {
 		if err := canUnexpectedlyWriteTo(mod.Path); err != nil {
 			return err
 		}
 
-		log.Printf("rsync module %q with path %s configured", name, mod.Path)
+		log.Printf("rsync module %q with path %s configured", mod.Name, mod.Path)
 	}
 
 	if monitoringListen := opts.Gokrazy.MonitoringListen; monitoringListen != "" {
@@ -172,7 +171,7 @@ func Main(args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer, cf
 		}()
 	}
 
-	srv := &rsyncd.Server{Modules: cfg.ModuleMap}
+	srv := rsyncd.NewServer(cfg.Modules...)
 	var ln net.Listener
 	listeners, err := systemdListeners()
 	if err != nil {

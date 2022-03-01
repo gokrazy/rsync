@@ -49,7 +49,7 @@ func TestModuleListing(t *testing.T) {
 	tmp := t.TempDir()
 
 	// start a server to sync from
-	srv := rsynctest.New(t, rsynctest.InteropModMap(tmp))
+	srv := rsynctest.New(t, rsynctest.InteropModule(tmp))
 
 	// request module list
 	var buf bytes.Buffer
@@ -96,7 +96,7 @@ func TestInterop(t *testing.T) {
 	}
 
 	// start a server to sync from
-	srv := rsynctest.New(t, rsynctest.InteropModMap(source))
+	srv := rsynctest.New(t, rsynctest.InteropModule(source))
 
 	// 	{
 	// 		config := filepath.Join(tmp, "rsyncd.conf")
@@ -288,7 +288,7 @@ func TestInteropSubdir(t *testing.T) {
 	_, source, dest := createSourceFiles(t)
 
 	// start a server to sync from
-	srv := rsynctest.New(t, rsynctest.InteropModMap(source))
+	srv := rsynctest.New(t, rsynctest.InteropModule(source))
 
 	// sync into dest dir
 	rsync := exec.Command("rsync", //"/home/michael/src/openrsync/openrsync",
@@ -414,7 +414,7 @@ func TestInteropRemoteDaemonAnonSSH(t *testing.T) {
 
 	// start a server to sync from
 	srv := rsynctest.New(t,
-		rsynctest.InteropModMap(source),
+		rsynctest.InteropModule(source),
 		rsynctest.Listeners([]config.Listener{
 			{AnonSSH: "localhost:0"},
 		}))
