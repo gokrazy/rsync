@@ -2,6 +2,7 @@ package rsynctest
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -95,7 +96,7 @@ func New(t *testing.T, modMap map[string]config.Module, opts ...Option) *TestSer
 		}
 		go func() {
 			err := anonssh.Serve(ts.listener, cfg, func(args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer) error {
-				return maincmd.Main(args, stdin, stdout, stderr, cfg)
+				return maincmd.Main(context.Background(), args, stdin, stdout, stderr, cfg)
 			})
 
 			if errors.Is(err, net.ErrClosed) {
@@ -107,7 +108,7 @@ func New(t *testing.T, modMap map[string]config.Module, opts ...Option) *TestSer
 			}
 		}()
 	} else {
-		go srv.Serve(ts.listener)
+		go srv.Serve(context.Background(), ts.listener)
 	}
 
 	return ts
