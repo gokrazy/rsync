@@ -89,7 +89,7 @@ func Main(args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer, cf
 	}
 
 	if !opts.Daemon {
-		return fmt.Errorf("NYI: client mode")
+		return fmt.Errorf("not implemented yet: client mode")
 	}
 
 	// daemon_main()
@@ -181,7 +181,7 @@ func Main(args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer, cf
 	if len(listeners) > 0 {
 		ln = listeners[0]
 	} else {
-		log.Printf("could not obtain listeners from systemd, creating listener")
+		log.Printf("not using systemd socket activation, creating listener")
 		ln, err = net.Listen("tcp", listenAddr)
 		if err != nil {
 			return err
