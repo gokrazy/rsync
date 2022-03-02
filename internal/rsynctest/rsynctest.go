@@ -35,11 +35,11 @@ type TestServer struct {
 	Port string
 }
 
-// InteropModMap is a convenience function to define an rsync module named
+// InteropModule is a convenience function to define an rsync module named
 // “interop” with the specified path.
-func InteropModMap(path string) map[string]config.Module {
-	return map[string]config.Module{
-		"interop": {
+func InteropModule(path string) []config.Module {
+	return []config.Module{
+		{
 			Name: "interop",
 			Path: path,
 		},
@@ -60,7 +60,7 @@ func Listener(ln net.Listener) Option {
 	}
 }
 
-func New(t *testing.T, modMap map[string]config.Module, opts ...Option) *TestServer {
+func New(t *testing.T, modules []config.Module, opts ...Option) *TestServer {
 	ts := &TestServer{}
 	for _, opt := range opts {
 		opt(ts)
@@ -70,9 +70,7 @@ func New(t *testing.T, modMap map[string]config.Module, opts ...Option) *TestSer
 			{Rsyncd: "localhost:0"},
 		}
 	}
-	srv := &rsyncd.Server{
-		Modules: modMap,
-	}
+	srv := rsyncd.NewServer(modules...)
 
 	if ts.listener == nil {
 		ln, err := net.Listen("tcp", "localhost:0")
@@ -92,7 +90,7 @@ func New(t *testing.T, modMap map[string]config.Module, opts ...Option) *TestSer
 
 	if ts.listeners[0].AnonSSH != "" {
 		cfg := &config.Config{
-			ModuleMap: modMap,
+			Modules: modules,
 		}
 		go func() {
 			err := anonssh.Serve(ts.listener, cfg, func(args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer) error {

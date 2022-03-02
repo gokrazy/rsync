@@ -71,7 +71,7 @@ func pivotRoot(newroot string) error {
 	return nil
 }
 
-func namespace(modMap map[string]config.Module, listen string) error {
+func namespace(modules []config.Module, listen string) error {
 	if os.Getenv("GOKRAZY_RSYNC_NAMESPACE") != "" {
 		log.Printf("pid %d (inside Linux mount/pid namespace)", os.Getpid())
 
@@ -103,13 +103,13 @@ func namespace(modMap map[string]config.Module, listen string) error {
 
 		// prepare read-only bind mounts for each configured rsync module:
 		log.Printf("mounting rsync modules read-only:")
-		for name, mod := range modMap {
-			log.Printf("  rsync module %q from host=%s to namespace=/%s", name, mod.Path, name)
+		for _, mod := range modules {
+			log.Printf("  rsync module %q from host=%s to namespace=/%s", mod.Name, mod.Path, mod.Name)
 			// TODO: restrict module names to not contain slashes. does rsync do that?
-			if err := os.MkdirAll(name, 0755); err != nil {
+			if err := os.MkdirAll(mod.Name, 0755); err != nil {
 				return err
 			}
-			if err := syscall.Mount(mod.Path, name, "none", syscall.MS_BIND|syscall.MS_RDONLY, ""); err != nil {
+			if err := syscall.Mount(mod.Path, mod.Name, "none", syscall.MS_BIND|syscall.MS_RDONLY, ""); err != nil {
 				return err
 			}
 		}
@@ -127,9 +127,9 @@ func namespace(modMap map[string]config.Module, listen string) error {
 			return fmt.Errorf("dropPrivileges: %v", err)
 		}
 
-		for name, mod := range modMap {
-			mod.Path = "/" + name
-			modMap[name] = mod
+		for idx, mod := range modules {
+			mod.Path = "/" + mod.Name
+			modules[idx] = mod
 		}
 
 		if err := canUnexpectedlyWriteTo("."); err != nil {
