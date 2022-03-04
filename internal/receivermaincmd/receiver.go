@@ -121,11 +121,11 @@ func (rt *recvTransfer) receiveData(f *file, localFile *os.File) error {
 		}
 		token = -(token + 1)
 		offset2 := int64(token) * int64(sh.BlockLength)
-		len := sh.BlockLength
+		dataLen := sh.BlockLength
 		if token == sh.ChecksumCount-1 && sh.RemainderLength != 0 {
-			len = sh.RemainderLength
+			dataLen = sh.RemainderLength
 		}
-		data = make([]byte, len)
+		data = make([]byte, dataLen)
 		if _, err := localFile.ReadAt(data, offset2); err != nil {
 			return err
 		}
