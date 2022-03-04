@@ -243,12 +243,14 @@ func (st *sendTransfer) matched(h hash.Hash, f *os.File, head rsync.SumHead, off
 			offset, st.lastMatch, i, head.Sums[i].Len, n)
 	}
 
+	/* FIXME: this is not used
 	l := int64(0)
 	if !transmitAccumulated {
 		l = head.Sums[i].Len
 	}
+	*/
 
-	if err := st.sendToken(f, i, st.lastMatch, n, l); err != nil {
+	if err := st.sendToken(f, i, st.lastMatch, n); err != nil {
 		return fmt.Errorf("sendToken: %v", err)
 	}
 	// TODO: data_transfer += n;

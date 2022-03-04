@@ -42,7 +42,7 @@ func (st *sendTransfer) simpleSendToken(f *os.File, token int32, offset int64, n
 }
 
 // rsync/token.c:send_token
-func (st *sendTransfer) sendToken(f *os.File, i int32, offset int64, n int64, toklen int64) error {
+func (st *sendTransfer) sendToken(f *os.File, i int32, offset int64, n int64) error {
 	// TODO(compression): send deflated token
 	return st.simpleSendToken(f, i, offset, n)
 }
