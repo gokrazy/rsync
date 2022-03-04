@@ -23,12 +23,12 @@ func signExtend(b byte) uint32 {
 }
 
 func Checksum1(buf []byte) uint32 {
-	len := len(buf)
+	bufLen := len(buf)
 	var s1, s2 uint32
 	var i int
 
-	if len > 4 {
-		for i = 0; i < (len - 4); i += 4 {
+	if bufLen > 4 {
+		for i = 0; i < (bufLen - 4); i += 4 {
 			s2 += 4*(s1+signExtend(buf[i])) +
 				3*signExtend(buf[i+1]) +
 				2*signExtend(buf[i+2]) +
@@ -39,7 +39,7 @@ func Checksum1(buf []byte) uint32 {
 				signExtend(buf[i+3])
 		}
 	}
-	for ; i < len; i++ {
+	for ; i < bufLen; i++ {
 		s1 += signExtend(buf[i])
 		s2 += s1
 	}

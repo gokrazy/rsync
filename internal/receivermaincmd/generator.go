@@ -260,13 +260,13 @@ func (rt *recvTransfer) recvGenerator(idx int, f *file) error {
 }
 
 // rsync/generator.c:generate_and_send_sums
-func (rt *recvTransfer) generateAndSendSums(in *os.File, len int64) error {
-	sh := rsynccommon.SumSizesSqroot(len)
+func (rt *recvTransfer) generateAndSendSums(in *os.File, fileLen int64) error {
+	sh := rsynccommon.SumSizesSqroot(fileLen)
 	if err := sh.WriteTo(rt.conn); err != nil {
 		return err
 	}
 	buf := make([]byte, int(sh.BlockLength))
-	remaining := len
+	remaining := fileLen
 	for i := int32(0); i < sh.ChecksumCount; i++ {
 		n1 := int64(sh.BlockLength)
 		if n1 > remaining {
