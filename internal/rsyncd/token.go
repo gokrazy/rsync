@@ -36,7 +36,7 @@ func (st *sendTransfer) simpleSendToken(f *os.File, token int32, offset int64, n
 		}
 	}
 	if token != -2 {
-		return st.conn.WriteInt32(-(int32(token) + 1))
+		return st.conn.WriteInt32(-(token + 1))
 	}
 	return nil
 }
