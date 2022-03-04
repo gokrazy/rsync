@@ -332,7 +332,7 @@ func (s *Server) HandleConn(module config.Module, rd io.Reader, crd *countingRea
 	// https://github.com/kristapsdz/openrsync/blob/master/rsync.5
 
 	// send file list
-	fileList, err := st.sendFileList(c, module, opts, paths)
+	fileList, err := st.sendFileList(module, opts, paths)
 	if err != nil {
 		return err
 	}
