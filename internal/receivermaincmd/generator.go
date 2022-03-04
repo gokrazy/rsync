@@ -86,7 +86,7 @@ func (rt *recvTransfer) setPerms(f *file) error {
 		}
 	}
 
-	st, err = rt.setUid(f, local, st)
+	_, err = rt.setUid(f, local, st)
 	if err != nil {
 		return err
 	}
