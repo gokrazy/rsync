@@ -48,6 +48,8 @@ type session struct {
 }
 
 func (s *session) request(ctx context.Context, req *ssh.Request) error {
+	_ = ctx // FIXME: not yet used
+
 	switch req.Type {
 
 	case "env":
