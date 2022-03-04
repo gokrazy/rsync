@@ -195,7 +195,7 @@ func rsyncMain(osenv osenv, opts *Opts, sources []string, dest string) (*Stats, 
 				user = machine[:idx]
 				machine = machine[idx+1:]
 			}
-			rc, wc, err := doCmd(osenv, opts, machine, user, path, daemonConnection)
+			rc, wc, err := doCmd(opts, machine, user, path, daemonConnection)
 			if err != nil {
 				return nil, err
 			}
@@ -236,7 +236,7 @@ func (prw *readWriter) Write(p []byte) (n int, err error) {
 }
 
 // rsync/main.c:do_cmd
-func doCmd(osenv osenv, opts *Opts, machine, user, path string, daemonConnection int) (io.ReadCloser, io.WriteCloser, error) {
+func doCmd(opts *Opts, machine, user, path string, daemonConnection int) (io.ReadCloser, io.WriteCloser, error) {
 	cmd := opts.ShellCommand
 	if cmd == "" {
 		cmd = "ssh"
