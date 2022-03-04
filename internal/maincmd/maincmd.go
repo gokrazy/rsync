@@ -34,7 +34,7 @@ func Main(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer,
 	opts, opt := rsyncd.NewGetOpt()
 	remaining, err := opt.Parse(args[1:])
 	if opt.Called("help") {
-		fmt.Fprintf(stderr, opt.Help())
+		fmt.Fprint(stderr, opt.Help())
 		os.Exit(1)
 	}
 	if err != nil {
