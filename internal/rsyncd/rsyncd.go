@@ -69,15 +69,6 @@ type fileList struct {
 	files     []file
 }
 
-// rsync/rsync.h:struct sum_buf
-type sumBuf struct {
-	offset int64
-	len    int64
-	index  int32
-	sum1   uint32
-	sum2   [16]byte
-}
-
 // rsync/rsync.h defines chunkSize as 32 * 1024, but increasing it to 256K
 // increases throughput with “tridge” rsync as client by 50 Mbit/s.
 const chunkSize = 256 * 1024

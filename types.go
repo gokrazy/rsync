@@ -2,6 +2,7 @@ package rsync
 
 import "github.com/gokrazy/rsync/internal/rsyncwire"
 
+// rsync/rsync.h:struct sum_buf
 type SumBuf struct {
 	Offset int64
 	Len    int64
