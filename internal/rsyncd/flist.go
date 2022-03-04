@@ -14,7 +14,7 @@ import (
 )
 
 // rsync/flist.c:send_file_list
-func (st *sendTransfer) sendFileList(c *rsyncwire.Conn, mod config.Module, opts *Opts, paths []string) (*fileList, error) {
+func (st *sendTransfer) sendFileList(mod config.Module, opts *Opts, paths []string) (*fileList, error) {
 	var fileList fileList
 	fec := &rsyncwire.Buffer{}
 
