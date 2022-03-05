@@ -96,7 +96,7 @@ func (ms *mapStruct) ptr(offset int64, l int32) []byte {
 	}
 	ms.pOffset = windowStart
 	ms.pLen = windowSize
-	//log.Printf("-> reading %d bytes from offset=%d", readSize, readOffset)
+	//log.Printf("-> reading %d bytes from %d into buffer at offset=%d", readSize, readStart, readOffset)
 	for readSize > 0 {
 		n, err := ms.f.Read(ms.window[readOffset : readOffset+readSize])
 		if err != nil {

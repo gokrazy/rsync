@@ -78,6 +78,7 @@ func (st *sendTransfer) sendFiles(fileList *fileList) error {
 			}
 		}
 
+		st.lastMatch = 0
 		if len(head.Sums) == 0 {
 			// fast path: send the whole file
 			err = st.sendFile(fileIndex, fileList.files[fileIndex])

@@ -15,6 +15,7 @@ import (
 
 // rsync/match.c:hash_search
 func (st *sendTransfer) hashSearch(targets []target, tagTable map[uint16]int, head rsync.SumHead, fileIndex int32, fl file) error {
+	log.Printf("hashSearch(path=%s, len(sums)=%d)", fl.path, len(head.Sums))
 	f, err := os.Open(fl.path)
 	if err != nil {
 		return err
@@ -57,8 +58,7 @@ func (st *sendTransfer) hashSearch(targets []target, tagTable map[uint16]int, he
 
 	var k int
 	var sum uint32
-	var s1, s2 uint16
-	var chunk []byte
+	var s1, s2 uint32
 	var offset int64
 	end := fi.Size() + 1 - head.Sums[len(head.Sums)-1].Len
 	log.Printf("last block len=%d, end=%d", head.Sums[len(head.Sums)-1].Len, end)
@@ -69,10 +69,10 @@ func (st *sendTransfer) hashSearch(targets []target, tagTable map[uint16]int, he
 			k = remaining
 		}
 
-		chunk = ms.ptr(offset, int32(k))
+		chunk := ms.ptr(offset, int32(k))
 		sum = rsyncchecksum.Checksum1(chunk)
-		s1 = uint16(sum & 0xFFFF)
-		s2 = uint16(sum >> 16)
+		s1 = uint32(sum & 0xFFFF)
+		s2 = uint32(sum >> 16)
 		return nil
 	}
 	if err := readChunk(); err != nil {
@@ -82,7 +82,7 @@ func (st *sendTransfer) hashSearch(targets []target, tagTable map[uint16]int, he
 	tagHits := 0
 Outer:
 	for {
-		tag := rsyncchecksum.Tag2(s1, s2)
+		tag := rsyncchecksum.Tag2(uint16(s1), uint16(s2))
 		var sum2 []byte
 		doneCsum2 := false
 		j, ok := tagTable[tag]
@@ -137,17 +137,6 @@ Outer:
 					return err
 				}
 
-				offset += head.Sums[i].Len
-				if err := readChunk(); err != nil {
-					return fmt.Errorf("readChunk: %v", err)
-				}
-
-				if offset >= end {
-					break
-				}
-
-				continue Outer
-
 				// rsync doesn’t read the next chunk (offset+sums[i].len),
 				// rsync starts reading one byte before the next chunk
 				// (offset+sums[i].len-1), because the code path starting at
@@ -157,54 +146,49 @@ Outer:
 				if err := readChunk(); err != nil {
 					return fmt.Errorf("readChunk: %v", err)
 				}
+
+				if offset >= end {
+					break Outer
+				}
+
 				break
 			}
 		}
-		// null_tag
-		offset++
-		if offset >= end {
-			break
+
+		// Update the rolling checksum by removing the oldest byte (update[0])
+		// and adding the newest byte (update[k]).
+		backup := offset - st.lastMatch
+		if backup < 0 {
+			backup = 0
 		}
 
-		if err := readChunk(); err != nil {
-			return fmt.Errorf("readChunk: %v", err)
+		more := offset+int64(k) < fi.Size()
+		mmore := int64(0)
+		if more {
+			mmore = 1
 		}
+		update := ms.ptr(offset-backup, int32(int64(k)+mmore+backup))
+		update = update[backup:]
 
-		continue Outer
+		s1 -= rsyncchecksum.SignExtend(update[0])
+		s2 -= uint32(k) * rsyncchecksum.SignExtend(update[0])
 
-		// TODO: make the rolling checksum below work:
+		if more {
+			s1 += rsyncchecksum.SignExtend(update[k])
+			s2 += s1
+		} else {
+			k--
+		}
+		s1 = uint32(uint16(s1))
+		s2 = uint32(uint16(s2))
 
-		// //log.Printf("null_tag, k=%d", k)
-		// readk := k + 1
-		// add := k < int(fi.Size()-offset)
-		// if !add {
-		// 	readk--
-		// }
-
-		// if readk > 0 {
-		// 	buf := make([]byte, readk)
-		// 	n, err := bf.ReadAt(buf, offset)
-		// 	//log.Printf("ReadAt(offset=%d, len=%d, ret=%d)", offset, len(buf), n)
-		// 	if err != nil {
-		// 		return fmt.Errorf("[resync] ReadAt(%v, len=%d): %v", offset, len(buf), err)
-		// 	}
-		// 	update := buf[:n]
-		// 	s1 -= uint16(update[0])
-		// 	s2 -= uint16(k) * uint16(update[0])
-
-		// 	if add {
-		// 		s1 += uint16(update[k])
-		// 		s2 += s1
-		// 	} else {
-		// 		log.Printf("WARNING: not enough bytes available")
-		// 		k--
-		// 	}
-
-		// 	// TODO: match early
-		// 	// if err := c.matched(h, f, head, offset-int64(head.BlockLength), -2); err != nil {
-		// 	// 	return err
-		// 	// }
-		// }
+		if backup >= int64(head.BlockLength)+chunkSize && end-offset > chunkSize {
+			// Prevent offset-st.lastMatch from growing too large by flushing
+			// intermediate chunks.
+			if err := st.matched(h, ms, head, offset-int64(head.BlockLength), -2); err != nil {
+				return err
+			}
+		}
 
 		offset++
 		if offset >= end {
@@ -234,10 +218,12 @@ func (st *sendTransfer) matched(h hash.Hash, ms *mapStruct, head rsync.SumHead, 
 
 	transmitAccumulated := i < 0
 
-	if !transmitAccumulated {
-		log.Printf("match at offset=%d last_match=%d i=%d len=%d n=%d",
-			offset, st.lastMatch, i, head.Sums[i].Len, n)
-	}
+	// if !transmitAccumulated {
+	// 	log.Printf("match at offset=%d last_match=%d i=%d len=%d n=%d",
+	// 		offset, st.lastMatch, i, head.Sums[i].Len, n)
+	// } else {
+	// 	log.Printf("transmit accumulated at offset=%d", offset)
+	// }
 
 	/* FIXME: this is not used
 	l := int64(0)
