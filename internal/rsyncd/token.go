@@ -1,15 +1,13 @@
 package rsyncd
 
 import (
-	"fmt"
 	"log"
-	"os"
 )
 
 // rsync/token.c:simple_send_token
-func (st *sendTransfer) simpleSendToken(f *os.File, token int32, offset int64, n int64) error {
+func (st *sendTransfer) simpleSendToken(ms *mapStruct, token int32, offset int64, n int64) error {
 	if n > 0 {
-		log.Printf("sending unmatched chunks")
+		log.Printf("sending unmatched chunks offset=%d, n=%d", offset, n)
 		l := int64(0)
 		for l < n {
 			n1 := int64(chunkSize)
@@ -17,12 +15,7 @@ func (st *sendTransfer) simpleSendToken(f *os.File, token int32, offset int64, n
 				n1 = n - l
 			}
 
-			buf := make([]byte, n1)
-			n, err := f.ReadAt(buf, offset+l)
-			if err != nil {
-				return fmt.Errorf("ReadAt(%v): %v", offset+l, err)
-			}
-			chunk := buf[:n]
+			chunk := ms.ptr(offset+l, int32(n1))
 
 			if err := st.conn.WriteInt32(int32(n1)); err != nil {
 				return err
@@ -42,7 +35,7 @@ func (st *sendTransfer) simpleSendToken(f *os.File, token int32, offset int64, n
 }
 
 // rsync/token.c:send_token
-func (st *sendTransfer) sendToken(f *os.File, i int32, offset int64, n int64) error {
+func (st *sendTransfer) sendToken(ms *mapStruct, i int32, offset int64, n int64) error {
 	// TODO(compression): send deflated token
-	return st.simpleSendToken(f, i, offset, n)
+	return st.simpleSendToken(ms, i, offset, n)
 }

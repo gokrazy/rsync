@@ -26,6 +26,12 @@ func (st *sendTransfer) hashSearch(targets []target, tagTable map[uint16]int, he
 		return err
 	}
 
+	readSize := 3 * head.BlockLength
+	if readSize > 256*1024 {
+		readSize = 256 * 1024
+	}
+	ms := mapFile(f, fi.Size(), readSize, head.BlockLength)
+
 	if err := st.conn.WriteInt32(fileIndex); err != nil {
 		return err
 	}
@@ -63,13 +69,7 @@ func (st *sendTransfer) hashSearch(targets []target, tagTable map[uint16]int, he
 			k = remaining
 		}
 
-		buf := make([]byte, k)
-		n, err := f.ReadAt(buf, offset)
-		// log.Printf("reading chunk at offset=%d with len=%d (ret=%d)", offset, len(buf), n)
-		if err != nil {
-			return err
-		}
-		chunk = buf[:n]
+		chunk = ms.ptr(offset, int32(k))
 		sum = rsyncchecksum.Checksum1(chunk)
 		s1 = uint16(sum & 0xFFFF)
 		s2 = uint16(sum >> 16)
@@ -112,12 +112,8 @@ Outer:
 				// log.Printf("potential match at %d target=%d %d sum=%08x", offset, j, i, sum)
 
 				if !doneCsum2 {
-					buf := make([]byte, l)
-					n, err := f.ReadAt(buf, offset)
-					if err != nil {
-						return err
-					}
-					sum2 = rsyncchecksum.Checksum2(st.seed, buf[:n])
+					buf := ms.ptr(offset, int32(l))
+					sum2 = rsyncchecksum.Checksum2(st.seed, buf[:])
 					doneCsum2 = true
 				}
 
@@ -137,7 +133,7 @@ Outer:
 				// was matched12. The search then continues at the byte after
 				// the matching block.”
 
-				if err := st.matched(h, f, head, offset, i); err != nil {
+				if err := st.matched(h, ms, head, offset, i); err != nil {
 					return err
 				}
 
@@ -178,37 +174,37 @@ Outer:
 
 		// TODO: make the rolling checksum below work:
 
-		//log.Printf("null_tag, k=%d", k)
-		readk := k + 1
-		add := k < int(fi.Size()-offset)
-		if !add {
-			readk--
-		}
+		// //log.Printf("null_tag, k=%d", k)
+		// readk := k + 1
+		// add := k < int(fi.Size()-offset)
+		// if !add {
+		// 	readk--
+		// }
 
-		if readk > 0 {
-			buf := make([]byte, readk)
-			n, err := f.ReadAt(buf, offset)
-			//log.Printf("ReadAt(offset=%d, len=%d, ret=%d)", offset, len(buf), n)
-			if err != nil {
-				return fmt.Errorf("[resync] ReadAt(%v, len=%d): %v", offset, len(buf), err)
-			}
-			update := buf[:n]
-			s1 -= uint16(update[0])
-			s2 -= uint16(k) * uint16(update[0])
+		// if readk > 0 {
+		// 	buf := make([]byte, readk)
+		// 	n, err := bf.ReadAt(buf, offset)
+		// 	//log.Printf("ReadAt(offset=%d, len=%d, ret=%d)", offset, len(buf), n)
+		// 	if err != nil {
+		// 		return fmt.Errorf("[resync] ReadAt(%v, len=%d): %v", offset, len(buf), err)
+		// 	}
+		// 	update := buf[:n]
+		// 	s1 -= uint16(update[0])
+		// 	s2 -= uint16(k) * uint16(update[0])
 
-			if add {
-				s1 += uint16(update[k])
-				s2 += s1
-			} else {
-				log.Printf("WARNING: not enough bytes available")
-				k--
-			}
+		// 	if add {
+		// 		s1 += uint16(update[k])
+		// 		s2 += s1
+		// 	} else {
+		// 		log.Printf("WARNING: not enough bytes available")
+		// 		k--
+		// 	}
 
-			// TODO: match early
-			// if err := c.matched(h, f, head, offset-int64(head.BlockLength), -2); err != nil {
-			// 	return err
-			// }
-		}
+		// 	// TODO: match early
+		// 	// if err := c.matched(h, f, head, offset-int64(head.BlockLength), -2); err != nil {
+		// 	// 	return err
+		// 	// }
+		// }
 
 		offset++
 		if offset >= end {
@@ -216,7 +212,7 @@ Outer:
 		}
 	}
 
-	if err := st.matched(h, f, head, fi.Size(), -1); err != nil {
+	if err := st.matched(h, ms, head, fi.Size(), -1); err != nil {
 		return err
 	}
 
@@ -233,7 +229,7 @@ Outer:
 }
 
 // rsync/match.c:matched
-func (st *sendTransfer) matched(h hash.Hash, f *os.File, head rsync.SumHead, offset int64, i int32) error {
+func (st *sendTransfer) matched(h hash.Hash, ms *mapStruct, head rsync.SumHead, offset int64, i int32) error {
 	n := offset - st.lastMatch
 
 	transmitAccumulated := i < 0
@@ -250,7 +246,7 @@ func (st *sendTransfer) matched(h hash.Hash, f *os.File, head rsync.SumHead, off
 	}
 	*/
 
-	if err := st.sendToken(f, i, st.lastMatch, n); err != nil {
+	if err := st.sendToken(ms, i, st.lastMatch, n); err != nil {
 		return fmt.Errorf("sendToken: %v", err)
 	}
 	// TODO: data_transfer += n;
@@ -265,13 +261,7 @@ func (st *sendTransfer) matched(h hash.Hash, f *os.File, head rsync.SumHead, off
 		if n-j < n1 {
 			n1 = n - j
 		}
-
-		buf := make([]byte, n1)
-		n, err := f.ReadAt(buf, st.lastMatch+j)
-		if err != nil {
-			return fmt.Errorf("ReadAt(%d): %v", st.lastMatch+j, err)
-		}
-		chunk := buf[:n]
+		chunk := ms.ptr(st.lastMatch+j, int32(n1))
 		h.Write(chunk)
 	}
 
