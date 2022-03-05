@@ -67,7 +67,9 @@ func (ms *mapStruct) ptr(offset int64, l int32) []byte {
 		windowSize = alignedLength(len + alignFudge)
 	}
 	if windowSize > ms.pSize {
-		ms.window = make([]byte, windowSize)
+		win := make([]byte, windowSize)
+		copy(win, ms.window)
+		ms.window = win
 		ms.pSize = windowSize
 	}
 	readStart := windowStart
