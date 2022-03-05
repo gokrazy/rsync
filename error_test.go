@@ -91,11 +91,11 @@ func TestNoReadPermission(t *testing.T) {
 		t.Fatal(err)
 	}
 	dummy := filepath.Join(source, "dummy")
-	want := []byte("heyo")
-	if err := ioutil.WriteFile(dummy, want, 0644); err != nil {
+	if err := ioutil.WriteFile(dummy, []byte("dummy"), 0644); err != nil {
 		t.Fatal(err)
 	}
 	other := filepath.Join(source, "other")
+	want := []byte("other file contents")
 	if err := ioutil.WriteFile(other, want, 0644); err != nil {
 		t.Fatal(err)
 	}
