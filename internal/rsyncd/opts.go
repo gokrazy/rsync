@@ -41,7 +41,7 @@ func NewGetOpt() (*Opts, *getoptions.GetOpt) {
 	opt.StringVar(&opts.Gokrazy.Listen, "gokr.listen", "", opt.Description("[host]:port listen address for the rsync daemon protocol"))
 	opt.StringVar(&opts.Gokrazy.MonitoringListen, "gokr.monitoring_listen", "", opt.Description("optional [host]:port listen address for a HTTP debug interface"))
 	opt.StringVar(&opts.Gokrazy.AnonSSHListen, "gokr.anonssh_listen", "", opt.Description("optional [host]:port listen address for the rsync daemon protocol via anonymous SSH"))
-	opt.StringVar(&opts.Gokrazy.ModuleMap, "gokr.modulemap", "nonex=/nonexistant/path", opt.Description("<modulename>=<path> pairs for quick setup of the server, without a config file"))
+	opt.StringVar(&opts.Gokrazy.ModuleMap, "gokr.modulemap", "", opt.Description("<modulename>=<path> pairs for quick setup of the server, without a config file"))
 
 	// rsync-compatible flags
 	opt.BoolVar(&opts.Daemon, "daemon", false, opt.Description("run as an rsync daemon"))

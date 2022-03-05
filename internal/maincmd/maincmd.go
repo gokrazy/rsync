@@ -96,12 +96,13 @@ func Main(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer,
 	// calling convention: start a daemon in TCP listening mode (or with systemd
 	// socket activation)
 
+	var cfgfn string
+	var cfgErr error
 	if cfg == nil {
-		var cfgfn string
-		var err error
-		cfg, cfgfn, err = config.FromDefaultFiles()
-		if err != nil {
-			if os.IsNotExist(err) {
+		cfg, cfgfn, cfgErr = config.FromDefaultFiles()
+		if cfgErr != nil {
+			if os.IsNotExist(cfgErr) {
+				log.Printf("config file not found, relying on flags")
 				// a non-existant config file is not an error: users can start
 				// gokr-rsyncd with e.g. the -gokr.listen and -gokr.modulemap flags.
 				cfg = &config.Config{
@@ -114,20 +115,33 @@ func Main(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer,
 					Modules: []config.Module{},
 				}
 			} else {
-				return err
+				return cfgErr
 			}
 		} else {
 			log.Printf("config file %s loaded", cfgfn)
 		}
 	}
 
-	if os.IsNotExist(err) &&
-		opts.Gokrazy.Listen == "" &&
-		opts.Gokrazy.AnonSSHListen == "" {
-		return fmt.Errorf("neither -gokr.listen nor -gokr.anonssh_listen specified, and config file not found: %v", err)
+	if os.IsNotExist(cfgErr) {
+		if opts.Gokrazy.Listen == "" &&
+			opts.Gokrazy.AnonSSHListen == "" {
+			return fmt.Errorf("neither -gokr.listen nor -gokr.anonssh_listen specified, and config file not found: %v", cfgErr)
+		}
+		// If no config file was found, and the user did not specify a
+		// -gokr.modulemap flag, use a default value to force the user to
+		// configure a module map.
+		if opts.Gokrazy.ModuleMap == "" {
+			opts.Gokrazy.ModuleMap = "nonex=/nonexistant/path"
+		}
+	} else {
+		if len(cfg.Listeners) == 0 ||
+			(cfg.Listeners[0].Rsyncd == "" &&
+				cfg.Listeners[0].AnonSSH == "") {
+			return fmt.Errorf("no rsyncd listeners configured, add a [[listener]] to %s", cfgfn)
+		}
 	}
-
 	// TODO: loosen this restriction, create multiple listeners
+
 	if len(cfg.Listeners) != 1 ||
 		(cfg.Listeners[0].Rsyncd == "" &&
 			cfg.Listeners[0].AnonSSH == "") {
@@ -155,6 +169,7 @@ func Main(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer,
 	} else if err != nil {
 		return fmt.Errorf("namespace: %v", err)
 	}
+	log.Printf("%d rsync modules configured in total", len(cfg.Modules))
 	for _, mod := range cfg.Modules {
 		if err := canUnexpectedlyWriteTo(mod.Path); err != nil {
 			return err
