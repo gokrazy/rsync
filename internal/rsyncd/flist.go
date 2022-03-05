@@ -7,10 +7,16 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/gokrazy/rsync"
 	"github.com/gokrazy/rsync/internal/config"
 	"github.com/gokrazy/rsync/internal/rsyncwire"
+)
+
+var (
+	lookupOnce      sync.Once
+	lookupGroupOnce sync.Once
 )
 
 // rsync/flist.c:send_file_list
@@ -126,7 +132,9 @@ func (st *sendTransfer) sendFileList(mod config.Module, opts *Opts, paths []stri
 					if _, ok := uidMap[uid]; !ok && uid != 0 {
 						u, err := user.LookupId(strconv.Itoa(int(uid)))
 						if err != nil {
-							log.Printf("lookup(%d) = %v", uid, err)
+							lookupOnce.Do(func() {
+								log.Printf("lookup(%d) = %v", uid, err)
+							})
 						} else {
 							uidMap[uid] = u.Username
 						}
@@ -142,7 +150,9 @@ func (st *sendTransfer) sendFileList(mod config.Module, opts *Opts, paths []stri
 					if _, ok := gidMap[gid]; !ok && gid != 0 {
 						g, err := user.LookupGroupId(strconv.Itoa(int(gid)))
 						if err != nil {
-							log.Printf("lookupgroup(%d) = %v", gid, err)
+							lookupGroupOnce.Do(func() {
+								log.Printf("lookupgroup(%d) = %v", gid, err)
+							})
 						} else {
 							gidMap[gid] = g.Name
 						}
