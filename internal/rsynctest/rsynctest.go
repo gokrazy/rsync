@@ -20,7 +20,7 @@ import (
 	"github.com/gokrazy/rsync/internal/anonssh"
 	"github.com/gokrazy/rsync/internal/config"
 	"github.com/gokrazy/rsync/internal/maincmd"
-	"github.com/gokrazy/rsync/internal/rsyncd"
+	"github.com/gokrazy/rsync/rsyncd"
 	"github.com/google/go-cmp/cmp"
 	"golang.org/x/sys/unix"
 )
@@ -37,8 +37,8 @@ type TestServer struct {
 
 // InteropModule is a convenience function to define an rsync module named
 // “interop” with the specified path.
-func InteropModule(path string) []config.Module {
-	return []config.Module{
+func InteropModule(path string) []rsyncd.Module {
+	return []rsyncd.Module{
 		{
 			Name: "interop",
 			Path: path,
@@ -60,7 +60,7 @@ func Listener(ln net.Listener) Option {
 	}
 }
 
-func New(t *testing.T, modules []config.Module, opts ...Option) *TestServer {
+func New(t *testing.T, modules []rsyncd.Module, opts ...Option) *TestServer {
 	ts := &TestServer{}
 	for _, opt := range opts {
 		opt(ts)
@@ -70,7 +70,10 @@ func New(t *testing.T, modules []config.Module, opts ...Option) *TestServer {
 			{Rsyncd: "localhost:0"},
 		}
 	}
-	srv := rsyncd.NewServer(modules...)
+	srv, err := rsyncd.NewServer(modules)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	if ts.listener == nil {
 		ln, err := net.Listen("tcp", "localhost:0")

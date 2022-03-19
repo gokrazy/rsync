@@ -12,10 +12,10 @@ import (
 	"os/exec"
 	"strconv"
 
-	"github.com/gokrazy/rsync/internal/config"
+	"github.com/gokrazy/rsync/rsyncd"
 )
 
-func namespace(modules []config.Module, listen string) error {
+func namespace(modules []rsyncd.Module, listen string) error {
 	if os.Getenv("GOKRAZY_RSYNC_PRIVDROP") != "" {
 		log.Printf("pid %d (privileges dropped)", os.Getpid())
 

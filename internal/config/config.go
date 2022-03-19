@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 
 	"github.com/BurntSushi/toml"
+	"github.com/gokrazy/rsync/rsyncd"
 )
 
 type Listener struct {
@@ -14,15 +15,9 @@ type Listener struct {
 	AnonSSH        string `toml:"anon_ssh"`
 }
 
-type Module struct {
-	Name string   `toml:"name"`
-	Path string   `toml:"path"`
-	ACL  []string `toml:"acl"`
-}
-
 type Config struct {
-	Listeners []Listener `toml:"listener"`
-	Modules   []Module   `toml:"module"`
+	Listeners []Listener      `toml:"listener"`
+	Modules   []rsyncd.Module `toml:"module"`
 }
 
 func FromString(input string) (*Config, error) {

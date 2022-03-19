@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/gokrazy/rsync/internal/config"
+	"github.com/gokrazy/rsync/rsyncd"
 	"github.com/google/go-cmp/cmp"
 )
 
@@ -43,7 +44,7 @@ path = "/non/existant/path"
 	}
 
 	{
-		want := []config.Module{
+		want := []rsyncd.Module{
 			{Name: "interop", Path: "/non/existant/path"},
 		}
 		if diff := cmp.Diff(want, cfg.Modules); diff != "" {

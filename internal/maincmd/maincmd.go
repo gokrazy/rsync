@@ -1,3 +1,7 @@
+// Package maincmd implements a subset of the '$ rsync' CLI surface, namely that it can:
+//   - serve as a server daemon over TCP or SSH (via SSH session stdin/stdout)
+//   - act as "client" CLI for connecting to the server
+//   - Not yet implemented: both "client" and "server" can act as the sender and the receiver
 package maincmd
 
 import (
@@ -12,7 +16,7 @@ import (
 
 	"github.com/gokrazy/rsync/internal/anonssh"
 	"github.com/gokrazy/rsync/internal/config"
-	"github.com/gokrazy/rsync/internal/rsyncd"
+	"github.com/gokrazy/rsync/rsyncd"
 
 	// For profiling and debugging
 	_ "net/http/pprof"
@@ -53,7 +57,10 @@ func Main(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer,
 				return err
 			}
 		}
-		srv := rsyncd.NewServer(cfg.Modules...)
+		srv, err := rsyncd.NewServer(cfg.Modules)
+		if err != nil {
+			return err
+		}
 		rw := readWriter{
 			r: stdin,
 			w: stdout,
@@ -66,7 +73,7 @@ func Main(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer,
 	if opts.Server {
 		// start_server()
 		srv := &rsyncd.Server{}
-		mod := config.Module{
+		mod := rsyncd.Module{
 			Name: "implicit",
 			Path: "/",
 		}
@@ -112,7 +119,7 @@ func Main(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer,
 							AnonSSH: opts.Gokrazy.AnonSSHListen,
 						},
 					},
-					Modules: []config.Module{},
+					Modules: []rsyncd.Module{},
 				}
 			} else {
 				return cfgErr
@@ -158,7 +165,7 @@ func Main(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer,
 		if len(parts) != 2 {
 			return fmt.Errorf("malformed -gokr.modulemap parameter %q, expected <modulename>=<path>", moduleMap)
 		}
-		module := config.Module{
+		module := rsyncd.Module{
 			Name: parts[0],
 			Path: parts[1],
 		}
@@ -187,7 +194,10 @@ func Main(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer,
 		}()
 	}
 
-	srv := rsyncd.NewServer(cfg.Modules...)
+	srv, err := rsyncd.NewServer(cfg.Modules)
+	if err != nil {
+		return err
+	}
 	var ln net.Listener
 	listeners, err := systemdListeners()
 	if err != nil {
