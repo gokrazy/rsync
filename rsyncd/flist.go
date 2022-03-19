@@ -10,7 +10,6 @@ import (
 	"sync"
 
 	"github.com/gokrazy/rsync"
-	"github.com/gokrazy/rsync/internal/config"
 	"github.com/gokrazy/rsync/internal/rsyncwire"
 )
 
@@ -20,7 +19,7 @@ var (
 )
 
 // rsync/flist.c:send_file_list
-func (st *sendTransfer) sendFileList(mod config.Module, opts *Opts, paths []string) (*fileList, error) {
+func (st *sendTransfer) sendFileList(mod Module, opts *Opts, paths []string) (*fileList, error) {
 	var fileList fileList
 	fec := &rsyncwire.Buffer{}
 

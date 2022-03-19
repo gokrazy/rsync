@@ -14,7 +14,7 @@ import (
 	"strconv"
 	"syscall"
 
-	"github.com/gokrazy/rsync/internal/config"
+	"github.com/gokrazy/rsync/rsyncd"
 	"golang.org/x/sys/unix"
 )
 
@@ -71,7 +71,7 @@ func pivotRoot(newroot string) error {
 	return nil
 }
 
-func namespace(modules []config.Module, listen string) error {
+func namespace(modules []rsyncd.Module, listen string) error {
 	if os.Getenv("GOKRAZY_RSYNC_NAMESPACE") != "" {
 		log.Printf("pid %d (inside Linux mount/pid namespace)", os.Getpid())
 

@@ -3,6 +3,7 @@ package rsyncd
 import (
 	"bufio"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -11,7 +12,6 @@ import (
 	"strings"
 
 	"github.com/gokrazy/rsync"
-	"github.com/gokrazy/rsync/internal/config"
 	"github.com/gokrazy/rsync/internal/rsyncwire"
 )
 
@@ -25,22 +25,34 @@ type sendTransfer struct {
 	lastMatch int64
 }
 
-func NewServer(modules ...config.Module) *Server {
-	return &Server{modules}
+type Module struct {
+	Name string   `toml:"name"`
+	Path string   `toml:"path"`
+	ACL  []string `toml:"acl"`
+}
+
+func NewServer(modules []Module) (*Server, error) {
+	for _, mod := range modules {
+		if err := validateModule(mod); err != nil {
+			return nil, err
+		}
+	}
+
+	return &Server{modules}, nil
 }
 
 type Server struct {
-	modules []config.Module
+	modules []Module
 }
 
-func (s *Server) getModule(requestedModule string) (config.Module, error) {
+func (s *Server) getModule(requestedModule string) (Module, error) {
 	for _, mod := range s.modules {
 		if mod.Name == requestedModule {
 			return mod, nil
 		}
 	}
 
-	return config.Module{}, fmt.Errorf("no such module: %s", requestedModule)
+	return Module{}, fmt.Errorf("no such module: %s", requestedModule)
 }
 
 func (s *Server) formatModuleList() string {
@@ -190,7 +202,7 @@ func (s *Server) HandleDaemonConn(ctx context.Context, conn io.ReadWriter, remot
 	log.Printf("client %v requested rsync module %q", remoteAddr, requestedModule)
 	module, err := s.getModule(requestedModule)
 	if err != nil {
-		fmt.Fprintf(cwr, "@ERROR: Unknown module '%s'\n", requestedModule)
+		fmt.Fprintf(cwr, "@ERROR: Unknown module %q\n", requestedModule)
 		return err
 	}
 
@@ -263,7 +275,7 @@ func (s *Server) HandleDaemonConn(ctx context.Context, conn io.ReadWriter, remot
 }
 
 // handleConn is equivalent to rsync/main.c:start_server
-func (s *Server) HandleConn(module config.Module, rd io.Reader, crd *countingReader, cwr *countingWriter, paths []string, opts *Opts, negotiate bool) (err error) {
+func (s *Server) HandleConn(module Module, rd io.Reader, crd *countingReader, cwr *countingWriter, paths []string, opts *Opts, negotiate bool) (err error) {
 	// “SHOULD be unique to each connection” as per
 	// https://github.com/JohannesBuchner/Jarsync/blob/master/jarsync/rsync.txt
 	//
@@ -395,4 +407,15 @@ func (s *Server) Serve(ctx context.Context, ln net.Listener) error {
 			}
 		}()
 	}
+}
+
+func validateModule(mod Module) error {
+	if mod.Name == "" {
+		return errors.New("module has no name")
+	}
+	if mod.Path == "" {
+		return fmt.Errorf("module %q has empty path", mod.Name)
+	}
+
+	return nil
 }
