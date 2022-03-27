@@ -16,7 +16,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/gokrazy/rsync/internal/config"
+	"github.com/gokrazy/rsync/internal/rsyncdconfig"
 	"github.com/google/shlex"
 	"golang.org/x/crypto/ssh"
 )
@@ -24,7 +24,7 @@ import (
 type mainFunc func(args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer) error
 
 type anonssh struct {
-	cfg  *config.Config
+	cfg  *rsyncdconfig.Config
 	main mainFunc
 }
 
@@ -239,7 +239,7 @@ func loadHostKey() (ssh.Signer, error) {
 	return ssh.ParsePrivateKey(b)
 }
 
-func Serve(ln net.Listener, cfg *config.Config, main mainFunc) error {
+func Serve(ln net.Listener, cfg *rsyncdconfig.Config, main mainFunc) error {
 	as := &anonssh{
 		main: main,
 	}

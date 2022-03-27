@@ -13,8 +13,8 @@ import (
 	"testing"
 
 	"github.com/BurntSushi/toml"
-	"github.com/gokrazy/rsync/internal/config"
 	"github.com/gokrazy/rsync/internal/maincmd"
+	"github.com/gokrazy/rsync/internal/rsyncdconfig"
 	"github.com/gokrazy/rsync/internal/rsynctest"
 	"github.com/gokrazy/rsync/rsyncd"
 	"github.com/google/go-cmp/cmp"
@@ -357,7 +357,7 @@ func TestInteropRemoteDaemon(t *testing.T) {
 	{
 		// in remote daemon mode, rsync needs a config file, so we create one and
 		// set the HOME environment variable such that gokr-rsyncd will pick it up.
-		cfg := config.Config{
+		cfg := rsyncdconfig.Config{
 			Modules: []rsyncd.Module{
 				{Name: "interop", Path: source},
 			},
@@ -417,7 +417,7 @@ func TestInteropRemoteDaemonAnonSSH(t *testing.T) {
 	// start a server to sync from
 	srv := rsynctest.New(t,
 		rsynctest.InteropModule(source),
-		rsynctest.Listeners([]config.Listener{
+		rsynctest.Listeners([]rsyncdconfig.Listener{
 			{AnonSSH: "localhost:0"},
 		}))
 

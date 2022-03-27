@@ -15,7 +15,7 @@ import (
 	"strings"
 
 	"github.com/gokrazy/rsync/internal/anonssh"
-	"github.com/gokrazy/rsync/internal/config"
+	"github.com/gokrazy/rsync/internal/rsyncdconfig"
 	"github.com/gokrazy/rsync/rsyncd"
 
 	// For profiling and debugging
@@ -34,7 +34,7 @@ type readWriter struct {
 func (r *readWriter) Read(p []byte) (n int, err error)  { return r.r.Read(p) }
 func (r *readWriter) Write(p []byte) (n int, err error) { return r.w.Write(p) }
 
-func Main(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer, cfg *config.Config) error {
+func Main(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer, cfg *rsyncdconfig.Config) error {
 	opts, opt := rsyncd.NewGetOpt()
 	remaining, err := opt.Parse(args[1:])
 	if opt.Called("help") {
@@ -52,7 +52,7 @@ func Main(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer,
 		// start_daemon()
 		if cfg == nil {
 			var err error
-			cfg, _, err = config.FromDefaultFiles()
+			cfg, _, err = rsyncdconfig.FromDefaultFiles()
 			if err != nil {
 				return err
 			}
@@ -106,14 +106,14 @@ func Main(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer,
 	var cfgfn string
 	var cfgErr error
 	if cfg == nil {
-		cfg, cfgfn, cfgErr = config.FromDefaultFiles()
+		cfg, cfgfn, cfgErr = rsyncdconfig.FromDefaultFiles()
 		if cfgErr != nil {
 			if os.IsNotExist(cfgErr) {
 				log.Printf("config file not found, relying on flags")
 				// a non-existant config file is not an error: users can start
 				// gokr-rsyncd with e.g. the -gokr.listen and -gokr.modulemap flags.
-				cfg = &config.Config{
-					Listeners: []config.Listener{
+				cfg = &rsyncdconfig.Config{
+					Listeners: []rsyncdconfig.Listener{
 						{
 							Rsyncd:  opts.Gokrazy.Listen,
 							AnonSSH: opts.Gokrazy.AnonSSHListen,

@@ -18,8 +18,8 @@ import (
 	"testing"
 
 	"github.com/gokrazy/rsync/internal/anonssh"
-	"github.com/gokrazy/rsync/internal/config"
 	"github.com/gokrazy/rsync/internal/maincmd"
+	"github.com/gokrazy/rsync/internal/rsyncdconfig"
 	"github.com/gokrazy/rsync/rsyncd"
 	"github.com/google/go-cmp/cmp"
 	"golang.org/x/sys/unix"
@@ -28,7 +28,7 @@ import (
 type TestServer struct {
 	// config
 	listener  net.Listener
-	listeners []config.Listener
+	listeners []rsyncdconfig.Listener
 
 	// Port is the port on which the test server is listening on. Useful to pass
 	// to rsync’s --port option.
@@ -48,7 +48,7 @@ func InteropModule(path string) []rsyncd.Module {
 
 type Option func(ts *TestServer)
 
-func Listeners(lns []config.Listener) Option {
+func Listeners(lns []rsyncdconfig.Listener) Option {
 	return func(ts *TestServer) {
 		ts.listeners = lns
 	}
@@ -66,7 +66,7 @@ func New(t *testing.T, modules []rsyncd.Module, opts ...Option) *TestServer {
 		opt(ts)
 	}
 	if len(ts.listeners) == 0 {
-		ts.listeners = []config.Listener{
+		ts.listeners = []rsyncdconfig.Listener{
 			{Rsyncd: "localhost:0"},
 		}
 	}
@@ -92,7 +92,7 @@ func New(t *testing.T, modules []rsyncd.Module, opts ...Option) *TestServer {
 	ts.Port = port
 
 	if ts.listeners[0].AnonSSH != "" {
-		cfg := &config.Config{
+		cfg := &rsyncdconfig.Config{
 			Modules: modules,
 		}
 		go func() {

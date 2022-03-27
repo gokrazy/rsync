@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gokrazy/rsync/internal/config"
+	"github.com/gokrazy/rsync/internal/rsyncdconfig"
 	"github.com/gokrazy/rsync/internal/rsynctest"
 )
 
@@ -49,7 +49,7 @@ func TestIPACL(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	cfg, err := config.FromString(`
+	cfg, err := rsyncdconfig.FromString(`
 [[module]]
 name = "interop"
 path = "` + source + `"

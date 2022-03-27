@@ -11,8 +11,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gokrazy/rsync/internal/config"
 	"github.com/gokrazy/rsync/internal/receivermaincmd"
+	"github.com/gokrazy/rsync/internal/rsyncdconfig"
 	"github.com/gokrazy/rsync/internal/rsynctest"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/renameio/v2"
@@ -247,7 +247,7 @@ func TestReceiverSSH(t *testing.T) {
 	// start a server to sync from
 	srv := rsynctest.New(t,
 		rsynctest.InteropModule(source),
-		rsynctest.Listeners([]config.Listener{
+		rsynctest.Listeners([]rsyncdconfig.Listener{
 			{AnonSSH: "localhost:0"},
 		}))
 

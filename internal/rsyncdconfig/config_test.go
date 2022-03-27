@@ -1,15 +1,15 @@
-package config_test
+package rsyncdconfig_test
 
 import (
 	"testing"
 
-	"github.com/gokrazy/rsync/internal/config"
+	"github.com/gokrazy/rsync/internal/rsyncdconfig"
 	"github.com/gokrazy/rsync/rsyncd"
 	"github.com/google/go-cmp/cmp"
 )
 
 func TestConfig(t *testing.T) {
-	cfg, err := config.FromString(`
+	cfg, err := rsyncdconfig.FromString(`
 [[listener]]
 rsyncd = "localhost:873"
 
@@ -33,7 +33,7 @@ path = "/non/existant/path"
 	}
 
 	{
-		want := []config.Listener{
+		want := []rsyncdconfig.Listener{
 			{Rsyncd: "localhost:873"},
 			{HTTPMonitoring: "localhost:8738"},
 			{AnonSSH: "localhost:22873"},

@@ -1,4 +1,4 @@
-package config
+package rsyncdconfig
 
 import (
 	"io/ioutil"
