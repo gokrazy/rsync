@@ -3,11 +3,11 @@ package rsyncd
 import (
 	"encoding/binary"
 	"io"
-	"log"
 	"os"
 	"sort"
 
 	"github.com/gokrazy/rsync"
+	"github.com/gokrazy/rsync/internal/log"
 	"github.com/gokrazy/rsync/internal/rsyncchecksum"
 	"github.com/gokrazy/rsync/internal/rsynccommon"
 	"github.com/mmcloughlin/md4"

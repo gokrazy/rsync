@@ -6,12 +6,12 @@ package maincmd
 import (
 	"errors"
 	"fmt"
-	"log"
 	"net"
 	"os"
 	"os/exec"
 	"strconv"
 
+	"github.com/gokrazy/rsync/internal/log"
 	"github.com/gokrazy/rsync/rsyncd"
 )
 

@@ -11,11 +11,11 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"log"
 	"net"
 	"os"
 	"path/filepath"
 
+	"github.com/gokrazy/rsync/internal/log"
 	"github.com/gokrazy/rsync/internal/rsyncdconfig"
 	"github.com/google/shlex"
 	"golang.org/x/crypto/ssh"

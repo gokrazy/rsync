@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"os"
 	"os/exec"
 	"strconv"
@@ -14,6 +13,7 @@ import (
 	"unicode"
 
 	"github.com/gokrazy/rsync"
+	"github.com/gokrazy/rsync/internal/log"
 	"github.com/gokrazy/rsync/internal/rsyncwire"
 	"github.com/google/shlex"
 	"golang.org/x/sync/errgroup"

@@ -8,13 +8,13 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"log"
 	"net"
 	"net/http"
 	"os"
 	"strings"
 
 	"github.com/gokrazy/rsync/internal/anonssh"
+	"github.com/gokrazy/rsync/internal/log"
 	"github.com/gokrazy/rsync/internal/rsyncdconfig"
 	"github.com/gokrazy/rsync/rsyncd"
 

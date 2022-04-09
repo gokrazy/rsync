@@ -4,8 +4,9 @@ package maincmd
 
 import (
 	"fmt"
-	"log"
 	"syscall"
+
+	"github.com/gokrazy/rsync/internal/log"
 )
 
 func dropPrivileges() error {

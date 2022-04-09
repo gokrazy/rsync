@@ -5,10 +5,10 @@ import (
 	"encoding/binary"
 	"fmt"
 	"hash"
-	"log"
 	"os"
 
 	"github.com/gokrazy/rsync"
+	"github.com/gokrazy/rsync/internal/log"
 	"github.com/gokrazy/rsync/internal/rsyncchecksum"
 	"github.com/mmcloughlin/md4"
 )

@@ -1,7 +1,6 @@
 package rsyncd
 
 import (
-	"log"
 	"os"
 	"os/user"
 	"path/filepath"
@@ -10,6 +9,7 @@ import (
 	"sync"
 
 	"github.com/gokrazy/rsync"
+	"github.com/gokrazy/rsync/internal/log"
 	"github.com/gokrazy/rsync/internal/rsyncwire"
 )
 

@@ -6,7 +6,6 @@ package maincmd
 import (
 	"errors"
 	"fmt"
-	"log"
 	"net"
 	"os"
 	"os/exec"
@@ -15,6 +14,7 @@ import (
 	"syscall"
 
 	"github.com/gokrazy/rsync/rsyncd"
+	"github.com/gokrazy/rsync/internal/log"
 	"golang.org/x/sys/unix"
 )
 

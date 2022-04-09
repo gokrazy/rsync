@@ -1,7 +1,7 @@
 package rsyncd
 
 import (
-	"log"
+	"github.com/gokrazy/rsync/internal/log"
 )
 
 // rsync/token.c:simple_send_token

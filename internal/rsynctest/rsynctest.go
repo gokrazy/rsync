@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"log"
 	"net"
 	"os"
 	"os/exec"
@@ -18,6 +17,7 @@ import (
 	"testing"
 
 	"github.com/gokrazy/rsync/internal/anonssh"
+	"github.com/gokrazy/rsync/internal/log"
 	"github.com/gokrazy/rsync/internal/maincmd"
 	"github.com/gokrazy/rsync/internal/rsyncdconfig"
 	"github.com/gokrazy/rsync/rsyncd"
@@ -105,7 +105,7 @@ func New(t *testing.T, modules []rsyncd.Module, opts ...Option) *TestServer {
 			}
 
 			if err != nil {
-				log.Print(err)
+				log.Printf(err.Error())
 			}
 		}()
 	} else {
