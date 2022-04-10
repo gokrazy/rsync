@@ -1,13 +1,9 @@
 package rsyncd
 
-import (
-	"github.com/gokrazy/rsync/internal/log"
-)
-
 // rsync/token.c:simple_send_token
 func (st *sendTransfer) simpleSendToken(ms *mapStruct, token int32, offset int64, n int64) error {
 	if n > 0 {
-		log.Printf("sending unmatched chunks offset=%d, n=%d", offset, n)
+		st.logger.Printf("sending unmatched chunks offset=%d, n=%d", offset, n)
 		l := int64(0)
 		for l < n {
 			n1 := int64(chunkSize)

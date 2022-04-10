@@ -8,14 +8,13 @@ import (
 	"os"
 
 	"github.com/gokrazy/rsync"
-	"github.com/gokrazy/rsync/internal/log"
 	"github.com/gokrazy/rsync/internal/rsyncchecksum"
 	"github.com/mmcloughlin/md4"
 )
 
 // rsync/match.c:hash_search
 func (st *sendTransfer) hashSearch(targets []target, tagTable map[uint16]int, head rsync.SumHead, fileIndex int32, fl file) error {
-	log.Printf("hashSearch(path=%s, len(sums)=%d)", fl.path, len(head.Sums))
+	st.logger.Printf("hashSearch(path=%s, len(sums)=%d)", fl.path, len(head.Sums))
 	f, err := os.Open(fl.path)
 	if err != nil {
 		return err
@@ -61,7 +60,7 @@ func (st *sendTransfer) hashSearch(targets []target, tagTable map[uint16]int, he
 	var s1, s2 uint32
 	var offset int64
 	end := fi.Size() + 1 - head.Sums[len(head.Sums)-1].Len
-	log.Printf("last block len=%d, end=%d", head.Sums[len(head.Sums)-1].Len, end)
+	st.logger.Printf("last block len=%d, end=%d", head.Sums[len(head.Sums)-1].Len, end)
 
 	readChunk := func() error {
 		k = int(head.BlockLength)
@@ -109,7 +108,7 @@ Outer:
 					continue
 				}
 
-				// log.Printf("potential match at %d target=%d %d sum=%08x", offset, j, i, sum)
+				// st.logger.Printf("potential match at %d target=%d %d sum=%08x", offset, j, i, sum)
 
 				if !doneCsum2 {
 					buf := ms.ptr(offset, int32(l))
@@ -118,7 +117,7 @@ Outer:
 				}
 
 				if local, remote := sum2[:head.ChecksumLength], head.Sums[i].Sum2[:head.ChecksumLength]; !bytes.Equal(local, remote) {
-					log.Printf("false alarm: local %x, remote %x", local, remote)
+					st.logger.Printf("false alarm: local %x, remote %x", local, remote)
 					//falseAlarms++
 					continue
 				}
@@ -202,7 +201,7 @@ Outer:
 
 	{
 		sum := h.Sum(nil)
-		log.Printf("sum: %x (len = %d)", sum, len(sum))
+		st.logger.Printf("sum: %x (len = %d)", sum, len(sum))
 		if _, err := st.conn.Writer.Write(sum); err != nil {
 			return err
 		}
@@ -219,10 +218,10 @@ func (st *sendTransfer) matched(h hash.Hash, ms *mapStruct, head rsync.SumHead, 
 	transmitAccumulated := i < 0
 
 	// if !transmitAccumulated {
-	// 	log.Printf("match at offset=%d last_match=%d i=%d len=%d n=%d",
+	// 	st.logger.Printf("match at offset=%d last_match=%d i=%d len=%d n=%d",
 	// 		offset, st.lastMatch, i, head.Sums[i].Len, n)
 	// } else {
-	// 	log.Printf("transmit accumulated at offset=%d", offset)
+	// 	st.logger.Printf("transmit accumulated at offset=%d", offset)
 	// }
 
 	/* FIXME: this is not used

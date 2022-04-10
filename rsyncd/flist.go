@@ -9,7 +9,6 @@ import (
 	"sync"
 
 	"github.com/gokrazy/rsync"
-	"github.com/gokrazy/rsync/internal/log"
 	"github.com/gokrazy/rsync/internal/rsyncwire"
 )
 
@@ -31,20 +30,20 @@ func (st *sendTransfer) sendFileList(mod Module, opts *Opts, paths []string) (*f
 	// TODO: handle info == nil case (permission denied?): should set an i/o
 	// error flag, but traversal should continue
 
-	log.Printf("sendFileList(module=%q)", mod.Name)
+	st.logger.Printf("sendFileList(module=%q)", mod.Name)
 	// TODO: handle |root| referring to an individual file, symlink or special (skip)
 	for _, requested := range paths {
 		modRoot := mod.Path
-		log.Printf("  path %q (module root %q)", requested, modRoot)
+		st.logger.Printf("  path %q (module root %q)", requested, modRoot)
 		root := strings.TrimPrefix(requested, mod.Name+"/")
 		root = filepath.Clean(mod.Path + "/" + root)
-		// log.Printf("  filepath.Walk(%q)", root)
+		// st.logger.Printf("  filepath.Walk(%q)", root)
 		strip := filepath.Dir(filepath.Clean(root)) + "/"
 		if strings.HasSuffix(requested, "/") {
 			strip = filepath.Clean(root) + "/"
 		}
 		err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
-			// log.Printf("filepath.WalkFn(path=%s)", path)
+			// st.logger.Printf("filepath.WalkFn(path=%s)", path)
 			if err != nil {
 				return err
 			}
@@ -53,12 +52,12 @@ func (st *sendTransfer) sendFileList(mod Module, opts *Opts, paths []string) (*f
 			flags := byte(rsync.XMIT_LONG_NAME)
 
 			name := strings.TrimPrefix(path, strip)
-			// log.Printf("Trim(path=%q, %q) = %q", path, strip, name)
+			// st.logger.Printf("Trim(path=%q, %q) = %q", path, strip, name)
 			if name == root {
 				name = "."
 				flags |= rsync.XMIT_TOP_DIR
 			}
-			// log.Printf("flags for %q: %v", name, flags)
+			// st.logger.Printf("flags for %q: %v", name, flags)
 
 			fileList.files = append(fileList.files, file{
 				path:    path,
@@ -132,7 +131,7 @@ func (st *sendTransfer) sendFileList(mod Module, opts *Opts, paths []string) (*f
 						u, err := user.LookupId(strconv.Itoa(int(uid)))
 						if err != nil {
 							lookupOnce.Do(func() {
-								log.Printf("lookup(%d) = %v", uid, err)
+								st.logger.Printf("lookup(%d) = %v", uid, err)
 							})
 						} else {
 							uidMap[uid] = u.Username
@@ -150,7 +149,7 @@ func (st *sendTransfer) sendFileList(mod Module, opts *Opts, paths []string) (*f
 						g, err := user.LookupGroupId(strconv.Itoa(int(gid)))
 						if err != nil {
 							lookupGroupOnce.Do(func() {
-								log.Printf("lookupgroup(%d) = %v", gid, err)
+								st.logger.Printf("lookupgroup(%d) = %v", gid, err)
 							})
 						} else {
 							gidMap[gid] = g.Name

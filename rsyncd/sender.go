@@ -7,7 +7,6 @@ import (
 	"sort"
 
 	"github.com/gokrazy/rsync"
-	"github.com/gokrazy/rsync/internal/log"
 	"github.com/gokrazy/rsync/internal/rsyncchecksum"
 	"github.com/gokrazy/rsync/internal/rsynccommon"
 	"github.com/mmcloughlin/md4"
@@ -91,9 +90,9 @@ func (st *sendTransfer) sendFiles(fileList *fileList) error {
 				// proceed. Only starting with protocol 30, an I/O error flag is
 				// sent after the file transfer phase.
 				if os.IsNotExist(err) {
-					log.Printf("file has vanished: %s", fileList.files[fileIndex].path)
+					st.logger.Printf("file has vanished: %s", fileList.files[fileIndex].path)
 				} else {
-					log.Printf("sendFiles: %v", err)
+					st.logger.Printf("sendFiles: %v", err)
 				}
 				continue
 			} else {
@@ -139,7 +138,7 @@ func (st *sendTransfer) receiveSums() (rsync.SumHead, error) {
 			return head, err
 		}
 		_ = n
-		// log.Printf("chunk[%d] len=%d offset=%.0f sum1=%08x, sum2=%x",
+		// st.logger.Printf("chunk[%d] len=%d offset=%.0f sum1=%08x, sum2=%x",
 		// 	i, sb.len, float64(sb.offset), sb.sum1, sb.sum2[:n])
 		head.Sums[i] = sb
 	}
@@ -167,7 +166,7 @@ func (st *sendTransfer) sendFile(fileIndex int32, fl file) error {
 	}
 
 	sh := rsynccommon.SumSizesSqroot(fi.Size())
-	// log.Printf("sh = %+v", sh)
+	// st.logger.Printf("sh = %+v", sh)
 	if err := sh.WriteTo(st.conn); err != nil {
 		return err
 	}
@@ -224,7 +223,7 @@ func (st *sendTransfer) sendFile(fileIndex int32, fl file) error {
 		return err
 	}
 	sum := h.Sum(nil)
-	// log.Printf("sum: %x (len = %d)", sum, len(sum))
+	// st.logger.Printf("sum: %x (len = %d)", sum, len(sum))
 	if _, err := st.conn.Writer.Write(sum); err != nil {
 		return err
 	}

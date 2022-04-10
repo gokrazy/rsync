@@ -17,7 +17,8 @@ import (
 
 type sendTransfer struct {
 	// config
-	opts *Opts
+	logger log.Logger
+	opts   *Opts
 
 	// state
 	conn      *rsyncwire.Conn
@@ -348,9 +349,10 @@ func (s *Server) HandleConn(module Module, rd io.Reader, crd *countingReader, cw
 	}()
 
 	st := &sendTransfer{
-		opts: opts,
-		conn: c,
-		seed: sessionChecksumSeed,
+		logger: s.logger,
+		opts:   opts,
+		conn:   c,
+		seed:   sessionChecksumSeed,
 	}
 
 	// receive the exclusion list (openrsync’s is always empty)
