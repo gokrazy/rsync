@@ -5,7 +5,8 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
-	"log"
+
+	"github.com/gokrazy/rsync/internal/log"
 )
 
 const (

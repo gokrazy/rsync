@@ -8,13 +8,13 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"log"
 	"net"
 	"net/http"
 	"os"
 	"strings"
 
 	"github.com/gokrazy/rsync/internal/anonssh"
+	"github.com/gokrazy/rsync/internal/log"
 	"github.com/gokrazy/rsync/internal/rsyncdconfig"
 	"github.com/gokrazy/rsync/rsyncd"
 
@@ -72,7 +72,10 @@ func Main(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer,
 	// Example: --server --sender -vvvvlogDtpre.iLsfxCIvu . .
 	if opts.Server {
 		// start_server()
-		srv := &rsyncd.Server{}
+		srv, err := rsyncd.NewServer(nil)
+		if err != nil {
+			return err
+		}
 		mod := rsyncd.Module{
 			Name: "implicit",
 			Path: "/",
