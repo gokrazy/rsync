@@ -27,7 +27,7 @@ func (st *sendTransfer) hashSearch(targets []target, tagTable map[uint16]int, he
 	}
 
 	readSize := 3 * head.BlockLength
-	if readSize > 256*1024 {
+	if readSize < 256*1024 {
 		readSize = 256 * 1024
 	}
 	ms := mapFile(f, fi.Size(), readSize, head.BlockLength)
