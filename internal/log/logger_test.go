@@ -11,7 +11,6 @@ import (
 
 // make sure we won't panic for calling directly
 func Test_DefaultLoggerUsage(t *testing.T) {
-
 	log.Printf("foo")
 	log.Printf("foo: %s", "bar")
 }

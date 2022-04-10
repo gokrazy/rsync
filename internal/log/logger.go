@@ -3,9 +3,10 @@ package log
 
 import "log"
 
-// Logger logs messages.
+// Logger is an interface that allows specifying your own logger.
+// By default, the Go log package is used, which prints to stderr.
 type Logger interface {
-	// Printf logs message to the underlaying log output. Arguments are handled in the manner of fmt.Printf.
+	// Printf logs message to the underlying log output. Arguments are handled in the manner of fmt.Printf.
 	Printf(msg string, a ...interface{})
 }
 
