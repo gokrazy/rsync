@@ -105,7 +105,7 @@ func New(t *testing.T, modules []rsyncd.Module, opts ...Option) *TestServer {
 			}
 
 			if err != nil {
-				log.Printf(err.Error())
+				log.Printf("%s", err.Error())
 			}
 		}()
 	} else {
