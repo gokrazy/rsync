@@ -31,17 +31,51 @@ type Module struct {
 	ACL  []string `toml:"acl"`
 }
 
-func NewServer(modules []Module) (*Server, error) {
+// Option specifies the server options.
+type Option interface {
+	applyServer(*Server)
+}
+
+type serverOptionFunc func(server *Server)
+
+func (f serverOptionFunc) applyServer(s *Server) {
+	f(s)
+}
+
+// WithLogger specifies the logger to use for the server.
+// It also sets the global logger used by the rsync package.
+func WithLogger(logger log.Logger) Option {
+	return serverOptionFunc(func(s *Server) {
+		s.logger = logger
+
+		// TODO: remove global logger usage once we remove
+		//       the ad-hoc logger reference.
+		log.SetLogger(logger)
+	})
+}
+
+func NewServer(modules []Module, opts ...Option) (*Server, error) {
 	for _, mod := range modules {
 		if err := validateModule(mod); err != nil {
 			return nil, err
 		}
 	}
 
-	return &Server{modules}, nil
+	server := &Server{
+		logger:  log.Default(),
+		modules: modules,
+	}
+
+	for _, opt := range opts {
+		opt.applyServer(server)
+	}
+
+	return server, nil
 }
 
 type Server struct {
+	logger log.Logger
+
 	modules []Module
 }
 
@@ -194,12 +228,12 @@ func (s *Server) HandleDaemonConn(ctx context.Context, conn io.ReadWriter, remot
 	}
 	requestedModule = strings.TrimSpace(requestedModule)
 	if requestedModule == "" || requestedModule == "#list" {
-		log.Printf("client %v requested rsync module listing", remoteAddr)
+		s.logger.Printf("client %v requested rsync module listing", remoteAddr)
 		io.WriteString(cwr, s.formatModuleList())
 		io.WriteString(cwr, "@RSYNCD: EXIT\n")
 		return nil
 	}
-	log.Printf("client %v requested rsync module %q", remoteAddr, requestedModule)
+	s.logger.Printf("client %v requested rsync module %q", remoteAddr, requestedModule)
 	module, err := s.getModule(requestedModule)
 	if err != nil {
 		fmt.Fprintf(cwr, "@ERROR: Unknown module %q\n", requestedModule)
@@ -221,14 +255,14 @@ func (s *Server) HandleDaemonConn(ctx context.Context, conn io.ReadWriter, remot
 			return err
 		}
 		flag = strings.TrimSpace(flag)
-		log.Printf("client sent: %q", flag)
+		s.logger.Printf("client sent: %q", flag)
 		if flag == "" {
 			break
 		}
 		flags = append(flags, flag)
 	}
 
-	log.Printf("flags: %+v", flags)
+	s.logger.Printf("flags: %+v", flags)
 	opts, opt := NewGetOpt()
 
 	//getoptions.Debug.SetOutput(os.Stderr)
@@ -258,7 +292,7 @@ func (s *Server) HandleDaemonConn(ctx context.Context, conn io.ReadWriter, remot
 		opts.PreserveDevices = true
 		opts.PreserveSpecials = true
 	}
-	log.Printf("remaining: %q", remaining)
+	s.logger.Printf("remaining: %q", remaining)
 	// remaining[0] is always "."
 	// remaining[1] is the first directory
 	if len(remaining) < 2 {
@@ -292,7 +326,7 @@ func (s *Server) HandleConn(module Module, rd io.Reader, crd *countingReader, cw
 		if err != nil {
 			return err
 		}
-		log.Printf("remote protocol: %d", remoteProtocol)
+		s.logger.Printf("remote protocol: %d", remoteProtocol)
 		if err := c.WriteInt32(rsync.ProtocolVersion); err != nil {
 			return err
 		}
@@ -329,7 +363,7 @@ func (s *Server) HandleConn(module Module, rd io.Reader, crd *countingReader, cw
 		return fmt.Errorf("protocol error: non-empty exclusion list received")
 	}
 
-	log.Printf("exclusion list read")
+	s.logger.Printf("exclusion list read")
 
 	// “Update exchange” as per
 	// https://github.com/kristapsdz/openrsync/blob/master/rsync.5
@@ -340,7 +374,7 @@ func (s *Server) HandleConn(module Module, rd io.Reader, crd *countingReader, cw
 		return err
 	}
 
-	log.Printf("file list sent")
+	s.logger.Printf("file list sent")
 
 	// Sort the file list. The client sorts, so we need to sort, too (in the
 	// same way!), otherwise our indices do not match what the client will
@@ -367,7 +401,7 @@ func (s *Server) HandleConn(module Module, rd io.Reader, crd *countingReader, cw
 		return err
 	}
 
-	log.Printf("reading final int32")
+	s.logger.Printf("reading final int32")
 
 	finish, err := c.ReadInt32()
 	if err != nil {
@@ -377,7 +411,7 @@ func (s *Server) HandleConn(module Module, rd io.Reader, crd *countingReader, cw
 		return fmt.Errorf("protocol error: expected final -1, got %d", finish)
 	}
 
-	log.Printf("HandleConn done")
+	s.logger.Printf("HandleConn done")
 
 	return nil
 }
@@ -399,11 +433,11 @@ func (s *Server) Serve(ctx context.Context, ln net.Listener) error {
 			}
 		}
 		remoteAddr := conn.RemoteAddr()
-		log.Printf("remote connection from %s", remoteAddr)
+		s.logger.Printf("remote connection from %s", remoteAddr)
 		go func() {
 			defer conn.Close()
 			if err := s.HandleDaemonConn(ctx, conn, remoteAddr); err != nil {
-				log.Printf("[%s] handle: %v", remoteAddr, err)
+				s.logger.Printf("[%s] handle: %v", remoteAddr, err)
 			}
 		}()
 	}

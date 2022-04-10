@@ -23,3 +23,8 @@ func Printf(msg string, a ...interface{}) {
 func SetLogger(logger Logger) {
 	instance = logger
 }
+
+// Default returns the global logger instance.
+func Default() Logger {
+	return instance
+}
