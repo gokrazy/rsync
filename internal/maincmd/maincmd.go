@@ -196,15 +196,26 @@ func Main(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer,
 		}
 		cfg.Modules = append(cfg.Modules, module)
 	}
-	if err := namespace(cfg.Modules, listenAddr); err == errIsParent {
-		return nil
-	} else if err != nil {
-		return fmt.Errorf("namespace: %v", err)
+	if cfg.DontNamespace {
+		if cfg.Listeners[0].Rsyncd != "" ||
+			cfg.Listeners[0].AnonSSH != "" {
+			return fmt.Errorf("dont_namespace must be used with authorized_ssh listeners only")
+		}
+		version()
+		log.Printf("environment: not namespace due to dont_namespace option")
+	} else {
+		if err := namespace(cfg.Modules, listenAddr); err == errIsParent {
+			return nil
+		} else if err != nil {
+			return fmt.Errorf("namespace: %v", err)
+		}
 	}
 	log.Printf("%d rsync modules configured in total", len(cfg.Modules))
 	for _, mod := range cfg.Modules {
-		if err := canUnexpectedlyWriteTo(mod.Path); err != nil {
-			return err
+		if !cfg.DontNamespace {
+			if err := canUnexpectedlyWriteTo(mod.Path); err != nil {
+				return err
+			}
 		}
 
 		log.Printf("rsync module %q with path %s configured", mod.Name, mod.Path)

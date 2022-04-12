@@ -22,8 +22,9 @@ type Listener struct {
 }
 
 type Config struct {
-	Listeners []Listener      `toml:"listener"`
-	Modules   []rsyncd.Module `toml:"module"`
+	Listeners     []Listener      `toml:"listener"`
+	Modules       []rsyncd.Module `toml:"module"`
+	DontNamespace bool            `toml:"dont_namespace"`
 }
 
 func FromString(input string) (*Config, error) {
