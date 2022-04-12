@@ -218,6 +218,38 @@ func genHostKey(keyPath string) ([]byte, error) {
 	return b, nil
 }
 
+type Listener struct {
+	hostKey            ssh.Signer
+	authorizedKeys     map[string]bool
+	authorizedKeysPath string
+}
+
+func ListenerFromConfig(cfg rsyncdconfig.Listener) (*Listener, error) {
+	hostKey, err := loadHostKey()
+	if err != nil {
+		return nil, err
+	}
+
+	var authorizedKeys map[string]bool
+	if cfg.AuthorizedSSH.Address != "" {
+		if cfg.AuthorizedSSH.AuthorizedKeys == "" {
+			return nil, fmt.Errorf("authorized_keys not specified")
+		}
+
+		var err error
+		authorizedKeys, err = loadAuthorizedKeys(cfg.AuthorizedSSH.AuthorizedKeys)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return &Listener{
+		hostKey:            hostKey,
+		authorizedKeys:     authorizedKeys,
+		authorizedKeysPath: cfg.AuthorizedSSH.AuthorizedKeys,
+	}, nil
+}
+
 func loadHostKey() (ssh.Signer, error) {
 	dir, err := os.UserConfigDir()
 	if err != nil {
@@ -274,41 +306,28 @@ func loadAuthorizedKeys(path string) (map[string]bool, error) {
 	return result, nil
 }
 
-func Serve(ln net.Listener, authorizedKeysPath string, cfg *rsyncdconfig.Config, main mainFunc) error {
+func Serve(ln net.Listener, listener *Listener, cfg *rsyncdconfig.Config, main mainFunc) error {
 	as := &anonssh{
 		main: main,
 	}
 
-	var authorizedKeys map[string]bool
-	if authorizedKeysPath != "" {
-		var err error
-		authorizedKeys, err = loadAuthorizedKeys(authorizedKeysPath)
-		if err != nil {
-			return err
-		}
-	}
-
 	config := &ssh.ServerConfig{
 		PublicKeyCallback: func(conn ssh.ConnMetadata, pubKey ssh.PublicKey) (*ssh.Permissions, error) {
-			if authorizedKeysPath == "" {
+			if listener.authorizedKeys == nil {
 				log.Printf("user %q successfully authorized from remote addr %s", conn.User(), conn.RemoteAddr())
 				return nil, nil
 			}
-			if authorizedKeys[string(pubKey.Marshal())] {
+			if listener.authorizedKeys[string(pubKey.Marshal())] {
 				log.Printf("user %q successfully authorized from remote addr %s", conn.User(), conn.RemoteAddr())
 				return nil, nil
 			}
-			return nil, fmt.Errorf("public key not found in %s", authorizedKeysPath)
+			return nil, fmt.Errorf("public key not found in %s", listener.authorizedKeysPath)
 		},
 	}
 
-	signer, err := loadHostKey()
-	if err != nil {
-		return err
-	}
-	config.AddHostKey(signer)
+	config.AddHostKey(listener.hostKey)
 
-	log.Printf("SSH host key fingerprint: %s", ssh.FingerprintSHA256(signer.PublicKey()))
+	log.Printf("SSH host key fingerprint: %s", ssh.FingerprintSHA256(listener.hostKey.PublicKey()))
 
 	for {
 		conn, err := ln.Accept()
