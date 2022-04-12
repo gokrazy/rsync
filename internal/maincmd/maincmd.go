@@ -151,7 +151,8 @@ func Main(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer,
 	} else {
 		if len(cfg.Listeners) == 0 ||
 			(cfg.Listeners[0].Rsyncd == "" &&
-				cfg.Listeners[0].AnonSSH == "") {
+				cfg.Listeners[0].AnonSSH == "" &&
+				cfg.Listeners[0].AuthorizedSSH.Address == "") {
 			return fmt.Errorf("no rsyncd listeners configured, add a [[listener]] to %s", cfgfn)
 		}
 	}
@@ -159,13 +160,17 @@ func Main(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer,
 
 	if len(cfg.Listeners) != 1 ||
 		(cfg.Listeners[0].Rsyncd == "" &&
-			cfg.Listeners[0].AnonSSH == "") {
+			cfg.Listeners[0].AnonSSH == "" &&
+			cfg.Listeners[0].AuthorizedSSH.Address == "") {
 		return fmt.Errorf("not precisely 1 rsyncd listener specified")
 	}
 
 	listenAddr := cfg.Listeners[0].Rsyncd
 	if listenAddr == "" {
 		listenAddr = cfg.Listeners[0].AnonSSH
+		if listenAddr == "" {
+			listenAddr = cfg.Listeners[0].AuthorizedSSH.Address
+		}
 	}
 
 	if moduleMap := opts.Gokrazy.ModuleMap; moduleMap != "" {
@@ -221,9 +226,19 @@ func Main(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer,
 		}
 	}
 
+	if cfg.Listeners[0].AuthorizedSSH.Address != "" {
+		if cfg.Listeners[0].AuthorizedSSH.AuthorizedKeys == "" {
+			return fmt.Errorf("misconfiguration: authorized_keys must not be empty when using an authorized_ssh listener")
+		}
+		log.Printf("rsync daemon listening (authorized SSH) on %s", ln.Addr())
+		return anonssh.Serve(ln, cfg.Listeners[0].AuthorizedSSH.AuthorizedKeys, cfg, func(args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer) error {
+			return Main(ctx, args, stdin, stdout, stderr, cfg)
+		})
+	}
+
 	if cfg.Listeners[0].AnonSSH != "" {
 		log.Printf("rsync daemon listening (anon SSH) on %s", ln.Addr())
-		return anonssh.Serve(ln, cfg, func(args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer) error {
+		return anonssh.Serve(ln, "", cfg, func(args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer) error {
 			return Main(ctx, args, stdin, stdout, stderr, cfg)
 		})
 	}

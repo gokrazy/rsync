@@ -9,10 +9,16 @@ import (
 	"github.com/gokrazy/rsync/rsyncd"
 )
 
+type SSHListener struct {
+	Address        string `toml:"address"`
+	AuthorizedKeys string `toml:"authorized_keys"`
+}
+
 type Listener struct {
-	Rsyncd         string `toml:"rsyncd"`
-	HTTPMonitoring string `toml:"http_monitoring"`
-	AnonSSH        string `toml:"anon_ssh"`
+	Rsyncd         string      `toml:"rsyncd"`
+	HTTPMonitoring string      `toml:"http_monitoring"`
+	AnonSSH        string      `toml:"anon_ssh"`
+	AuthorizedSSH  SSHListener `toml:"authorized_ssh"`
 }
 
 type Config struct {

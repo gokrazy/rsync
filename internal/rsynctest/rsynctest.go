@@ -91,12 +91,29 @@ func New(t *testing.T, modules []rsyncd.Module, opts ...Option) *TestServer {
 	}
 	ts.Port = port
 
-	if ts.listeners[0].AnonSSH != "" {
+	if ts.listeners[0].AuthorizedSSH.Address != "" {
 		cfg := &rsyncdconfig.Config{
 			Modules: modules,
 		}
 		go func() {
-			err := anonssh.Serve(ts.listener, cfg, func(args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer) error {
+			err := anonssh.Serve(ts.listener, ts.listeners[0].AuthorizedSSH.AuthorizedKeys, cfg, func(args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer) error {
+				return maincmd.Main(context.Background(), args, stdin, stdout, stderr, cfg)
+			})
+
+			if errors.Is(err, net.ErrClosed) {
+				return
+			}
+
+			if err != nil {
+				log.Printf("%s", err.Error())
+			}
+		}()
+	} else if ts.listeners[0].AnonSSH != "" {
+		cfg := &rsyncdconfig.Config{
+			Modules: modules,
+		}
+		go func() {
+			err := anonssh.Serve(ts.listener, "", cfg, func(args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer) error {
 				return maincmd.Main(context.Background(), args, stdin, stdout, stderr, cfg)
 			})
 

@@ -1,6 +1,8 @@
 package anonssh
 
 import (
+	"bufio"
+	"bytes"
 	"context"
 	"crypto/ed25519"
 	"crypto/rand"
@@ -14,6 +16,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/gokrazy/rsync/internal/log"
 	"github.com/gokrazy/rsync/internal/rsyncdconfig"
@@ -239,14 +242,63 @@ func loadHostKey() (ssh.Signer, error) {
 	return ssh.ParsePrivateKey(b)
 }
 
-func Serve(ln net.Listener, cfg *rsyncdconfig.Config, main mainFunc) error {
+func loadAuthorizedKeys(path string) (map[string]bool, error) {
+	b, err := ioutil.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+
+	result := make(map[string]bool)
+
+	s := bufio.NewScanner(bytes.NewReader(b))
+	for lineNum := 1; s.Scan(); lineNum++ {
+		if tr := strings.TrimSpace(s.Text()); tr == "" || strings.HasPrefix(tr, "#") {
+			continue
+		}
+		pubKey, _, _, _, err := ssh.ParseAuthorizedKey(s.Bytes())
+
+		// This warning can be removed once the mentioned issue is resolved
+		if keyType := pubKey.Type(); keyType == "ssh-rsa" {
+			log.Printf("Warning: ignoring unsupported ssh-rsa key in %s:%d (see https://github.com/gokrazy/breakglass/issues/11)", path, lineNum)
+		}
+
+		if err != nil {
+			return nil, err
+		}
+		result[string(pubKey.Marshal())] = true
+	}
+	if err := s.Err(); err != nil {
+		return nil, err
+	}
+
+	return result, nil
+}
+
+func Serve(ln net.Listener, authorizedKeysPath string, cfg *rsyncdconfig.Config, main mainFunc) error {
 	as := &anonssh{
 		main: main,
 	}
+
+	var authorizedKeys map[string]bool
+	if authorizedKeysPath != "" {
+		var err error
+		authorizedKeys, err = loadAuthorizedKeys(authorizedKeysPath)
+		if err != nil {
+			return err
+		}
+	}
+
 	config := &ssh.ServerConfig{
 		PublicKeyCallback: func(conn ssh.ConnMetadata, pubKey ssh.PublicKey) (*ssh.Permissions, error) {
-			log.Printf("user %q successfully authorized from remote addr %s", conn.User(), conn.RemoteAddr())
-			return nil, nil
+			if authorizedKeysPath == "" {
+				log.Printf("user %q successfully authorized from remote addr %s", conn.User(), conn.RemoteAddr())
+				return nil, nil
+			}
+			if authorizedKeys[string(pubKey.Marshal())] {
+				log.Printf("user %q successfully authorized from remote addr %s", conn.User(), conn.RemoteAddr())
+				return nil, nil
+			}
+			return nil, fmt.Errorf("public key not found in %s", authorizedKeysPath)
 		},
 	}
 
