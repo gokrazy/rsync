@@ -92,11 +92,15 @@ func New(t *testing.T, modules []rsyncd.Module, opts ...Option) *TestServer {
 	ts.Port = port
 
 	if ts.listeners[0].AuthorizedSSH.Address != "" {
+		sshListener, err := anonssh.ListenerFromConfig(ts.listeners[0])
+		if err != nil {
+			t.Fatal(err)
+		}
 		cfg := &rsyncdconfig.Config{
 			Modules: modules,
 		}
 		go func() {
-			err := anonssh.Serve(ts.listener, ts.listeners[0].AuthorizedSSH.AuthorizedKeys, cfg, func(args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer) error {
+			err := anonssh.Serve(ts.listener, sshListener, cfg, func(args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer) error {
 				return maincmd.Main(context.Background(), args, stdin, stdout, stderr, cfg)
 			})
 
@@ -109,11 +113,15 @@ func New(t *testing.T, modules []rsyncd.Module, opts ...Option) *TestServer {
 			}
 		}()
 	} else if ts.listeners[0].AnonSSH != "" {
+		sshListener, err := anonssh.ListenerFromConfig(ts.listeners[0])
+		if err != nil {
+			t.Fatal(err)
+		}
 		cfg := &rsyncdconfig.Config{
 			Modules: modules,
 		}
 		go func() {
-			err := anonssh.Serve(ts.listener, "", cfg, func(args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer) error {
+			err := anonssh.Serve(ts.listener, sshListener, cfg, func(args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer) error {
 				return maincmd.Main(context.Background(), args, stdin, stdout, stderr, cfg)
 			})
 
