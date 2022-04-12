@@ -109,7 +109,12 @@ func Main(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer,
 	var cfgfn string
 	var cfgErr error
 	if cfg == nil {
-		cfg, cfgfn, cfgErr = rsyncdconfig.FromDefaultFiles()
+		if opts.Gokrazy.Config != "" {
+			cfgfn = opts.Gokrazy.Config
+			cfg, cfgErr = rsyncdconfig.FromFile(cfgfn)
+		} else {
+			cfg, cfgfn, cfgErr = rsyncdconfig.FromDefaultFiles()
+		}
 		if cfgErr != nil {
 			if os.IsNotExist(cfgErr) {
 				log.Printf("config file not found, relying on flags")

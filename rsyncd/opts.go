@@ -4,6 +4,7 @@ import "github.com/DavidGamba/go-getoptions"
 
 type Opts struct {
 	Gokrazy struct {
+		Config           string
 		Listen           string
 		MonitoringListen string
 		AnonSSHListen    string
@@ -38,6 +39,7 @@ func NewGetOpt() (*Opts, *getoptions.GetOpt) {
 	opt.Bool("help", false, opt.Alias("h"))
 
 	// gokr-rsyncd flags
+	opt.StringVar(&opts.Gokrazy.Config, "gokr.config", "", opt.Description("path to a config file (if unspecified, os.UserConfigDir()/gokr-rsyncd.toml is used)"))
 	opt.StringVar(&opts.Gokrazy.Listen, "gokr.listen", "", opt.Description("[host]:port listen address for the rsync daemon protocol"))
 	opt.StringVar(&opts.Gokrazy.MonitoringListen, "gokr.monitoring_listen", "", opt.Description("optional [host]:port listen address for a HTTP debug interface"))
 	opt.StringVar(&opts.Gokrazy.AnonSSHListen, "gokr.anonssh_listen", "", opt.Description("optional [host]:port listen address for the rsync daemon protocol via anonymous SSH"))
