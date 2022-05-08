@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"runtime"
 	"sort"
 	"strings"
 
@@ -437,7 +438,18 @@ func (s *Server) Serve(ctx context.Context, ln net.Listener) error {
 		remoteAddr := conn.RemoteAddr()
 		s.logger.Printf("remote connection from %s", remoteAddr)
 		go func() {
-			defer conn.Close()
+			defer func() {
+				// ref: https://github.com/golang/go/blob/a131fd1313e0056ad094d234c67648409d081b8c/src/net/http/server.go#L1823-L1828
+				if err := recover(); err != nil {
+					const size = 64 << 10
+					buf := make([]byte, size)
+					buf = buf[:runtime.Stack(buf, false)]
+					s.logger.Printf("gokr-rsync: panic serving %s: %v\n%s", remoteAddr, err, buf)
+				}
+
+				conn.Close()
+			}()
+
 			if err := s.HandleDaemonConn(ctx, conn, remoteAddr); err != nil {
 				s.logger.Printf("[%s] handle: %v", remoteAddr, err)
 			}
