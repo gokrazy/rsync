@@ -72,7 +72,7 @@ func (st *sendTransfer) sendFiles(fileList *fileList) error {
 			// value and gives an index into the sorted signature table which
 			// points to the first entry in the table which has a matching
 			// hash.”
-			for idx := range head.Sums {
+			for idx := len(head.Sums) - 1; idx >= 0; idx-- {
 				tagTable[targets[idx].tag] = idx
 			}
 		}
