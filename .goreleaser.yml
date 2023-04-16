@@ -1,0 +1,135 @@
+before:
+  hooks:
+    - go mod download
+    - go generate ./...
+
+builds:
+- id: "rsync-linux"
+  main: "./cmd/gokr-rsync"
+  binary: "gokr-rsync"
+  env:
+  - CGO_ENABLED=0
+  goos:
+  - linux
+  goarch:
+  - amd64
+  - arm
+  - arm64
+  - 386
+
+- id: "rsyncd-linux"
+  main: "./cmd/gokr-rsyncd"
+  binary: "gokr-rsyncd"
+  env:
+  - CGO_ENABLED=0
+  goos:
+  - linux
+  goarch:
+  - amd64
+  - arm
+  - arm64
+  - 386
+
+- id: "rsync-windows"
+  main: "./cmd/gokr-rsync"
+  binary: "gokr-rsync"
+  env:
+  - CGO_ENABLED=0
+  goos:
+  - windows
+  goarch:
+  - arm64
+  - amd64
+  - 386
+
+- id: "rsyncd-windows"
+  main: "./cmd/gokr-rsyncd"
+  binary: "gokr-rsyncd"
+  env:
+  - CGO_ENABLED=0
+  goos:
+  - windows
+  goarch:
+  - arm64
+  - amd64
+  - 386
+
+- id: "rsync-macos"
+  main: "./cmd/gokr-rsync"
+  binary: "gokr-rsync"
+  env:
+  - CGO_ENABLED=0
+  goos:
+  - darwin
+  goarch:
+  - arm64
+  - amd64
+
+- id: "rsyncd-macos"
+  main: "./cmd/gokr-rsyncd"
+  binary: "gokr-rsyncd"
+  env:
+  - CGO_ENABLED=0
+  goos:
+  - darwin
+  goarch:
+  - arm64
+  - amd64
+
+archives:
+- id: linux
+  name_template: >-
+    rsync_
+    {{- title .Os }}_
+    {{- if eq .Arch "amd64" }}x86_64
+    {{- else if eq .Arch "386" }}i386
+    {{- else}}{{ .Arch }}{{ end }}
+  builds: ["rsync-linux", "rsyncd-linux"]
+
+- id: windows
+  name_template: >-
+    rsync_
+    {{- title .Os }}_
+    {{- if eq .Arch "amd64" }}x86_64
+    {{- else if eq .Arch "386" }}i386
+    {{- else}}{{ .Arch }}{{ end }}
+  builds: ["rsync-windows", "rsyncd-windows"]
+  format: zip
+
+- id: macos
+  name_template: >-
+    rsync_Mac_
+    {{- if eq .Arch "amd64" }}Intel
+    {{- else if eq .Arch "arm64" }}Apple_Silicon
+    {{- else}}{{ .Arch }}{{ end }}
+  builds: ["rsync-macos", "rsyncd-macos"]
+  format: zip
+
+signs:
+- id: mac-notarize
+  ids: [macos]
+  signature: "${artifact}.dmg"
+  output: true
+  cmd: bash
+  args:
+  - "-c"
+  - "gon gon_$(echo ${artifact} | sed 's,^dist/rsync_,,g;s,\\.zip$,,g').hcl"
+  artifacts: archive
+    
+checksum:
+  name_template: 'checksums.txt'
+
+snapshot:
+  name_template: "{{ .Tag }}-next"
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+    - '^docs:'
+    - '^test:'
+
+release:
+  github:
+    owner: gokrazy
+    name: rsync
