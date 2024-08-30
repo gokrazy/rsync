@@ -33,8 +33,6 @@ func TestMain(m *testing.M) {
 	}
 }
 
-// TODO: non-empty exclusion list
-
 func TestRsyncVersion(t *testing.T) {
 	// This function is not an actual test, just used to include the rsync
 	// version in test output.
@@ -310,6 +308,40 @@ func TestInteropSubdir(t *testing.T) {
 
 	if err := sourceFullySyncedTo(t, dest); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestInteropSubdirExclude(t *testing.T) {
+	_, source, dest := createSourceFiles(t)
+
+	// start a server to sync from
+	srv := rsynctest.New(t, rsynctest.InteropModule(source))
+
+	// sync into dest dir
+	rsync := exec.Command("rsync", //"/home/michael/src/openrsync/openrsync",
+		append(
+			append([]string{
+				//		"--debug=all4",
+				"--archive",
+				// TODO: implement support for include rules
+				//"-f", "+ *.o",
+				// NOTE: Using -f is the more modern replacement
+				// for using --exclude like so:
+				//"--exclude=dummy",
+				"-f", "- dummy",
+				"-v", "-v", "-v", "-v",
+				"--port=" + srv.Port,
+			}, sourcesArgs(t)...),
+			dest)...)
+	rsync.Stdout = os.Stdout
+	rsync.Stderr = os.Stderr
+	if err := rsync.Run(); err != nil {
+		t.Fatalf("%v: %v", rsync.Args, err)
+	}
+
+	dummyFn := filepath.Join(dest, "dummy")
+	if _, err := os.ReadFile(dummyFn); !os.IsNotExist(err) {
+		t.Fatalf("ReadFile(%s) did not return -ENOENT, but %v", dummyFn, err)
 	}
 }
 

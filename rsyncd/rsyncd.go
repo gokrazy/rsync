@@ -356,22 +356,17 @@ func (s *Server) HandleConn(module Module, rd io.Reader, crd *countingReader, cw
 	}
 
 	// receive the exclusion list (openrsync’s is always empty)
-	const exclusionListEnd = 0
-	got, err := c.ReadInt32()
+	exclusionList, err := recvFilterList(c)
 	if err != nil {
 		return err
 	}
-	if want := int32(exclusionListEnd); got != want {
-		return fmt.Errorf("protocol error: non-empty exclusion list received")
-	}
-
-	s.logger.Printf("exclusion list read")
+	s.logger.Printf("exclusion list read (entries: %d)", len(exclusionList.filters))
 
 	// “Update exchange” as per
 	// https://github.com/kristapsdz/openrsync/blob/master/rsync.5
 
 	// send file list
-	fileList, err := st.sendFileList(module, opts, paths)
+	fileList, err := st.sendFileList(module, opts, paths, exclusionList)
 	if err != nil {
 		return err
 	}

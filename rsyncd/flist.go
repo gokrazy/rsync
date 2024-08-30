@@ -18,7 +18,7 @@ var (
 )
 
 // rsync/flist.c:send_file_list
-func (st *sendTransfer) sendFileList(mod Module, opts *Opts, paths []string) (*fileList, error) {
+func (st *sendTransfer) sendFileList(mod Module, opts *Opts, paths []string, excl *filterRuleList) (*fileList, error) {
 	var fileList fileList
 	fec := &rsyncwire.Buffer{}
 
@@ -46,6 +46,10 @@ func (st *sendTransfer) sendFileList(mod Module, opts *Opts, paths []string) (*f
 			// st.logger.Printf("filepath.WalkFn(path=%s)", path)
 			if err != nil {
 				return err
+			}
+
+			if excl.matches(path) {
+				return nil
 			}
 
 			// Only ever transmit long names, like openrsync
