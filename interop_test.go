@@ -328,10 +328,10 @@ func TestInteropSubdirExclude(t *testing.T) {
 				// NOTE: Using -f is the more modern replacement
 				// for using --exclude like so:
 				//"--exclude=dummy",
-				"-f", "- dummy",
+				"-f", "- expensive",
 				"-v", "-v", "-v", "-v",
 				"--port=" + srv.Port,
-			}, sourcesArgs(t)...),
+			}, "rsync://localhost/interop"),
 			dest)...)
 	rsync.Stdout = os.Stdout
 	rsync.Stderr = os.Stderr
@@ -339,9 +339,13 @@ func TestInteropSubdirExclude(t *testing.T) {
 		t.Fatalf("%v: %v", rsync.Args, err)
 	}
 
-	dummyFn := filepath.Join(dest, "dummy")
-	if _, err := os.ReadFile(dummyFn); !os.IsNotExist(err) {
-		t.Fatalf("ReadFile(%s) did not return -ENOENT, but %v", dummyFn, err)
+	expensiveFn := filepath.Join(dest, "expensive", "dummy")
+	if _, err := os.ReadFile(expensiveFn); !os.IsNotExist(err) {
+		t.Fatalf("ReadFile(%s) did not return -ENOENT, but %v", expensiveFn, err)
+	}
+	cheapFn := filepath.Join(dest, "cheap", "dummy")
+	if _, err := os.ReadFile(cheapFn); err != nil {
+		t.Fatalf("ReadFile(%s): %v", cheapFn, err)
 	}
 }
 

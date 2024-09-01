@@ -49,7 +49,7 @@ func (st *sendTransfer) sendFileList(mod Module, opts *Opts, paths []string, exc
 			}
 
 			if excl.matches(path) {
-				return nil
+				return filepath.SkipDir
 			}
 
 			// Only ever transmit long names, like openrsync
