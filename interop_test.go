@@ -331,7 +331,7 @@ func TestInteropSubdirExclude(t *testing.T) {
 				"-f", "- expensive",
 				"-v", "-v", "-v", "-v",
 				"--port=" + srv.Port,
-			}, "rsync://localhost/interop"),
+			}, "rsync://localhost/interop/"),
 			dest)...)
 	rsync.Stdout = os.Stdout
 	rsync.Stderr = os.Stderr
@@ -346,6 +346,59 @@ func TestInteropSubdirExclude(t *testing.T) {
 	cheapFn := filepath.Join(dest, "cheap", "dummy")
 	if _, err := os.ReadFile(cheapFn); err != nil {
 		t.Fatalf("ReadFile(%s): %v", cheapFn, err)
+	}
+}
+
+func TestInteropSubdirExcludeMultipleNested(t *testing.T) {
+	_, source, dest := createSourceFiles(t)
+
+	nested := filepath.Join(source, "nested")
+
+	// create files in source to be copied
+	subDirs := []string{"nested-expensive", "nested-cheap"}
+	for _, subdir := range subDirs {
+		dummy := filepath.Join(nested, subdir, "dummy")
+		if err := os.MkdirAll(filepath.Dir(dummy), 0755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(dummy, []byte(subdir), 0644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// start a server to sync from
+	srv := rsynctest.New(t, rsynctest.InteropModule(source))
+
+	// sync into dest dir
+	rsync := exec.Command("rsync", //"/home/michael/src/openrsync/openrsync",
+		append(
+			append([]string{
+				//		"--debug=all4",
+				"--archive",
+				// TODO: implement support for include rules
+				//"-f", "+ *.o",
+				// NOTE: Using -f is the more modern replacement
+				// for using --exclude like so:
+				//"--exclude=dummy",
+				"-f", "- nested/nested-expensive",
+				"-f", "- nested/nested-cheap",
+				"-v", "-v", "-v", "-v",
+				"--port=" + srv.Port,
+			}, "rsync://localhost/interop/"),
+			dest)...)
+	rsync.Stdout = os.Stdout
+	rsync.Stderr = os.Stderr
+	if err := rsync.Run(); err != nil {
+		t.Fatalf("%v: %v", rsync.Args, err)
+	}
+
+	expensiveFn := filepath.Join(dest, "nested", "nested-expensive", "dummy")
+	if _, err := os.ReadFile(expensiveFn); !os.IsNotExist(err) {
+		t.Fatalf("ReadFile(%s) did not return -ENOENT, but %v", expensiveFn, err)
+	}
+	cheapFn := filepath.Join(dest, "nested", "nested-cheap", "dummy")
+	if _, err := os.ReadFile(cheapFn); !os.IsNotExist(err) {
+		t.Fatalf("ReadFile(%s) did not return -ENOENT, but %v", cheapFn, err)
 	}
 }
 

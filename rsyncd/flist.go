@@ -48,10 +48,6 @@ func (st *sendTransfer) sendFileList(mod Module, opts *Opts, paths []string, exc
 				return err
 			}
 
-			if excl.matches(path) {
-				return filepath.SkipDir
-			}
-
 			// Only ever transmit long names, like openrsync
 			flags := byte(rsync.XMIT_LONG_NAME)
 
@@ -62,6 +58,10 @@ func (st *sendTransfer) sendFileList(mod Module, opts *Opts, paths []string, exc
 				flags |= rsync.XMIT_TOP_DIR
 			}
 			// st.logger.Printf("flags for %q: %v", name, flags)
+
+			if excl.matches(name) {
+				return filepath.SkipDir
+			}
 
 			fileList.files = append(fileList.files, file{
 				path:    path,
