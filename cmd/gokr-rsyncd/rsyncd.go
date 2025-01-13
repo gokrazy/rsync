@@ -14,7 +14,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/gokrazy/rsync/internal/maincmd"
+	maincmd "github.com/gokrazy/rsync/internal/daemonmaincmd"
 )
 
 func main() {
