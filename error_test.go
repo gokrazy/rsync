@@ -2,7 +2,6 @@ package rsync_test
 
 import (
 	"bytes"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -91,12 +90,12 @@ func TestNoReadPermission(t *testing.T) {
 		t.Fatal(err)
 	}
 	dummy := filepath.Join(source, "dummy")
-	if err := ioutil.WriteFile(dummy, []byte("dummy"), 0644); err != nil {
+	if err := os.WriteFile(dummy, []byte("dummy"), 0644); err != nil {
 		t.Fatal(err)
 	}
 	other := filepath.Join(source, "other")
 	want := []byte("other file contents")
-	if err := ioutil.WriteFile(other, want, 0644); err != nil {
+	if err := os.WriteFile(other, want, 0644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -126,12 +125,12 @@ func TestNoReadPermission(t *testing.T) {
 	if os.Getuid() > 0 {
 		// uid 0 can read the file despite chmod(0), so skip this check:
 
-		if _, err := ioutil.ReadFile(filepath.Join(dest, "dummy")); err == nil {
+		if _, err := os.ReadFile(filepath.Join(dest, "dummy")); err == nil {
 			t.Fatalf("dummy file unexpectedly created in the destination")
 		}
 	}
 
-	got, err := ioutil.ReadFile(filepath.Join(dest, "other"))
+	got, err := os.ReadFile(filepath.Join(dest, "other"))
 	if err != nil {
 		t.Fatal(err)
 	}

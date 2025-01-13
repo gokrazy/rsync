@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
@@ -82,7 +81,7 @@ func TestInterop(t *testing.T) {
 	}
 	dummy := filepath.Join(source, "dummy")
 	want := []byte("heyo")
-	if err := ioutil.WriteFile(dummy, want, 0644); err != nil {
+	if err := os.WriteFile(dummy, want, 0644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -119,7 +118,7 @@ func TestInterop(t *testing.T) {
 	// 	       list = true
 
 	// 	`
-	// 		if err := ioutil.WriteFile(config, []byte(rsyncdConfig), 0644); err != nil {
+	// 		if err := os.WriteFile(config, []byte(rsyncdConfig), 0644); err != nil {
 	// 			t.Fatal(err)
 	// 		}
 	// 		srv := exec.Command("rsync",
@@ -176,7 +175,7 @@ func TestInterop(t *testing.T) {
 	}
 
 	{
-		got, err := ioutil.ReadFile(filepath.Join(dest, "dummy"))
+		got, err := os.ReadFile(filepath.Join(dest, "dummy"))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -233,7 +232,7 @@ func createSourceFiles(t *testing.T) (string, string, string) {
 		if err := os.MkdirAll(filepath.Dir(dummy), 0755); err != nil {
 			t.Fatal(err)
 		}
-		if err := ioutil.WriteFile(dummy, []byte(subdir), 0644); err != nil {
+		if err := os.WriteFile(dummy, []byte(subdir), 0644); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -258,7 +257,7 @@ func sourcesArgs(t *testing.T) []string {
 func sourceFullySyncedTo(t *testing.T, dest string) error {
 	{
 		want := []byte("expensive")
-		got, err := ioutil.ReadFile(filepath.Join(dest, "dummy"))
+		got, err := os.ReadFile(filepath.Join(dest, "dummy"))
 		if err != nil {
 			return err
 		}
@@ -273,7 +272,7 @@ func sourceFullySyncedTo(t *testing.T, dest string) error {
 
 	{
 		want := []byte("cheap")
-		got, err := ioutil.ReadFile(filepath.Join(dest, "cheap", "dummy"))
+		got, err := os.ReadFile(filepath.Join(dest, "cheap", "dummy"))
 		if err != nil {
 			return err
 		}
@@ -561,7 +560,7 @@ func TestInteropRemoteDaemonAuthorizedSSHFail(t *testing.T) {
 	}
 
 	authorizedKeysPath := filepath.Join(tmp, "authorized_keys")
-	if err := ioutil.WriteFile(authorizedKeysPath, []byte("# no keys authorized"), 0644); err != nil {
+	if err := os.WriteFile(authorizedKeysPath, []byte("# no keys authorized"), 0644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -611,11 +610,11 @@ func TestInteropRemoteDaemonAuthorizedSSHPass(t *testing.T) {
 	}
 
 	authorizedKeysPath := filepath.Join(tmp, "authorized_keys")
-	pubKey, err := ioutil.ReadFile(privKeyPath + ".pub")
+	pubKey, err := os.ReadFile(privKeyPath + ".pub")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := ioutil.WriteFile(authorizedKeysPath, pubKey, 0644); err != nil {
+	if err := os.WriteFile(authorizedKeysPath, pubKey, 0644); err != nil {
 		t.Fatal(err)
 	}
 

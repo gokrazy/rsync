@@ -1,7 +1,6 @@
 package rsyncdconfig
 
 import (
-	"io/ioutil"
 	"os"
 	"path/filepath"
 
@@ -36,7 +35,7 @@ func FromString(input string) (*Config, error) {
 }
 
 func FromFile(path string) (*Config, error) {
-	input, err := ioutil.ReadFile(path)
+	input, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}

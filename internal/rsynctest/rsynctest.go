@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net"
 	"os"
 	"os/exec"
@@ -276,14 +275,14 @@ func WriteLargeDataFile(t *testing.T, source string, headPattern, bodyPattern, e
 	if err := os.MkdirAll(filepath.Dir(large), 0755); err != nil {
 		t.Fatal(err)
 	}
-	if err := ioutil.WriteFile(large, content, 0644); err != nil {
+	if err := os.WriteFile(large, content, 0644); err != nil {
 		t.Fatal(err)
 	}
 }
 
 func DataFileMatches(fn string, headPattern, bodyPattern, endPattern []byte) error {
 	want := ConstructLargeDataFile(headPattern, bodyPattern, endPattern)
-	got, err := ioutil.ReadFile(fn)
+	got, err := os.ReadFile(fn)
 	if err != nil {
 		return err
 	}

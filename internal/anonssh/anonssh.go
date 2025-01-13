@@ -12,7 +12,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net"
 	"os"
 	"path/filepath"
@@ -256,7 +255,7 @@ func loadHostKey() (ssh.Signer, error) {
 		return nil, err
 	}
 	path := filepath.Join(dir, "gokr-rsyncd", "ssh_host_ed25519_key")
-	b, err := ioutil.ReadFile(path)
+	b, err := os.ReadFile(path)
 	if err != nil {
 		if os.IsNotExist(err) {
 			if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
@@ -275,7 +274,7 @@ func loadHostKey() (ssh.Signer, error) {
 }
 
 func loadAuthorizedKeys(path string) (map[string]bool, error) {
-	b, err := ioutil.ReadFile(path)
+	b, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}

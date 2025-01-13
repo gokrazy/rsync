@@ -2,7 +2,7 @@ package rsync_test
 
 import (
 	"bytes"
-	"io/ioutil"
+
 	"os"
 	"path/filepath"
 	"testing"
@@ -27,7 +27,7 @@ func TestReceiverListing(t *testing.T) {
 		t.Fatal(err)
 	}
 	hello := filepath.Join(source, "hello")
-	if err := ioutil.WriteFile(hello, []byte("world"), 0644); err != nil {
+	if err := os.WriteFile(hello, []byte("world"), 0644); err != nil {
 		t.Fatal(err)
 	}
 	mtime, err := time.Parse(time.RFC3339, "2009-11-10T23:00:00Z")

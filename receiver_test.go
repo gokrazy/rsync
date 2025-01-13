@@ -1,7 +1,6 @@
 package rsync_test
 
 import (
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"os/user"
@@ -56,7 +55,7 @@ func TestReceiver(t *testing.T) {
 		t.Fatal(err)
 	}
 	hello := filepath.Join(source, "hello")
-	if err := ioutil.WriteFile(hello, []byte("world"), 0644); err != nil {
+	if err := os.WriteFile(hello, []byte("world"), 0644); err != nil {
 		t.Fatal(err)
 	}
 	mtime, err := time.Parse(time.RFC3339, "2009-11-10T23:00:00Z")
@@ -75,7 +74,7 @@ func TestReceiver(t *testing.T) {
 	}
 
 	no := filepath.Join(source, "no")
-	if err := ioutil.WriteFile(no, []byte("no"), 0666); err != nil {
+	if err := os.WriteFile(no, []byte("no"), 0666); err != nil {
 		t.Fatal(err)
 	}
 	uid, gid, verifyUid := setUid(t, no)
@@ -101,7 +100,7 @@ func TestReceiver(t *testing.T) {
 
 	{
 		want := []byte("world")
-		got, err := ioutil.ReadFile(filepath.Join(dest, "hello"))
+		got, err := os.ReadFile(filepath.Join(dest, "hello"))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -146,7 +145,7 @@ func TestReceiver(t *testing.T) {
 
 	// Make a change that is invisible with our current settings:
 	// change the file contents without changing size and mtime.
-	if err := ioutil.WriteFile(hello, []byte("moon!"), 0644); err != nil {
+	if err := os.WriteFile(hello, []byte("moon!"), 0644); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.Chtimes(hello, mtime, mtime); err != nil {
@@ -166,7 +165,7 @@ func TestReceiver(t *testing.T) {
 
 	{
 		want := []byte("world")
-		got, err := ioutil.ReadFile(filepath.Join(dest, "hello"))
+		got, err := os.ReadFile(filepath.Join(dest, "hello"))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -240,7 +239,7 @@ func TestReceiverSSH(t *testing.T) {
 	if err := os.MkdirAll(source, 0755); err != nil {
 		t.Fatal(err)
 	}
-	if err := ioutil.WriteFile(filepath.Join(source, "hello"), []byte("world"), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(source, "hello"), []byte("world"), 0644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -278,7 +277,7 @@ func TestReceiverSSH(t *testing.T) {
 
 	{
 		want := []byte("world")
-		got, err := ioutil.ReadFile(filepath.Join(dest, "hello"))
+		got, err := os.ReadFile(filepath.Join(dest, "hello"))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -296,7 +295,7 @@ func TestReceiverCommand(t *testing.T) {
 	if err := os.MkdirAll(source, 0755); err != nil {
 		t.Fatal(err)
 	}
-	if err := ioutil.WriteFile(filepath.Join(source, "hello"), []byte("world"), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(source, "hello"), []byte("world"), 0644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -331,7 +330,7 @@ func TestReceiverCommand(t *testing.T) {
 
 	{
 		want := []byte("world")
-		got, err := ioutil.ReadFile(filepath.Join(dest, "hello"))
+		got, err := os.ReadFile(filepath.Join(dest, "hello"))
 		if err != nil {
 			t.Fatal(err)
 		}

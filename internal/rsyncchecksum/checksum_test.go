@@ -2,7 +2,6 @@ package rsyncchecksum_test
 
 import (
 	"bytes"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
@@ -25,7 +24,7 @@ func writeLargeDataFile(t *testing.T, source string, headPattern, bodyPattern, e
 	if err := os.MkdirAll(filepath.Dir(large), 0755); err != nil {
 		t.Fatal(err)
 	}
-	if err := ioutil.WriteFile(large, content, 0644); err != nil {
+	if err := os.WriteFile(large, content, 0644); err != nil {
 		t.Fatal(err)
 	}
 }
