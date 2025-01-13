@@ -304,8 +304,6 @@ func (s *Server) HandleDaemonConn(ctx context.Context, conn io.ReadWriter, remot
 	}
 	paths := remaining[1:]
 
-	// TODO: verify --sender is set and error out otherwise
-
 	return s.HandleConn(module, rd, crd, cwr, paths, opts, false)
 }
 
@@ -341,13 +339,29 @@ func (s *Server) HandleConn(module Module, rd io.Reader, crd *countingReader, cw
 	// Transmissions received from the client are not multiplexed.
 	mpx := &rsyncwire.MultiplexWriter{Writer: c.Writer}
 	c.Writer = mpx
+
+	if opts.Sender {
+		// If returning an error, send the error to the client for display, too:
+		defer func() {
+			if err != nil {
+				mpx.WriteMsg(rsyncwire.MsgError, fmt.Appendf(nil, "gokr-rsync [sender]: %v\n", err))
+			}
+		}()
+
+		return s.handleConnSender(module, rd, crd, cwr, paths, opts, false, c, sessionChecksumSeed)
+	}
+
 	// If returning an error, send the error to the client for display, too:
 	defer func() {
 		if err != nil {
-			mpx.WriteMsg(rsyncwire.MsgError, []byte(fmt.Sprintf("gokr-rsync [sender]: %v\n", err)))
+			mpx.WriteMsg(rsyncwire.MsgError, fmt.Appendf(nil, "gokr-rsync [receiver]: %v\n", err))
 		}
 	}()
+	return fmt.Errorf("receiver not yet implemented")
+}
 
+// handleConnSender is equivalent to rsync/main.c:do_server_sender
+func (s *Server) handleConnSender(module Module, rd io.Reader, crd *countingReader, cwr *countingWriter, paths []string, opts *Opts, negotiate bool, c *rsyncwire.Conn, sessionChecksumSeed int32) (err error) {
 	st := &sendTransfer{
 		logger: s.logger,
 		opts:   opts,
@@ -408,7 +422,7 @@ func (s *Server) HandleConn(module Module, rd io.Reader, crd *countingReader, cw
 		return fmt.Errorf("protocol error: expected final -1, got %d", finish)
 	}
 
-	s.logger.Printf("HandleConn done")
+	s.logger.Printf("handleConnSender done")
 
 	return nil
 }
