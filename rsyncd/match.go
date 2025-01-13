@@ -26,10 +26,7 @@ func (st *sendTransfer) hashSearch(targets []target, tagTable map[uint16]int, he
 		return err
 	}
 
-	readSize := 3 * head.BlockLength
-	if readSize < 256*1024 {
-		readSize = 256 * 1024
-	}
+	readSize := max(3*head.BlockLength, 256*1024)
 	ms := mapFile(f, fi.Size(), readSize, head.BlockLength)
 
 	if err := st.conn.WriteInt32(fileIndex); err != nil {
@@ -242,10 +239,7 @@ func (st *sendTransfer) matched(h hash.Hash, ms *mapStruct, head rsync.SumHead, 
 	}
 
 	for j := int64(0); j < n; j += chunkSize {
-		n1 := int64(chunkSize)
-		if n-j < n1 {
-			n1 = n - j
-		}
+		n1 := min(int64(chunkSize), n-j)
 		chunk := ms.ptr(st.lastMatch+j, int32(n1))
 		h.Write(chunk)
 	}

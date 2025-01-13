@@ -6,10 +6,7 @@ func (st *sendTransfer) simpleSendToken(ms *mapStruct, token int32, offset int64
 		st.logger.Printf("sending unmatched chunks offset=%d, n=%d", offset, n)
 		l := int64(0)
 		for l < n {
-			n1 := int64(chunkSize)
-			if n-l < n1 {
-				n1 = n - l
-			}
+			n1 := min(int64(chunkSize), n-l)
 
 			chunk := ms.ptr(offset+l, int32(n1))
 
