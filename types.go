@@ -1,6 +1,10 @@
 package rsync
 
-import "github.com/gokrazy/rsync/internal/rsyncwire"
+import (
+	"fmt"
+
+	"github.com/gokrazy/rsync/internal/rsyncwire"
+)
 
 // rsync/rsync.h:struct sum_buf
 type SumBuf struct {
@@ -32,26 +36,43 @@ type SumHead struct {
 }
 
 func (sh *SumHead) ReadFrom(c *rsyncwire.Conn) error {
+	// TODO(protocol>=30): update maxBlockLen
+	const maxBlockLen = 1 << 29 // see rsync.h:OLD_MAX_BLOCK_SIZE
+
 	var err error
 	sh.ChecksumCount, err = c.ReadInt32()
 	if err != nil {
 		return err
+	}
+	if sh.ChecksumCount < 0 {
+		return fmt.Errorf("invalid checksum count %d", sh.ChecksumCount)
 	}
 
 	sh.BlockLength, err = c.ReadInt32()
 	if err != nil {
 		return err
 	}
+	if sh.BlockLength < 0 || sh.BlockLength > maxBlockLen {
+		return fmt.Errorf("invalid block length %d", sh.BlockLength)
+	}
 
 	sh.ChecksumLength, err = c.ReadInt32()
 	if err != nil {
 		return err
+	}
+	// TODO(protocol>=27): update max sh.ChecksumLength check
+	if sh.ChecksumLength < 0 || sh.ChecksumLength > 16 {
+		return fmt.Errorf("invalid checksum length %d", sh.ChecksumLength)
 	}
 
 	sh.RemainderLength, err = c.ReadInt32()
 	if err != nil {
 		return err
 	}
+	if sh.RemainderLength < 0 || sh.RemainderLength > sh.BlockLength {
+		return fmt.Errorf("invalid remainder length %d", sh.RemainderLength)
+	}
+
 	return nil
 }
 
