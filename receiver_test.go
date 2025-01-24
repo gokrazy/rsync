@@ -339,3 +339,47 @@ func TestReceiverCommand(t *testing.T) {
 		}
 	}
 }
+
+// TestReceiverSymlinkTraversal passes by default but is useful to simulate
+// a symlink race TOCTOU attack by modifying rsyncd/rsyncd.go.
+func TestReceiverSymlinkTraversal(t *testing.T) {
+	tmp := t.TempDir()
+	if err := os.WriteFile(filepath.Join(tmp, "passwd"), []byte("secret"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	source := filepath.Join(tmp, "source")
+	dest := filepath.Join(tmp, "dest")
+
+	if err := os.MkdirAll(source, 0755); err != nil {
+		t.Fatal(err)
+	}
+	hello := filepath.Join(source, "passwd")
+	if err := os.WriteFile(hello, []byte("benign"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	// start a server to sync from
+	srv := rsynctest.New(t, rsynctest.InteropModule(source))
+
+	args := []string{
+		"gokr-rsync",
+		"-aH",
+		"rsync://localhost:" + srv.Port + "/interop/",
+		dest,
+	}
+	_, err := receivermaincmd.Main(args, os.Stdin, os.Stdout, os.Stdout)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	{
+		want := []byte("benign")
+		got, err := os.ReadFile(filepath.Join(dest, "passwd"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if diff := cmp.Diff(want, got); diff != "" {
+			t.Fatalf("unexpected file contents: diff (-want +got):\n%s", diff)
+		}
+	}
+}

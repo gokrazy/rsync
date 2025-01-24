@@ -8,6 +8,7 @@ import (
 	"os"
 
 	"github.com/gokrazy/rsync"
+	"github.com/gokrazy/rsync/internal/nofollow"
 	"github.com/gokrazy/rsync/internal/rsyncchecksum"
 	"github.com/mmcloughlin/md4"
 )
@@ -15,7 +16,7 @@ import (
 // rsync/match.c:hash_search
 func (st *sendTransfer) hashSearch(targets []target, tagTable map[uint16]int, head rsync.SumHead, fileIndex int32, fl file) error {
 	st.logger.Printf("hashSearch(path=%s, len(sums)=%d)", fl.path, len(head.Sums))
-	f, err := os.Open(fl.path)
+	f, err := os.OpenFile(fl.path, os.O_RDONLY|nofollow.Maybe, 0)
 	if err != nil {
 		return err
 	}

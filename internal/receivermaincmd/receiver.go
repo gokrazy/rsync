@@ -10,6 +10,7 @@ import (
 
 	"github.com/gokrazy/rsync"
 	"github.com/gokrazy/rsync/internal/log"
+	"github.com/gokrazy/rsync/internal/nofollow"
 	"github.com/mmcloughlin/md4"
 )
 
@@ -54,7 +55,7 @@ func (rt *recvTransfer) recvFile1(f *file) error {
 func (rt *recvTransfer) openLocalFile(f *file) (*os.File, error) {
 	local := filepath.Join(rt.dest, f.Name)
 
-	in, err := os.Open(local)
+	in, err := os.OpenFile(local, os.O_RDONLY|nofollow.Maybe, 0)
 	if err != nil {
 		return nil, err
 	}

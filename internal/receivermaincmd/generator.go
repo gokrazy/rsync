@@ -10,6 +10,7 @@ import (
 
 	"github.com/gokrazy/rsync"
 	"github.com/gokrazy/rsync/internal/log"
+	"github.com/gokrazy/rsync/internal/nofollow"
 	"github.com/gokrazy/rsync/internal/rsyncchecksum"
 	"github.com/gokrazy/rsync/internal/rsynccommon"
 )
@@ -244,7 +245,7 @@ func (rt *recvTransfer) recvGenerator(idx int, f *file) error {
 
 	// TODO: if deltas are disabled, request the file in full
 
-	in, err := os.Open(local)
+	in, err := os.OpenFile(local, os.O_RDONLY|nofollow.Maybe, 0)
 	if err != nil {
 		log.Printf("failed to open %s, continuing: %v", local, err)
 		return requestFullFile()
