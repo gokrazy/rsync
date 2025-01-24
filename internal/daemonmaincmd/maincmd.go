@@ -39,7 +39,7 @@ func Main(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer,
 	remaining, err := opt.Parse(args[1:])
 	if opt.Called("help") {
 		fmt.Fprint(stderr, opt.Help())
-		os.Exit(1)
+		os.Exit(0) // exit with code 0 for compatibility with tridge rsync
 	}
 	if err != nil {
 		return err
