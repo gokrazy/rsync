@@ -342,7 +342,7 @@ func clientRun(osenv receiver.Osenv, opts *Opts, conn io.ReadWriter, dest string
 	}
 	log.Printf("received %d names", len(fileList))
 
-	return rt.Do(c, fileList)
+	return rt.Do(c, fileList, false)
 }
 
 func Main(args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer) (*receiver.Stats, error) {

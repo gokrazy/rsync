@@ -45,6 +45,14 @@ func InteropModule(path string) []rsyncd.Module {
 	}
 }
 
+// WritableInteropModule is a wrapper around InteropModule that marks the module
+// as writable (not read-only).
+func WritableInteropModule(path string) []rsyncd.Module {
+	mods := InteropModule(path)
+	mods[0].Writable = true
+	return mods
+}
+
 type Option func(ts *TestServer)
 
 func Listeners(lns []rsyncdconfig.Listener) Option {

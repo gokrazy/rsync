@@ -15,7 +15,7 @@ type Stats struct {
 }
 
 // rsync/main.c:do_recv
-func (rt *Transfer) Do(c *rsyncwire.Conn, fileList []*File) (*Stats, error) {
+func (rt *Transfer) Do(c *rsyncwire.Conn, fileList []*File, noReport bool) (*Stats, error) {
 	ctx := context.Background()
 	eg, ctx := errgroup.WithContext(ctx)
 	eg.Go(func() error {
@@ -39,9 +39,13 @@ func (rt *Transfer) Do(c *rsyncwire.Conn, fileList []*File) (*Stats, error) {
 		return nil, err
 	}
 
-	stats, err := report(c)
-	if err != nil {
-		return nil, err
+	var stats *Stats
+	if !noReport {
+		var err error
+		stats, err = report(c)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	// send final goodbye message

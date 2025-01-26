@@ -7,11 +7,14 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"os"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/gokrazy/rsync"
 	"github.com/gokrazy/rsync/internal/log"
+	"github.com/gokrazy/rsync/internal/receiver"
 	"github.com/gokrazy/rsync/internal/rsyncwire"
 )
 
@@ -27,9 +30,10 @@ type sendTransfer struct {
 }
 
 type Module struct {
-	Name string   `toml:"name"`
-	Path string   `toml:"path"`
-	ACL  []string `toml:"acl"`
+	Name     string   `toml:"name"`
+	Path     string   `toml:"path"`
+	ACL      []string `toml:"acl"`
+	Writable bool     `toml:"writable"`
 }
 
 // Option specifies the server options.
@@ -109,6 +113,16 @@ type file struct {
 	path    string
 	wpath   string
 	regular bool
+
+	// fields below are used by the receiver (TODO: unify)
+	Name       string
+	Length     int64
+	ModTime    time.Time
+	Mode       int32
+	Uid        int32
+	Gid        int32
+	LinkTarget string
+	Rdev       int32
 }
 
 type fileList struct {
@@ -303,6 +317,7 @@ func (s *Server) HandleDaemonConn(ctx context.Context, conn io.ReadWriter, remot
 		return fmt.Errorf("protocol error: got %q, expected %q", got, want)
 	}
 	paths := remaining[1:]
+	s.logger.Printf("paths: %q", paths)
 
 	return s.HandleConn(module, rd, crd, cwr, paths, opts, false)
 }
@@ -348,7 +363,7 @@ func (s *Server) HandleConn(module Module, rd io.Reader, crd *countingReader, cw
 			}
 		}()
 
-		return s.handleConnSender(module, rd, crd, cwr, paths, opts, false, c, sessionChecksumSeed)
+		return s.handleConnSender(module, crd, cwr, paths, opts, false, c, sessionChecksumSeed)
 	}
 
 	// If returning an error, send the error to the client for display, too:
@@ -357,11 +372,68 @@ func (s *Server) HandleConn(module Module, rd io.Reader, crd *countingReader, cw
 			mpx.WriteMsg(rsyncwire.MsgError, fmt.Appendf(nil, "gokr-rsync [receiver]: %v\n", err))
 		}
 	}()
-	return fmt.Errorf("receiver not yet implemented")
+	return s.handleConnReceiver(module, crd, cwr, paths, opts, false, c, sessionChecksumSeed)
+}
+
+// handleConnReceiver is equivalent to rsync/main.c:do_server_recv
+func (s *Server) handleConnReceiver(module Module, crd *countingReader, cwr *countingWriter, paths []string, opts *Opts, negotiate bool, c *rsyncwire.Conn, sessionChecksumSeed int32) (err error) {
+	s.logger.Printf("handleConnReceiver")
+
+	if !module.Writable {
+		return fmt.Errorf("ERROR: module is read only")
+	}
+
+	rt := &receiver.Transfer{
+		Opts: &receiver.TransferOpts{
+			DryRun: opts.DryRun,
+
+			PreserveGid:      opts.PreserveGid,
+			PreserveUid:      opts.PreserveUid,
+			PreserveLinks:    opts.PreserveLinks,
+			PreservePerms:    opts.PreservePerms,
+			PreserveDevices:  opts.PreserveDevices,
+			PreserveSpecials: opts.PreserveSpecials,
+			PreserveTimes:    opts.PreserveTimes,
+			// TODO: PreserveHardlinks: opts.PreserveHardlinks,
+		},
+		Dest: module.Path,
+		// TODO: what is Env used for and can we get rid of it?
+		Env: receiver.Osenv{
+			Stdout: os.Stdout,
+			Stderr: os.Stderr,
+			Stdin:  os.Stdin,
+		},
+		Conn: c,
+		Seed: sessionChecksumSeed,
+	}
+
+	if false /* TODO: opts.Delete */ {
+		// receive the exclusion list (openrsync’s is always empty)
+		exclusionList, err := recvFilterList(c)
+		if err != nil {
+			return err
+		}
+		s.logger.Printf("exclusion list read (entries: %d)", len(exclusionList.filters))
+	}
+
+	// receive file list
+	s.logger.Printf("receiving file list")
+	fileList, err := rt.ReceiveFileList()
+	if err != nil {
+		return err
+	}
+	s.logger.Printf("received %d names", len(fileList))
+	stats, err := rt.Do(c, fileList, true)
+	if err != nil {
+		return err
+	}
+
+	s.logger.Printf("stats: %+v", stats)
+	return nil
 }
 
 // handleConnSender is equivalent to rsync/main.c:do_server_sender
-func (s *Server) handleConnSender(module Module, rd io.Reader, crd *countingReader, cwr *countingWriter, paths []string, opts *Opts, negotiate bool, c *rsyncwire.Conn, sessionChecksumSeed int32) (err error) {
+func (s *Server) handleConnSender(module Module, crd *countingReader, cwr *countingWriter, paths []string, opts *Opts, negotiate bool, c *rsyncwire.Conn, sessionChecksumSeed int32) (err error) {
 	st := &sendTransfer{
 		logger: s.logger,
 		opts:   opts,
