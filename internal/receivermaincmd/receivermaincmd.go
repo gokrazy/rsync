@@ -354,8 +354,6 @@ func clientRun(osenv osenv, opts *Opts, conn io.ReadWriter, dest string, negotia
 	}
 	log.Printf("received %d names", len(fileList))
 
-	sortFileList(fileList)
-
 	// receive the uid/gid list
 	users, groups, err := rt.recvIdList()
 	if err != nil {

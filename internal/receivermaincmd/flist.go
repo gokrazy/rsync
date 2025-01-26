@@ -214,5 +214,8 @@ func (rt *recvTransfer) receiveFileList() ([]*file, error) {
 			f.Gid)
 		fileList = append(fileList, f)
 	}
+
+	sortFileList(fileList)
+
 	return fileList, nil
 }
