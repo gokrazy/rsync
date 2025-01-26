@@ -1,6 +1,6 @@
 //go:build linux || darwin
 
-package receivermaincmd
+package receiver
 
 import "github.com/google/renameio/v2"
 

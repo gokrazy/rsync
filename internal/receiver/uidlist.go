@@ -1,4 +1,4 @@
-package receivermaincmd
+package receiver
 
 import (
 	"io"
@@ -10,22 +10,22 @@ type mapping struct {
 	LocalId int32
 }
 
-func (rt *recvTransfer) recvIdMapping1(localId func(id int32, name string) int32) (map[int32]mapping, error) {
+func (rt *Transfer) recvIdMapping1(localId func(id int32, name string) int32) (map[int32]mapping, error) {
 	idMapping := make(map[int32]mapping)
 	for {
-		id, err := rt.conn.ReadInt32()
+		id, err := rt.Conn.ReadInt32()
 		if err != nil {
 			return nil, err
 		}
 		if id == 0 {
 			break
 		}
-		length, err := rt.conn.ReadByte()
+		length, err := rt.Conn.ReadByte()
 		if err != nil {
 			return nil, err
 		}
 		name := make([]byte, length)
-		if _, err := io.ReadFull(rt.conn.Reader, name); err != nil {
+		if _, err := io.ReadFull(rt.Conn.Reader, name); err != nil {
 			return nil, err
 		}
 		idMapping[id] = mapping{
@@ -37,7 +37,7 @@ func (rt *recvTransfer) recvIdMapping1(localId func(id int32, name string) int32
 }
 
 // rsync/uidlist.c:recv_id_list
-func (rt *recvTransfer) recvIdList() (users map[int32]mapping, groups map[int32]mapping, _ error) {
+func (rt *Transfer) RecvIdList() (users map[int32]mapping, groups map[int32]mapping, _ error) {
 	var err error
 	users, err = rt.recvIdMapping1(func(remoteUid int32, remoteUsername string) int32 {
 		// TODO: look up local uid by username

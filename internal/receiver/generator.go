@@ -1,4 +1,4 @@
-package receivermaincmd
+package receiver
 
 import (
 	"fmt"
@@ -16,7 +16,7 @@ import (
 )
 
 // rsync/generator.c:generate_files()
-func (rt *recvTransfer) generateFiles(fileList []*file) error {
+func (rt *Transfer) GenerateFiles(fileList []*File) error {
 	phase := 0
 	for idx, f := range fileList {
 		// TODO: use a copy of f with .Mode |= S_IWUSR for directories, so
@@ -28,14 +28,14 @@ func (rt *recvTransfer) generateFiles(fileList []*file) error {
 	}
 	phase++
 	log.Printf("generateFiles phase=%d", phase)
-	if err := rt.conn.WriteInt32(-1); err != nil {
+	if err := rt.Conn.WriteInt32(-1); err != nil {
 		return err
 	}
 
 	// TODO: re-do any files that failed
 	phase++
 	log.Printf("generateFiles phase=%d", phase)
-	if err := rt.conn.WriteInt32(-1); err != nil {
+	if err := rt.Conn.WriteInt32(-1); err != nil {
 		return err
 	}
 
@@ -44,7 +44,7 @@ func (rt *recvTransfer) generateFiles(fileList []*file) error {
 }
 
 // rsync/generator.c:skip_file
-func (rt *recvTransfer) skipFile(f *file, st os.FileInfo) (bool, error) {
+func (rt *Transfer) skipFile(f *File, st os.FileInfo) (bool, error) {
 	if st.Size() != f.Length {
 		return false, nil
 	}
@@ -66,12 +66,12 @@ func modTimeEqual(a, b time.Time) bool {
 }
 
 // rsync/rsync.c:set_perms
-func (rt *recvTransfer) setPerms(f *file) error {
-	if rt.opts.DryRun {
+func (rt *Transfer) setPerms(f *File) error {
+	if rt.Opts.DryRun {
 		return nil
 	}
 
-	local := filepath.Join(rt.dest, f.Name)
+	local := filepath.Join(rt.Dest, f.Name)
 	st, err := os.Lstat(local)
 	if err != nil {
 		return err
@@ -79,7 +79,7 @@ func (rt *recvTransfer) setPerms(f *file) error {
 
 	perm := fs.FileMode(f.Mode) & os.ModePerm
 	mode := f.Mode & rsync.S_IFMT
-	if rt.opts.PreserveTimes &&
+	if rt.Opts.PreserveTimes &&
 		mode != rsync.S_IFLNK &&
 		!modTimeEqual(st.ModTime(), f.ModTime) {
 		if err := os.Chtimes(local, f.ModTime, f.ModTime); err != nil {
@@ -102,9 +102,9 @@ func (rt *recvTransfer) setPerms(f *file) error {
 }
 
 // rsync/generator.c:recv_generator
-func (rt *recvTransfer) recvGenerator(idx int, f *file) error {
+func (rt *Transfer) recvGenerator(idx int, f *File) error {
 	if rt.listOnly() {
-		fmt.Fprintf(rt.env.stdout, "%s %11.0f %s %s\n",
+		fmt.Fprintf(rt.Env.Stdout, "%s %11.0f %s %s\n",
 			f.FileMode().String(),
 			float64(f.Length), // TODO: rsync prints decimal separators
 			f.ModTime.Format("2006/01/02 15:04:05"),
@@ -113,12 +113,12 @@ func (rt *recvTransfer) recvGenerator(idx int, f *file) error {
 	}
 	log.Printf("recv_generator(f=%+v)", f)
 
-	local := filepath.Join(rt.dest, f.Name)
+	local := filepath.Join(rt.Dest, f.Name)
 	st, err := os.Lstat(local)
 
 	mode := f.Mode & rsync.S_IFMT
 	if mode == rsync.S_IFDIR {
-		if rt.opts.DryRun {
+		if rt.Opts.DryRun {
 			return nil
 		}
 		if err == nil && !st.IsDir() {
@@ -144,7 +144,7 @@ func (rt *recvTransfer) recvGenerator(idx int, f *file) error {
 		return nil
 	}
 
-	if rt.opts.PreserveLinks && mode == rsync.S_IFLNK {
+	if rt.Opts.PreserveLinks && mode == rsync.S_IFLNK {
 		// TODO: safe_symlinks option
 		if err == nil {
 			// local file exists, verify target matches
@@ -170,7 +170,7 @@ func (rt *recvTransfer) recvGenerator(idx int, f *file) error {
 		return nil
 	}
 
-	if rt.opts.PreserveDevices && (mode == rsync.S_IFCHR ||
+	if rt.Opts.PreserveDevices && (mode == rsync.S_IFCHR ||
 		mode == rsync.S_IFBLK ||
 		mode == rsync.S_IFSOCK ||
 		mode == rsync.S_IFIFO) {
@@ -180,7 +180,7 @@ func (rt *recvTransfer) recvGenerator(idx int, f *file) error {
 		return nil
 	}
 
-	if rt.opts.PreserveHardlinks {
+	if rt.Opts.PreserveHardlinks {
 		// TODO: hard link check
 	}
 
@@ -192,14 +192,14 @@ func (rt *recvTransfer) recvGenerator(idx int, f *file) error {
 
 	requestFullFile := func() error {
 		log.Printf("requesting: %s", f.Name)
-		if err := rt.conn.WriteInt32(int32(idx)); err != nil {
+		if err := rt.Conn.WriteInt32(int32(idx)); err != nil {
 			return err
 		}
-		if rt.opts.DryRun {
+		if rt.Opts.DryRun {
 			return nil
 		}
 		var sh rsync.SumHead
-		if err := sh.WriteTo(rt.conn); err != nil {
+		if err := sh.WriteTo(rt.Conn); err != nil {
 			return err
 		}
 		return nil
@@ -235,8 +235,8 @@ func (rt *recvTransfer) recvGenerator(idx int, f *file) error {
 		return nil
 	}
 
-	if rt.opts.DryRun {
-		if err := rt.conn.WriteInt32(int32(idx)); err != nil {
+	if rt.Opts.DryRun {
+		if err := rt.Conn.WriteInt32(int32(idx)); err != nil {
 			return err
 		}
 
@@ -253,7 +253,7 @@ func (rt *recvTransfer) recvGenerator(idx int, f *file) error {
 	defer in.Close()
 
 	log.Printf("sending sums for: %s", f.Name)
-	if err := rt.conn.WriteInt32(int32(idx)); err != nil {
+	if err := rt.Conn.WriteInt32(int32(idx)); err != nil {
 		return err
 	}
 
@@ -261,9 +261,9 @@ func (rt *recvTransfer) recvGenerator(idx int, f *file) error {
 }
 
 // rsync/generator.c:generate_and_send_sums
-func (rt *recvTransfer) generateAndSendSums(in *os.File, fileLen int64) error {
+func (rt *Transfer) generateAndSendSums(in *os.File, fileLen int64) error {
 	sh := rsynccommon.SumSizesSqroot(fileLen)
-	if err := sh.WriteTo(rt.conn); err != nil {
+	if err := sh.WriteTo(rt.Conn); err != nil {
 		return err
 	}
 	buf := make([]byte, int(sh.BlockLength))
@@ -279,11 +279,11 @@ func (rt *recvTransfer) generateAndSendSums(in *os.File, fileLen int64) error {
 		}
 
 		sum1 := rsyncchecksum.Checksum1(b)
-		sum2 := rsyncchecksum.Checksum2(rt.seed, b)
-		if err := rt.conn.WriteInt32(int32(sum1)); err != nil {
+		sum2 := rsyncchecksum.Checksum2(rt.Seed, b)
+		if err := rt.Conn.WriteInt32(int32(sum1)); err != nil {
 			return err
 		}
-		if _, err := rt.conn.Writer.Write(sum2); err != nil {
+		if _, err := rt.Conn.Writer.Write(sum2); err != nil {
 			return err
 		}
 		remaining -= n1

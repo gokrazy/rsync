@@ -14,29 +14,11 @@ import (
 
 	"github.com/gokrazy/rsync"
 	"github.com/gokrazy/rsync/internal/log"
+	"github.com/gokrazy/rsync/internal/receiver"
 	"github.com/gokrazy/rsync/internal/rsyncwire"
 	"github.com/google/shlex"
 	"golang.org/x/sync/errgroup"
 )
-
-type osenv struct {
-	stdin  io.Reader
-	stdout io.Writer
-	stderr io.Writer
-}
-
-type recvTransfer struct {
-	// config
-	opts *Opts
-	dest string
-	env  osenv
-
-	// state
-	conn *rsyncwire.Conn
-	seed int32
-}
-
-func (rt *recvTransfer) listOnly() bool { return rt.dest == "" }
 
 type Stats struct {
 	Read    int64 // total bytes read (from network connection)
@@ -155,7 +137,7 @@ func checkForHostspec(src string) (host, path string, port int, _ error) {
 }
 
 // rsync/main.c:start_client
-func rsyncMain(osenv osenv, opts *Opts, sources []string, dest string) (*Stats, error) {
+func rsyncMain(osenv receiver.Osenv, opts *Opts, sources []string, dest string) (*Stats, error) {
 	log.Printf("dest: %q, sources: %q", dest, sources)
 	log.Printf("opts: %+v", opts)
 	for _, src := range sources {
@@ -300,9 +282,9 @@ func doCmd(opts *Opts, machine, user, path string, daemonConnection int) (io.Rea
 }
 
 // rsync/main.c:do_recv
-func doRecv(osenv osenv, opts *Opts, conn io.ReadWriter, dest string, negotiate bool, c *rsyncwire.Conn, rt *recvTransfer, fileList []*file) (*Stats, error) {
+func doRecv(osenv receiver.Osenv, opts *Opts, conn io.ReadWriter, dest string, negotiate bool, c *rsyncwire.Conn, rt *receiver.Transfer, fileList []*receiver.File) (*Stats, error) {
 	// receive the uid/gid list
-	users, groups, err := rt.recvIdList()
+	users, groups, err := rt.RecvIdList()
 	if err != nil {
 		return nil, err
 	}
@@ -319,14 +301,14 @@ func doRecv(osenv osenv, opts *Opts, conn io.ReadWriter, dest string, negotiate 
 	ctx := context.Background()
 	eg, ctx := errgroup.WithContext(ctx)
 	eg.Go(func() error {
-		return rt.generateFiles(fileList)
+		return rt.GenerateFiles(fileList)
 	})
 	eg.Go(func() error {
 		// Ensure we don’t block on the receiver when the generator returns an
 		// error.
 		errChan := make(chan error)
 		go func() {
-			errChan <- rt.recvFiles(fileList)
+			errChan <- rt.RecvFiles(fileList)
 		}()
 		select {
 		case <-ctx.Done():
@@ -370,7 +352,7 @@ func doRecv(osenv osenv, opts *Opts, conn io.ReadWriter, dest string, negotiate 
 }
 
 // rsync/main.c:client_run
-func clientRun(osenv osenv, opts *Opts, conn io.ReadWriter, dest string, negotiate bool) (*Stats, error) {
+func clientRun(osenv receiver.Osenv, opts *Opts, conn io.ReadWriter, dest string, negotiate bool) (*Stats, error) {
 	c := &rsyncwire.Conn{
 		Reader: conn,
 		Writer: conn,
@@ -400,12 +382,23 @@ func clientRun(osenv osenv, opts *Opts, conn io.ReadWriter, dest string, negotia
 	rd := bufio.NewReaderSize(mrd, 256*1024)
 	c.Reader = rd
 
-	rt := &recvTransfer{
-		opts: opts,
-		dest: dest,
-		env:  osenv,
-		conn: c,
-		seed: seed,
+	rt := &receiver.Transfer{
+		Opts: &receiver.TransferOpts{
+			DryRun: opts.DryRun,
+
+			PreserveGid:       opts.PreserveGid,
+			PreserveUid:       opts.PreserveUid,
+			PreserveLinks:     opts.PreserveLinks,
+			PreservePerms:     opts.PreservePerms,
+			PreserveDevices:   opts.PreserveDevices,
+			PreserveSpecials:  opts.PreserveSpecials,
+			PreserveTimes:     opts.PreserveTimes,
+			PreserveHardlinks: opts.PreserveHardlinks,
+		},
+		Dest: dest,
+		Env:  osenv,
+		Conn: c,
+		Seed: seed,
 	}
 
 	// TODO: this is different for client/server
@@ -421,7 +414,7 @@ func clientRun(osenv osenv, opts *Opts, conn io.ReadWriter, dest string, negotia
 
 	// receive file list
 	log.Printf("receiving file list")
-	fileList, err := rt.receiveFileList()
+	fileList, err := rt.ReceiveFileList()
 	if err != nil {
 		return nil, err
 	}
@@ -430,28 +423,11 @@ func clientRun(osenv osenv, opts *Opts, conn io.ReadWriter, dest string, negotia
 	return doRecv(osenv, opts, conn, dest, negotiate, c, rt, fileList)
 }
 
-// rsync/token.c:recvToken
-func (rt *recvTransfer) recvToken() (token int32, data []byte, _ error) {
-	var err error
-	token, err = rt.conn.ReadInt32()
-	if err != nil {
-		return 0, nil, err
-	}
-	if token <= 0 {
-		return token, nil, nil
-	}
-	data = make([]byte, int(token))
-	if _, err := io.ReadFull(rt.conn.Reader, data); err != nil {
-		return 0, nil, err
-	}
-	return token, data, nil
-}
-
 func Main(args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer) (*Stats, error) {
-	osenv := osenv{
-		stdin:  stdin,
-		stdout: stdout,
-		stderr: stderr,
+	osenv := receiver.Osenv{
+		Stdin:  stdin,
+		Stdout: stdout,
+		Stderr: stderr,
 	}
 	opts, opt := NewGetOpt()
 	remaining, err := opt.Parse(args[1:])

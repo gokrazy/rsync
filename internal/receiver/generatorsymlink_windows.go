@@ -1,6 +1,6 @@
 //go:build windows
 
-package receivermaincmd
+package receiver
 
 import "os"
 

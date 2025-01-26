@@ -11,10 +11,11 @@ import (
 
 	"github.com/gokrazy/rsync"
 	"github.com/gokrazy/rsync/internal/log"
+	"github.com/gokrazy/rsync/internal/receiver"
 )
 
 // rsync/clientserver.c:start_socket_client
-func socketClient(osenv osenv, opts *Opts, src, dest string) (*Stats, error) {
+func socketClient(osenv receiver.Osenv, opts *Opts, src, dest string) (*Stats, error) {
 	u, err := url.Parse(src)
 	if err != nil {
 		return nil, err

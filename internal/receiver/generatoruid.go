@@ -1,6 +1,6 @@
 //go:build linux || darwin
 
-package receivermaincmd
+package receiver
 
 import (
 	"io/fs"
@@ -32,14 +32,14 @@ var inGroup = func() map[uint32]bool {
 	return m
 }()
 
-func (rt *recvTransfer) setUid(f *file, local string, st fs.FileInfo) (fs.FileInfo, error) {
+func (rt *Transfer) setUid(f *File, local string, st fs.FileInfo) (fs.FileInfo, error) {
 	stt := st.Sys().(*syscall.Stat_t)
 
-	changeUid := rt.opts.PreserveUid &&
+	changeUid := rt.Opts.PreserveUid &&
 		amRoot &&
 		stt.Uid != uint32(f.Uid)
 
-	changeGid := rt.opts.PreserveGid &&
+	changeGid := rt.Opts.PreserveGid &&
 		(amRoot || inGroup[uint32(f.Gid)]) &&
 		stt.Gid != uint32(f.Gid)
 

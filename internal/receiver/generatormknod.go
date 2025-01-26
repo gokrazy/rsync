@@ -1,6 +1,6 @@
 //go:build linux || darwin
 
-package receivermaincmd
+package receiver
 
 import (
 	"io/fs"
@@ -12,8 +12,8 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-func (rt *recvTransfer) createDevice(f *file, st fs.FileInfo) error {
-	local := filepath.Join(rt.dest, f.Name)
+func (rt *Transfer) createDevice(f *File, st fs.FileInfo) error {
+	local := filepath.Join(rt.Dest, f.Name)
 	perm := fs.FileMode(f.Mode) & os.ModePerm
 	mode := f.Mode & rsync.S_IFMT
 	switch mode {

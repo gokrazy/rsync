@@ -1,4 +1,4 @@
-package receivermaincmd
+package receiver
 
 import (
 	"bytes"
@@ -15,10 +15,10 @@ import (
 )
 
 // rsync/receiver.c:recv_files
-func (rt *recvTransfer) recvFiles(fileList []*file) error {
+func (rt *Transfer) RecvFiles(fileList []*File) error {
 	phase := 0
 	for {
-		idx, err := rt.conn.ReadInt32()
+		idx, err := rt.Conn.ReadInt32()
 		if err != nil {
 			return err
 		}
@@ -40,7 +40,7 @@ func (rt *recvTransfer) recvFiles(fileList []*file) error {
 	return nil
 }
 
-func (rt *recvTransfer) recvFile1(f *file) error {
+func (rt *Transfer) recvFile1(f *File) error {
 	localFile, err := rt.openLocalFile(f)
 	if err != nil && !os.IsNotExist(err) {
 		log.Printf("opening local file failed, continuing: %v", err)
@@ -52,8 +52,8 @@ func (rt *recvTransfer) recvFile1(f *file) error {
 	return nil
 }
 
-func (rt *recvTransfer) openLocalFile(f *file) (*os.File, error) {
-	local := filepath.Join(rt.dest, f.Name)
+func (rt *Transfer) openLocalFile(f *File) (*os.File, error) {
+	local := filepath.Join(rt.Dest, f.Name)
 
 	in, err := os.OpenFile(local, os.O_RDONLY|nofollow.Maybe, 0)
 	if err != nil {
@@ -73,7 +73,7 @@ func (rt *recvTransfer) openLocalFile(f *file) (*os.File, error) {
 		return nil, nil
 	}
 
-	if !rt.opts.PreservePerms {
+	if !rt.Opts.PreservePerms {
 		// If the file exists already and we are not preserving permissions,
 		// then act as though the remote sent us the existing permissions:
 		f.Mode = int32(st.Mode().Perm())
@@ -83,13 +83,13 @@ func (rt *recvTransfer) openLocalFile(f *file) (*os.File, error) {
 }
 
 // rsync/receiver.c:receive_data
-func (rt *recvTransfer) receiveData(f *file, localFile *os.File) error {
+func (rt *Transfer) receiveData(f *File, localFile *os.File) error {
 	var sh rsync.SumHead
-	if err := sh.ReadFrom(rt.conn); err != nil {
+	if err := sh.ReadFrom(rt.Conn); err != nil {
 		return err
 	}
 
-	local := filepath.Join(rt.dest, f.Name)
+	local := filepath.Join(rt.Dest, f.Name)
 
 	log.Printf("creating %s", local)
 	out, err := newPendingFile(local)
@@ -99,7 +99,7 @@ func (rt *recvTransfer) receiveData(f *file, localFile *os.File) error {
 	defer out.Cleanup()
 
 	h := md4.New()
-	binary.Write(h, binary.LittleEndian, rt.seed)
+	binary.Write(h, binary.LittleEndian, rt.Seed)
 
 	wr := io.MultiWriter(out, h)
 
@@ -137,7 +137,7 @@ func (rt *recvTransfer) receiveData(f *file, localFile *os.File) error {
 	}
 	localSum := h.Sum(nil)
 	remoteSum := make([]byte, len(localSum))
-	if _, err := io.ReadFull(rt.conn.Reader, remoteSum); err != nil {
+	if _, err := io.ReadFull(rt.Conn.Reader, remoteSum); err != nil {
 		return err
 	}
 	if !bytes.Equal(localSum, remoteSum) {
