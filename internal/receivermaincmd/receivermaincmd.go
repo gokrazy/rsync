@@ -2,7 +2,6 @@ package receivermaincmd
 
 import (
 	"bufio"
-	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -17,14 +16,7 @@ import (
 	"github.com/gokrazy/rsync/internal/receiver"
 	"github.com/gokrazy/rsync/internal/rsyncwire"
 	"github.com/google/shlex"
-	"golang.org/x/sync/errgroup"
 )
-
-type Stats struct {
-	Read    int64 // total bytes read (from network connection)
-	Written int64 // total bytes written (to network connection)
-	Size    int64 // total size of files
-}
 
 // parseHostspec returns the [USER@]HOST part of the string
 //
@@ -137,7 +129,7 @@ func checkForHostspec(src string) (host, path string, port int, _ error) {
 }
 
 // rsync/main.c:start_client
-func rsyncMain(osenv receiver.Osenv, opts *Opts, sources []string, dest string) (*Stats, error) {
+func rsyncMain(osenv receiver.Osenv, opts *Opts, sources []string, dest string) (*receiver.Stats, error) {
 	log.Printf("dest: %q, sources: %q", dest, sources)
 	log.Printf("opts: %+v", opts)
 	for _, src := range sources {
@@ -281,73 +273,8 @@ func doCmd(opts *Opts, machine, user, path string, daemonConnection int) (io.Rea
 	return rc, wc, nil
 }
 
-// rsync/main.c:report
-func report(c *rsyncwire.Conn) (*Stats, error) {
-	// read statistics:
-	// total bytes read (from network connection)
-	read, err := c.ReadInt64()
-	if err != nil {
-		return nil, err
-	}
-	// total bytes written (to network connection)
-	written, err := c.ReadInt64()
-	if err != nil {
-		return nil, err
-	}
-	// total size of files
-	size, err := c.ReadInt64()
-	if err != nil {
-		return nil, err
-	}
-	log.Printf("server sent stats: read=%d, written=%d, size=%d", read, written, size)
-
-	return &Stats{
-		Read:    read,
-		Written: written,
-		Size:    size,
-	}, nil
-}
-
-// rsync/main.c:do_recv
-func doRecv(osenv receiver.Osenv, opts *Opts, conn io.ReadWriter, dest string, negotiate bool, c *rsyncwire.Conn, rt *receiver.Transfer, fileList []*receiver.File) (*Stats, error) {
-	ctx := context.Background()
-	eg, ctx := errgroup.WithContext(ctx)
-	eg.Go(func() error {
-		return rt.GenerateFiles(fileList)
-	})
-	eg.Go(func() error {
-		// Ensure we don’t block on the receiver when the generator returns an
-		// error.
-		errChan := make(chan error)
-		go func() {
-			errChan <- rt.RecvFiles(fileList)
-		}()
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case err := <-errChan:
-			return err
-		}
-	})
-	if err := eg.Wait(); err != nil {
-		return nil, err
-	}
-
-	stats, err := report(c)
-	if err != nil {
-		return nil, err
-	}
-
-	// send final goodbye message
-	if err := c.WriteInt32(-1); err != nil {
-		return nil, err
-	}
-
-	return stats, nil
-}
-
 // rsync/main.c:client_run
-func clientRun(osenv receiver.Osenv, opts *Opts, conn io.ReadWriter, dest string, negotiate bool) (*Stats, error) {
+func clientRun(osenv receiver.Osenv, opts *Opts, conn io.ReadWriter, dest string, negotiate bool) (*receiver.Stats, error) {
 	c := &rsyncwire.Conn{
 		Reader: conn,
 		Writer: conn,
@@ -415,10 +342,10 @@ func clientRun(osenv receiver.Osenv, opts *Opts, conn io.ReadWriter, dest string
 	}
 	log.Printf("received %d names", len(fileList))
 
-	return doRecv(osenv, opts, conn, dest, negotiate, c, rt, fileList)
+	return rt.Do(c, fileList)
 }
 
-func Main(args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer) (*Stats, error) {
+func Main(args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer) (*receiver.Stats, error) {
 	osenv := receiver.Osenv{
 		Stdin:  stdin,
 		Stdout: stdout,

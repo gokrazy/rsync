@@ -15,7 +15,7 @@ import (
 )
 
 // rsync/clientserver.c:start_socket_client
-func socketClient(osenv receiver.Osenv, opts *Opts, src, dest string) (*Stats, error) {
+func socketClient(osenv receiver.Osenv, opts *Opts, src, dest string) (*receiver.Stats, error) {
 	u, err := url.Parse(src)
 	if err != nil {
 		return nil, err
