@@ -217,5 +217,20 @@ func (rt *Transfer) ReceiveFileList() ([]*File, error) {
 
 	sortFileList(fileList)
 
+	// receive the uid/gid list
+	users, groups, err := rt.RecvIdList()
+	if err != nil {
+		return nil, err
+	}
+	_ = users
+	_ = groups
+
+	// read the i/o error flag
+	ioErrors, err := rt.Conn.ReadInt32()
+	if err != nil {
+		return nil, err
+	}
+	log.Printf("ioErrors: %v", ioErrors)
+
 	return fileList, nil
 }

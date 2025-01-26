@@ -310,21 +310,6 @@ func report(c *rsyncwire.Conn) (*Stats, error) {
 
 // rsync/main.c:do_recv
 func doRecv(osenv receiver.Osenv, opts *Opts, conn io.ReadWriter, dest string, negotiate bool, c *rsyncwire.Conn, rt *receiver.Transfer, fileList []*receiver.File) (*Stats, error) {
-	// receive the uid/gid list
-	users, groups, err := rt.RecvIdList()
-	if err != nil {
-		return nil, err
-	}
-	_ = users
-	_ = groups
-
-	// read the i/o error flag
-	ioErrors, err := c.ReadInt32()
-	if err != nil {
-		return nil, err
-	}
-	log.Printf("ioErrors: %v", ioErrors)
-
 	ctx := context.Background()
 	eg, ctx := errgroup.WithContext(ctx)
 	eg.Go(func() error {
