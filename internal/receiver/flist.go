@@ -185,7 +185,7 @@ func (rt *Transfer) receiveFileEntry(flags uint16, last *File) (*File, error) {
 
 // rsync/flist.c:recv_file_list
 func (rt *Transfer) ReceiveFileList() ([]*File, error) {
-	var lastFileEntry *File
+	lastFileEntry := new(File)
 	var fileList []*File
 	for {
 		b, err := rt.Conn.ReadByte()
