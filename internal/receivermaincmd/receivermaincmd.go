@@ -299,61 +299,8 @@ func doCmd(opts *Opts, machine, user, path string, daemonConnection int) (io.Rea
 	return rc, wc, nil
 }
 
-// rsync/main.c:client_run
-func clientRun(osenv osenv, opts *Opts, conn io.ReadWriter, dest string, negotiate bool) (*Stats, error) {
-	c := &rsyncwire.Conn{
-		Reader: conn,
-		Writer: conn,
-	}
-
-	if negotiate {
-		if err := c.WriteInt32(rsync.ProtocolVersion); err != nil {
-			return nil, err
-		}
-		remoteProtocol, err := c.ReadInt32()
-		if err != nil {
-			return nil, err
-		}
-		log.Printf("remote protocol: %d", remoteProtocol)
-	}
-
-	seed, err := c.ReadInt32()
-	if err != nil {
-		return nil, fmt.Errorf("reading seed: %v", err)
-	}
-
-	mrd := &rsyncwire.MultiplexReader{
-		Reader: conn,
-	}
-	// TODO: rearchitect such that our buffer can be smaller than the largest
-	// rsync message size
-	rd := bufio.NewReaderSize(mrd, 256*1024)
-	c.Reader = rd
-
-	rt := &recvTransfer{
-		opts: opts,
-		dest: dest,
-		env:  osenv,
-		conn: c,
-		seed: seed,
-	}
-
-	// TODO: implement support for exclusion, send exclusion list here
-	const exclusionListEnd = 0
-	if err := c.WriteInt32(exclusionListEnd); err != nil {
-		return nil, err
-	}
-
-	log.Printf("exclusion list sent")
-
-	// receive file list
-	log.Printf("receiving file list")
-	fileList, err := rt.receiveFileList()
-	if err != nil {
-		return nil, err
-	}
-	log.Printf("received %d names", len(fileList))
-
+// rsync/main.c:do_recv
+func doRecv(osenv osenv, opts *Opts, conn io.ReadWriter, dest string, negotiate bool, c *rsyncwire.Conn, rt *recvTransfer, fileList []*file) (*Stats, error) {
 	// receive the uid/gid list
 	users, groups, err := rt.recvIdList()
 	if err != nil {
@@ -420,6 +367,67 @@ func clientRun(osenv osenv, opts *Opts, conn io.ReadWriter, dest string, negotia
 		Written: written,
 		Size:    size,
 	}, nil
+}
+
+// rsync/main.c:client_run
+func clientRun(osenv osenv, opts *Opts, conn io.ReadWriter, dest string, negotiate bool) (*Stats, error) {
+	c := &rsyncwire.Conn{
+		Reader: conn,
+		Writer: conn,
+	}
+
+	if negotiate {
+		if err := c.WriteInt32(rsync.ProtocolVersion); err != nil {
+			return nil, err
+		}
+		remoteProtocol, err := c.ReadInt32()
+		if err != nil {
+			return nil, err
+		}
+		log.Printf("remote protocol: %d", remoteProtocol)
+	}
+
+	seed, err := c.ReadInt32()
+	if err != nil {
+		return nil, fmt.Errorf("reading seed: %v", err)
+	}
+
+	mrd := &rsyncwire.MultiplexReader{
+		Reader: conn,
+	}
+	// TODO: rearchitect such that our buffer can be smaller than the largest
+	// rsync message size
+	rd := bufio.NewReaderSize(mrd, 256*1024)
+	c.Reader = rd
+
+	rt := &recvTransfer{
+		opts: opts,
+		dest: dest,
+		env:  osenv,
+		conn: c,
+		seed: seed,
+	}
+
+	// TODO: this is different for client/server
+	// client always sends exclusion list, server always receives
+
+	// TODO: implement support for exclusion, send exclusion list here
+	const exclusionListEnd = 0
+	if err := c.WriteInt32(exclusionListEnd); err != nil {
+		return nil, err
+	}
+
+	log.Printf("exclusion list sent")
+
+	// receive file list
+	log.Printf("receiving file list")
+	fileList, err := rt.receiveFileList()
+	if err != nil {
+		return nil, err
+	}
+	log.Printf("received %d names", len(fileList))
+
+	return doRecv(osenv, opts, conn, dest, negotiate, c, rt, fileList)
 }
 
 // rsync/token.c:recvToken
