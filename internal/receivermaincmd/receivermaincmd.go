@@ -281,6 +281,33 @@ func doCmd(opts *Opts, machine, user, path string, daemonConnection int) (io.Rea
 	return rc, wc, nil
 }
 
+// rsync/main.c:report
+func report(c *rsyncwire.Conn) (*Stats, error) {
+	// read statistics:
+	// total bytes read (from network connection)
+	read, err := c.ReadInt64()
+	if err != nil {
+		return nil, err
+	}
+	// total bytes written (to network connection)
+	written, err := c.ReadInt64()
+	if err != nil {
+		return nil, err
+	}
+	// total size of files
+	size, err := c.ReadInt64()
+	if err != nil {
+		return nil, err
+	}
+	log.Printf("server sent stats: read=%d, written=%d, size=%d", read, written, size)
+
+	return &Stats{
+		Read:    read,
+		Written: written,
+		Size:    size,
+	}, nil
+}
+
 // rsync/main.c:do_recv
 func doRecv(osenv receiver.Osenv, opts *Opts, conn io.ReadWriter, dest string, negotiate bool, c *rsyncwire.Conn, rt *receiver.Transfer, fileList []*receiver.File) (*Stats, error) {
 	// receive the uid/gid list
@@ -321,34 +348,17 @@ func doRecv(osenv receiver.Osenv, opts *Opts, conn io.ReadWriter, dest string, n
 		return nil, err
 	}
 
-	// read statistics:
-	// total bytes read (from network connection)
-	read, err := c.ReadInt64()
+	stats, err := report(c)
 	if err != nil {
 		return nil, err
 	}
-	// total bytes written (to network connection)
-	written, err := c.ReadInt64()
-	if err != nil {
-		return nil, err
-	}
-	// total size of files
-	size, err := c.ReadInt64()
-	if err != nil {
-		return nil, err
-	}
-	log.Printf("server sent stats: read=%d, written=%d, size=%d", read, written, size)
 
 	// send final goodbye message
 	if err := c.WriteInt32(-1); err != nil {
 		return nil, err
 	}
 
-	return &Stats{
-		Read:    read,
-		Written: written,
-		Size:    size,
-	}, nil
+	return stats, nil
 }
 
 // rsync/main.c:client_run
