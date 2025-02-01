@@ -306,8 +306,10 @@ func clientRun(osenv receiver.Osenv, opts *Opts, conn io.ReadWriter, dest string
 
 	rt := &receiver.Transfer{
 		Opts: &receiver.TransferOpts{
-			DryRun: opts.DryRun,
+			Verbose: opts.Verbose,
+			DryRun:  opts.DryRun,
 
+			DeleteMode:        opts.DeleteMode,
 			PreserveGid:       opts.PreserveGid,
 			PreserveUid:       opts.PreserveUid,
 			PreserveLinks:     opts.PreserveLinks,

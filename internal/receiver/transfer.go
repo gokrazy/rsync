@@ -14,8 +14,10 @@ type Osenv struct {
 
 // TransferOpts is a subset of Opts which is required for implementing a receiver.
 type TransferOpts struct {
-	DryRun bool
+	Verbose bool
+	DryRun  bool
 
+	DeleteMode        bool
 	PreserveGid       bool
 	PreserveUid       bool
 	PreserveLinks     bool
@@ -34,8 +36,9 @@ type Transfer struct {
 	Env  Osenv
 
 	// state
-	Conn *rsyncwire.Conn
-	Seed int32
+	Conn     *rsyncwire.Conn
+	Seed     int32
+	IOErrors int32
 }
 
 func (rt *Transfer) listOnly() bool { return rt.Dest == "" }

@@ -19,6 +19,14 @@ func sortFileList(fileList []*File) {
 	})
 }
 
+// rsync/receiver.c:delete_files
+func findInFileList(fileList []*File, name string) bool {
+	i := sort.Search(len(fileList), func(i int) bool {
+		return fileList[i].Name >= name
+	})
+	return i < len(fileList) && fileList[i].Name == name
+}
+
 type File struct {
 	Name       string
 	Length     int64
@@ -231,6 +239,7 @@ func (rt *Transfer) ReceiveFileList() ([]*File, error) {
 		return nil, err
 	}
 	log.Printf("ioErrors: %v", ioErrors)
+	rt.IOErrors = ioErrors
 
 	return fileList, nil
 }

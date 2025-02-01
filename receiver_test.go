@@ -231,6 +231,51 @@ func TestReceiverSync(t *testing.T) {
 	}
 }
 
+func TestReceiverSyncDelete(t *testing.T) {
+	tmp := t.TempDir()
+	source := filepath.Join(tmp, "source")
+	dest := filepath.Join(tmp, "dest")
+	destLarge := filepath.Join(dest, "large-data-file")
+
+	headPattern := []byte{0x11}
+	bodyPattern := []byte{0xbb}
+	endPattern := []byte{0xee}
+	rsynctest.WriteLargeDataFile(t, source, headPattern, bodyPattern, endPattern)
+
+	// start a server to sync from
+	srv := rsynctest.New(t, rsynctest.InteropModule(source))
+
+	args := []string{
+		"gokr-rsync",
+		"-aH",
+		"--delete",
+		"rsync://localhost:" + srv.Port + "/interop/",
+		dest,
+	}
+	firstStats, err := receivermaincmd.Main(args, os.Stdin, os.Stdout, os.Stdout)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Logf("firstStats: %+v", firstStats)
+	//     receiver_test.go:211: firstStats: &{Read:91 Written:3146087 Size:3149824}
+
+	if err := rsynctest.DataFileMatches(destLarge, headPattern, bodyPattern, endPattern); err != nil {
+		t.Fatal(err)
+	}
+
+	// Add more files to the destination, which should be deleted:
+	extra := filepath.Join(dest, "extrafile")
+	if err := os.WriteFile(extra, []byte("deleteme"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := receivermaincmd.Main(args, os.Stdin, os.Stdout, os.Stdout); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(extra); !os.IsNotExist(err) {
+		t.Errorf("expected %s to be deleted, but it still exists", extra)
+	}
+}
+
 func TestReceiverSSH(t *testing.T) {
 	tmp := t.TempDir()
 	source := filepath.Join(tmp, "source")

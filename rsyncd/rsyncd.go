@@ -387,6 +387,7 @@ func (s *Server) handleConnReceiver(module Module, crd *countingReader, cwr *cou
 		Opts: &receiver.TransferOpts{
 			DryRun: opts.DryRun,
 
+			DeleteMode:       opts.Delete,
 			PreserveGid:      opts.PreserveGid,
 			PreserveUid:      opts.PreserveUid,
 			PreserveLinks:    opts.PreserveLinks,
