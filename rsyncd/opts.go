@@ -25,6 +25,7 @@ type Opts struct {
 	IgnoreTimes      bool
 	DryRun           bool
 	D                bool
+	Delete           bool
 }
 
 func NewGetOpt() (*Opts, *getoptions.GetOpt) {
@@ -49,6 +50,7 @@ func NewGetOpt() (*Opts, *getoptions.GetOpt) {
 	opt.BoolVar(&opts.Daemon, "daemon", false, opt.Description("run as an rsync daemon"))
 	opt.BoolVar(&opts.Server, "server", false)
 	opt.BoolVar(&opts.Sender, "sender", false)
+	opt.BoolVar(&opts.Delete, "delete", false)
 	opt.BoolVar(&opts.PreserveGid, "group", false, opt.Alias("g"))
 	opt.BoolVar(&opts.PreserveUid, "owner", false, opt.Alias("o"))
 	opt.BoolVar(&opts.PreserveLinks, "links", false, opt.Alias("l"))

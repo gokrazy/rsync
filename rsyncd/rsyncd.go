@@ -407,7 +407,7 @@ func (s *Server) handleConnReceiver(module Module, crd *countingReader, cwr *cou
 		Seed: sessionChecksumSeed,
 	}
 
-	if false /* TODO: opts.Delete */ {
+	if opts.Delete {
 		// receive the exclusion list (openrsync’s is always empty)
 		exclusionList, err := recvFilterList(c)
 		if err != nil {
