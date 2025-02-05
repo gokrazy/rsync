@@ -23,6 +23,7 @@ type Opts struct {
 	PreserveDevices  bool
 	PreserveSpecials bool
 	PreserveTimes    bool
+	OmitDirTimes     bool
 	Recurse          bool
 	IgnoreTimes      bool
 	DryRun           bool
@@ -64,6 +65,8 @@ func NewGetOpt() (*Opts, *getoptions.GetOpt) {
 	opt.BoolVar(&opts.Recurse, "recursive", false, opt.Alias("r"))
 	// TODO: implement PreserveTimes
 	opt.BoolVar(&opts.PreserveTimes, "times", false, opt.Alias("t"))
+	// TODO: implement OmitDirTimes
+	opt.BoolVar(&opts.OmitDirTimes, "omit-dir-times", false, opt.Alias("O"))
 	opt.BoolVar(&opts.Verbose, "v", false) // verbosity
 	opt.Bool("debug", false)               // debug; ignored
 	// TODO: implement IgnoreTimes
