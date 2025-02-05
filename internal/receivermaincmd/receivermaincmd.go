@@ -356,8 +356,8 @@ func Main(args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer) (*
 	opts, opt := NewGetOpt()
 	remaining, err := opt.Parse(args[1:])
 	if opt.Called("help") {
-		fmt.Fprintln(os.Stderr, opt.Help())
-		return nil, nil // exit with code 0 for compatibility with tridge rsync
+		fmt.Println(opt.Help()) // tridge rsync prints help to stdout
+		return nil, nil         // exit with code 0 for compatibility with tridge rsync
 	}
 	if err != nil {
 		return nil, err

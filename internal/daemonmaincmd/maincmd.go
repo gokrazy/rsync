@@ -38,8 +38,8 @@ func Main(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer,
 	opts, opt := rsyncd.NewGetOpt()
 	remaining, err := opt.Parse(args[1:])
 	if opt.Called("help") {
-		fmt.Fprint(stderr, opt.Help())
-		os.Exit(0) // exit with code 0 for compatibility with tridge rsync
+		fmt.Println(opt.Help()) // tridge rsync prints help to stdout
+		os.Exit(0)              // exit with code 0 for compatibility with tridge rsync
 	}
 	if err != nil {
 		return err
