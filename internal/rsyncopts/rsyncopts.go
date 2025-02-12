@@ -17,6 +17,8 @@ import (
 	"strings"
 	"syscall"
 	"unicode"
+
+	"github.com/gokrazy/rsync/internal/version"
 )
 
 const (
@@ -791,7 +793,7 @@ func ParseArguments(args []string) (*Context, error) {
 	// other options
 
 	if version_opt_cnt > 0 {
-		fmt.Printf("TODO: print version")
+		fmt.Println(version.Read())
 		os.Exit(0)
 	}
 
