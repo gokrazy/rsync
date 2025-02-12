@@ -14,6 +14,7 @@ import (
 	"github.com/gokrazy/rsync"
 	"github.com/gokrazy/rsync/internal/log"
 	"github.com/gokrazy/rsync/internal/receiver"
+	"github.com/gokrazy/rsync/internal/rsyncopts"
 	"github.com/gokrazy/rsync/internal/rsyncwire"
 	"github.com/google/shlex"
 )
@@ -129,7 +130,7 @@ func checkForHostspec(src string) (host, path string, port int, _ error) {
 }
 
 // rsync/main.c:start_client
-func rsyncMain(osenv receiver.Osenv, opts *Opts, sources []string, dest string) (*receiver.Stats, error) {
+func rsyncMain(osenv receiver.Osenv, opts *rsyncopts.Options, sources []string, dest string) (*receiver.Stats, error) {
 	log.Printf("dest: %q, sources: %q", dest, sources)
 	log.Printf("opts: %+v", opts)
 	for _, src := range sources {
@@ -143,7 +144,7 @@ func rsyncMain(osenv receiver.Osenv, opts *Opts, sources []string, dest string) 
 		} else {
 			// source is remote
 			if port != 0 {
-				if opts.ShellCommand != "" {
+				if opts.ShellCommand() != "" {
 					daemonConnection = 1 // daemon via remote shell
 				} else {
 					daemonConnection = -1 // daemon via socket
@@ -210,8 +211,8 @@ func (prw *readWriter) Write(p []byte) (n int, err error) {
 }
 
 // rsync/main.c:do_cmd
-func doCmd(opts *Opts, machine, user, path string, daemonConnection int) (io.ReadCloser, io.WriteCloser, error) {
-	cmd := opts.ShellCommand
+func doCmd(opts *rsyncopts.Options, machine, user, path string, daemonConnection int) (io.ReadCloser, io.WriteCloser, error) {
+	cmd := opts.ShellCommand()
 	if cmd == "" {
 		cmd = "ssh"
 		if e := os.Getenv("RSYNC_RSH"); e != "" {
@@ -274,7 +275,7 @@ func doCmd(opts *Opts, machine, user, path string, daemonConnection int) (io.Rea
 }
 
 // rsync/main.c:client_run
-func clientRun(osenv receiver.Osenv, opts *Opts, conn io.ReadWriter, dest string, negotiate bool) (*receiver.Stats, error) {
+func clientRun(osenv receiver.Osenv, opts *rsyncopts.Options, conn io.ReadWriter, dest string, negotiate bool) (*receiver.Stats, error) {
 	c := &rsyncwire.Conn{
 		Reader: conn,
 		Writer: conn,
@@ -306,18 +307,18 @@ func clientRun(osenv receiver.Osenv, opts *Opts, conn io.ReadWriter, dest string
 
 	rt := &receiver.Transfer{
 		Opts: &receiver.TransferOpts{
-			Verbose: opts.Verbose,
-			DryRun:  opts.DryRun,
+			Verbose: opts.Verbose(),
+			DryRun:  opts.DryRun(),
 
-			DeleteMode:        opts.DeleteMode,
-			PreserveGid:       opts.PreserveGid,
-			PreserveUid:       opts.PreserveUid,
-			PreserveLinks:     opts.PreserveLinks,
-			PreservePerms:     opts.PreservePerms,
-			PreserveDevices:   opts.PreserveDevices,
-			PreserveSpecials:  opts.PreserveSpecials,
-			PreserveTimes:     opts.PreserveTimes,
-			PreserveHardlinks: opts.PreserveHardlinks,
+			DeleteMode:        opts.DeleteMode(),
+			PreserveGid:       opts.PreserveGid(),
+			PreserveUid:       opts.PreserveUid(),
+			PreserveLinks:     opts.PreserveLinks(),
+			PreservePerms:     opts.PreservePerms(),
+			PreserveDevices:   opts.PreserveDevices(),
+			PreserveSpecials:  opts.PreserveSpecials(),
+			PreserveTimes:     opts.PreserveMTimes(),
+			PreserveHardlinks: opts.PreserveHardLinks(),
 		},
 		Dest: dest,
 		Env:  osenv,
@@ -353,34 +354,14 @@ func Main(args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer) (*
 		Stdout: stdout,
 		Stderr: stderr,
 	}
-	opts, opt := NewGetOpt()
-	remaining, err := opt.Parse(args[1:])
-	if opt.Called("help") {
-		fmt.Println(opt.Help()) // tridge rsync prints help to stdout
-		return nil, nil         // exit with code 0 for compatibility with tridge rsync
-	}
+	pc, err := rsyncopts.ParseArguments(args[1:])
 	if err != nil {
 		return nil, err
 	}
-
-	if opts.Archive {
-		// --archive is -rlptgoD
-		opts.Recurse = true       // -r
-		opts.PreserveLinks = true // -l
-		opts.PreservePerms = true // -p
-		opts.PreserveTimes = true // -t
-		opts.PreserveGid = true   // -g
-		opts.PreserveUid = true   // -o
-		opts.D = true             // -D
-	}
-
-	if opts.D {
-		opts.PreserveDevices = true
-		opts.PreserveSpecials = true
-	}
-
+	opts := pc.Options
+	remaining := pc.RemainingArgs
 	if len(remaining) == 0 {
-		return nil, errors.New(opt.Help())
+		return nil, errors.New(opts.Help())
 	}
 	if len(remaining) == 1 {
 		// Usages with just one SRC arg and no DEST arg list the source files

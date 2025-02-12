@@ -330,6 +330,25 @@ func (o *Options) setOutputVerbosity(prio priority) {
 	}
 }
 
+func (o *Options) Help() string {
+	return "TODO: help"
+}
+
+func (o *Options) ShellCommand() string    { return o.shell_cmd }
+func (o *Options) UpdateOnly() bool        { return o.update_only != 0 }
+func (o *Options) DryRun() bool            { return o.dry_run != 0 }
+func (o *Options) PreserveLinks() bool     { return o.preserve_links != 0 }
+func (o *Options) PreserveUid() bool       { return o.preserve_uid != 0 }
+func (o *Options) PreserveGid() bool       { return o.preserve_gid != 0 }
+func (o *Options) PreserveDevices() bool   { return o.preserve_devices != 0 }
+func (o *Options) PreserveMTimes() bool    { return o.preserve_mtimes != 0 }
+func (o *Options) PreservePerms() bool     { return o.preserve_perms != 0 }
+func (o *Options) PreserveSpecials() bool  { return o.preserve_specials != 0 }
+func (o *Options) PreserveHardLinks() bool { return o.preserve_hard_links != 0 }
+func (o *Options) Recurse() bool           { return o.recurse != 0 }
+func (o *Options) Verbose() bool           { return o.verbose != 0 }
+func (o *Options) DeleteMode() bool        { return o.delete_mode != 0 }
+
 func (o *Options) table() []poptOption {
 	return []poptOption{
 		/* longName, shortName, argInfo, arg, val */
@@ -748,8 +767,9 @@ func ParseArguments(args []string) (*Context, error) {
 			return nil, errNotYetImplemented
 
 		case OPT_HELP:
+			// tridge rsync prints help to stdout
 			fmt.Printf("TODO: print help")
-			os.Exit(0)
+			os.Exit(0) // exit with code 0 for compatibility with tridge rsync
 
 		case 'A':
 			return nil, fmt.Errorf("ACLs are not supported by gokrazy/rsync")
@@ -776,8 +796,9 @@ func ParseArguments(args []string) (*Context, error) {
 	}
 
 	if opts.human_readable > 1 && len(args) == 1 /* && !am_server */ {
-		fmt.Printf("TODO: print help")
-		os.Exit(0)
+		// tridge rsync prints help to stdout
+		fmt.Printf("TODO: print help -h")
+		os.Exit(0) // exit with code 0 for compatibility with tridge rsync
 	}
 
 	opts.setOutputVerbosity(DEFAULT_PRIORITY)

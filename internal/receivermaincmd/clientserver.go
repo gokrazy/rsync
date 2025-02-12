@@ -12,10 +12,11 @@ import (
 	"github.com/gokrazy/rsync"
 	"github.com/gokrazy/rsync/internal/log"
 	"github.com/gokrazy/rsync/internal/receiver"
+	"github.com/gokrazy/rsync/internal/rsyncopts"
 )
 
 // rsync/clientserver.c:start_socket_client
-func socketClient(osenv receiver.Osenv, opts *Opts, src, dest string) (*receiver.Stats, error) {
+func socketClient(osenv receiver.Osenv, opts *rsyncopts.Options, src, dest string) (*receiver.Stats, error) {
 	u, err := url.Parse(src)
 	if err != nil {
 		return nil, err
@@ -49,7 +50,7 @@ func socketClient(osenv receiver.Osenv, opts *Opts, src, dest string) (*receiver
 }
 
 // rsync/clientserver.c:start_inband_exchange
-func startInbandExchange(opts *Opts, conn io.ReadWriter, module, path string) error {
+func startInbandExchange(opts *rsyncopts.Options, conn io.ReadWriter, module, path string) error {
 	rd := bufio.NewReader(conn)
 
 	// send client greeting
