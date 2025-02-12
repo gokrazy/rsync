@@ -1,0 +1,68 @@
+diff --git i/main.c w/main.c
+index 4f070acc..a4344402 100644
+--- i/main.c
++++ w/main.c
+@@ -1781,6 +1781,8 @@ int main(int argc,char *argv[])
+ 		option_error();
+ 		exit_cleanup(RERR_SYNTAX);
+ 	}
++	dump_long_options();
++	exit(23);
+ 	if (write_batch
+ 	 && poptDupArgv(argc, (const char **)argv, &cooked_argc, (const char ***)&cooked_argv) != 0)
+ 		out_of_memory("main");
+diff --git i/options.c w/options.c
+index 578507c6..32f60a95 100644
+--- i/options.c
++++ w/options.c
+@@ -844,6 +844,50 @@ static struct poptOption long_options[] = {
+   {0,0,0,0, 0, 0, 0}
+ };
+ 
++void dump_long_options(void)
++{
++  for (int i = 0; i < 251; i++) {
++    struct poptOption opt = long_options[i];
++    printf("long=%s ", opt.longName);
++    if (opt.shortName == 0) {
++      printf("short= ");
++    } else {
++      printf("short=%c ", opt.shortName);
++    }
++    printf("arg=");
++    switch (opt.argInfo) {
++    case POPT_ARG_STRING: {
++      const char** ptr = opt.arg;
++      if (ptr == NULL) {
++	printf("\"(null)\"\n");
++      } else {
++	if (*ptr == NULL || strlen(*ptr) == 0) {
++	  printf("\"(null)\"\n");
++	} else {
++	  printf("\"%s\"\n", *ptr);
++	}
++      }
++      break;
++    }
++
++    case POPT_ARG_NONE:
++    case POPT_ARG_INT:
++    case POPT_BIT_SET:
++    case POPT_ARG_VAL: {
++      const int* ptr = opt.arg;
++      if (ptr == NULL) {
++	printf("<nil int>\n");
++      } else {
++	printf("%d\n", *ptr);
++      }
++      break;
++    }
++    default:
++      printf("unknown argInfo: %d", opt.argInfo);
++    }
++  }
++}
++
+ static struct poptOption long_daemon_options[] = {
+   /* longName, shortName, argInfo, argPtr, value, descrip, argDesc */
+   {"address",          0,  POPT_ARG_STRING, &bind_address, 0, 0, 0 },

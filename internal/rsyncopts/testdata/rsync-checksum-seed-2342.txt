@@ -1,0 +1,251 @@
+long=help short= arg=<nil int>
+long=version short=V arg=<nil int>
+long=verbose short=v arg=<nil int>
+long=no-verbose short= arg=0
+long=no-v short= arg=0
+long=info short= arg="(null)"
+long=debug short= arg="(null)"
+long=stderr short= arg="(null)"
+long=msgs2stderr short= arg=2
+long=no-msgs2stderr short= arg=2
+long=quiet short=q arg=<nil int>
+long=motd short= arg=1
+long=no-motd short= arg=1
+long=stats short= arg=0
+long=human-readable short=h arg=<nil int>
+long=no-human-readable short= arg=1
+long=no-h short= arg=1
+long=dry-run short=n arg=0
+long=archive short=a arg=<nil int>
+long=recursive short=r arg=0
+long=no-recursive short= arg=0
+long=no-r short= arg=0
+long=inc-recursive short= arg=1
+long=no-inc-recursive short= arg=1
+long=i-r short= arg=1
+long=no-i-r short= arg=1
+long=dirs short=d arg=0
+long=no-dirs short= arg=0
+long=no-d short= arg=0
+long=old-dirs short= arg=0
+long=old-d short= arg=0
+long=perms short=p arg=0
+long=no-perms short= arg=0
+long=no-p short= arg=0
+long=executability short=E arg=0
+long=acls short=A arg=<nil int>
+long=no-acls short= arg=0
+long=no-A short= arg=0
+long=xattrs short=X arg=<nil int>
+long=no-xattrs short= arg=0
+long=no-X short= arg=0
+long=times short=t arg=0
+long=no-times short= arg=0
+long=no-t short= arg=0
+long=atimes short=U arg=<nil int>
+long=no-atimes short= arg=0
+long=no-U short= arg=0
+long=open-noatime short= arg=0
+long=no-open-noatime short= arg=0
+long=crtimes short=N arg=0
+long=no-crtimes short= arg=0
+long=no-N short= arg=0
+long=omit-dir-times short=O arg=0
+long=no-omit-dir-times short= arg=0
+long=no-O short= arg=0
+long=omit-link-times short=J arg=0
+long=no-omit-link-times short= arg=0
+long=no-J short= arg=0
+long=modify-window short=@ arg=0
+long=super short= arg=0
+long=no-super short= arg=0
+long=fake-super short= arg=0
+long=owner short=o arg=0
+long=no-owner short= arg=0
+long=no-o short= arg=0
+long=group short=g arg=0
+long=no-group short= arg=0
+long=no-g short= arg=0
+long=(null) short=D arg=<nil int>
+long=no-D short= arg=<nil int>
+long=devices short= arg=0
+long=no-devices short= arg=0
+long=copy-devices short= arg=0
+long=write-devices short= arg=0
+long=no-write-devices short= arg=0
+long=specials short= arg=0
+long=no-specials short= arg=0
+long=links short=l arg=0
+long=no-links short= arg=0
+long=no-l short= arg=0
+long=copy-links short=L arg=0
+long=copy-unsafe-links short= arg=0
+long=safe-links short= arg=0
+long=munge-links short= arg=0
+long=no-munge-links short= arg=0
+long=copy-dirlinks short=k arg=0
+long=keep-dirlinks short=K arg=0
+long=hard-links short=H arg=<nil int>
+long=no-hard-links short= arg=0
+long=no-H short= arg=0
+long=relative short=R arg=0
+long=no-relative short= arg=0
+long=no-R short= arg=0
+long=implied-dirs short= arg=0
+long=no-implied-dirs short= arg=0
+long=i-d short= arg=0
+long=no-i-d short= arg=0
+long=chmod short= arg="(null)"
+long=ignore-times short=I arg=0
+long=size-only short= arg=0
+long=one-file-system short=x arg=<nil int>
+long=no-one-file-system short= arg=0
+long=no-x short= arg=0
+long=update short=u arg=0
+long=existing short= arg=0
+long=ignore-non-existing short= arg=0
+long=ignore-existing short= arg=0
+long=max-size short= arg="(null)"
+long=min-size short= arg="(null)"
+long=max-alloc short= arg="(null)"
+long=sparse short=S arg=0
+long=no-sparse short= arg=0
+long=no-S short= arg=0
+long=preallocate short= arg=0
+long=inplace short= arg=0
+long=no-inplace short= arg=0
+long=append short= arg=<nil int>
+long=append-verify short= arg=0
+long=no-append short= arg=0
+long=del short= arg=0
+long=delete short= arg=0
+long=delete-before short= arg=0
+long=delete-during short= arg=0
+long=delete-delay short= arg=0
+long=delete-after short= arg=0
+long=delete-excluded short= arg=0
+long=delete-missing-args short= arg=0
+long=ignore-missing-args short= arg=0
+long=remove-sent-files short= arg=0
+long=remove-source-files short= arg=0
+long=force short= arg=0
+long=no-force short= arg=0
+long=ignore-errors short= arg=0
+long=no-ignore-errors short= arg=0
+long=max-delete short= arg=-2147483648
+long=(null) short=F arg=<nil int>
+long=filter short=f arg="(null)"
+long=exclude short= arg="(null)"
+long=include short= arg="(null)"
+long=exclude-from short= arg="(null)"
+long=include-from short= arg="(null)"
+long=cvs-exclude short=C arg=0
+long=whole-file short=W arg=-1
+long=no-whole-file short= arg=-1
+long=no-W short= arg=-1
+long=checksum short=c arg=0
+long=no-checksum short= arg=0
+long=no-c short= arg=0
+long=checksum-choice short= arg="(null)"
+long=cc short= arg="(null)"
+long=block-size short=B arg="(null)"
+long=compare-dest short= arg="(null)"
+long=copy-dest short= arg="(null)"
+long=link-dest short= arg="(null)"
+long=fuzzy short=y arg=<nil int>
+long=no-fuzzy short= arg=0
+long=no-y short= arg=0
+long=compress short=z arg=<nil int>
+long=old-compress short= arg=<nil int>
+long=new-compress short= arg=<nil int>
+long=no-compress short= arg=<nil int>
+long=no-z short= arg=<nil int>
+long=compress-choice short= arg="(null)"
+long=zc short= arg="(null)"
+long=skip-compress short= arg="(null)"
+long=compress-level short= arg=-2147483648
+long=zl short= arg=-2147483648
+long=(null) short=P arg=<nil int>
+long=progress short= arg=0
+long=no-progress short= arg=0
+long=partial short= arg=0
+long=no-partial short= arg=0
+long=partial-dir short= arg="(null)"
+long=delay-updates short= arg=0
+long=no-delay-updates short= arg=0
+long=prune-empty-dirs short=m arg=0
+long=no-prune-empty-dirs short= arg=0
+long=no-m short= arg=0
+long=log-file short= arg="(null)"
+long=log-file-format short= arg="(null)"
+long=out-format short= arg="(null)"
+long=log-format short= arg="(null)"
+long=itemize-changes short=i arg=<nil int>
+long=no-itemize-changes short= arg=0
+long=no-i short= arg=0
+long=bwlimit short= arg="(null)"
+long=no-bwlimit short= arg=0
+long=backup short=b arg=0
+long=no-backup short= arg=0
+long=backup-dir short= arg="(null)"
+long=suffix short= arg="~"
+long=list-only short= arg=0
+long=read-batch short= arg="(null)"
+long=write-batch short= arg="(null)"
+long=only-write-batch short= arg="(null)"
+long=files-from short= arg="(null)"
+long=from0 short=0 arg=0
+long=no-from0 short= arg=0
+long=old-args short= arg=<nil int>
+long=no-old-args short= arg=0
+long=secluded-args short=s arg=0
+long=no-secluded-args short= arg=0
+long=protect-args short= arg=0
+long=no-protect-args short= arg=0
+long=no-s short= arg=0
+long=trust-sender short= arg=0
+long=numeric-ids short= arg=0
+long=no-numeric-ids short= arg=0
+long=usermap short= arg="(null)"
+long=groupmap short= arg="(null)"
+long=chown short= arg="(null)"
+long=timeout short= arg=0
+long=no-timeout short= arg=0
+long=contimeout short= arg=0
+long=no-contimeout short= arg=0
+long=fsync short= arg=0
+long=stop-after short= arg="(null)"
+long=time-limit short= arg="(null)"
+long=stop-at short= arg="(null)"
+long=rsh short=e arg="(null)"
+long=rsync-path short= arg="rsync"
+long=temp-dir short=T arg="(null)"
+long=iconv short= arg="(null)"
+long=no-iconv short= arg=<nil int>
+long=ipv4 short=4 arg=0
+long=ipv6 short=6 arg=0
+long=8-bit-output short=8 arg=0
+long=no-8-bit-output short= arg=0
+long=no-8 short= arg=0
+long=mkpath short= arg=0
+long=no-mkpath short= arg=0
+long=qsort short= arg=0
+long=copy-as short= arg="(null)"
+long=address short= arg="(null)"
+long=port short= arg=0
+long=sockopts short= arg="(null)"
+long=password-file short= arg="(null)"
+long=early-input short= arg="(null)"
+long=blocking-io short= arg=-1
+long=no-blocking-io short= arg=-1
+long=outbuf short= arg="(null)"
+long=remote-option short=M arg="(null)"
+long=protocol short= arg=32
+long=checksum-seed short= arg=2342
+long=server short= arg=<nil int>
+long=sender short= arg=<nil int>
+long=config short= arg="(null)"
+long=daemon short= arg=<nil int>
+long=dparam short= arg="(null)"
+long=detach short= arg=<nil int>
+long=no-detach short= arg=<nil int>
