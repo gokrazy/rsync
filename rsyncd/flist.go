@@ -9,6 +9,7 @@ import (
 	"sync"
 
 	"github.com/gokrazy/rsync"
+	"github.com/gokrazy/rsync/internal/rsyncopts"
 	"github.com/gokrazy/rsync/internal/rsyncwire"
 )
 
@@ -18,7 +19,7 @@ var (
 )
 
 // rsync/flist.c:send_file_list
-func (st *sendTransfer) sendFileList(mod Module, opts *Opts, paths []string, excl *filterRuleList) (*fileList, error) {
+func (st *sendTransfer) sendFileList(mod Module, opts *rsyncopts.Options, paths []string, excl *filterRuleList) (*fileList, error) {
 	var fileList fileList
 	fec := &rsyncwire.Buffer{}
 
@@ -128,7 +129,7 @@ func (st *sendTransfer) sendFileList(mod Module, opts *Opts, paths []string, exc
 
 			fec.WriteInt32(mode)
 
-			if opts.PreserveUid {
+			if opts.PreserveUid() {
 				uid, ok := uidFromFileInfo(info)
 				if ok {
 					if _, ok := uidMap[uid]; !ok && uid != 0 {
@@ -146,7 +147,7 @@ func (st *sendTransfer) sendFileList(mod Module, opts *Opts, paths []string, exc
 				fec.WriteInt32(uid)
 			}
 
-			if opts.PreserveGid {
+			if opts.PreserveGid() {
 				gid, ok := gidFromFileInfo(info)
 				if ok {
 					if _, ok := gidMap[gid]; !ok && gid != 0 {
@@ -164,14 +165,14 @@ func (st *sendTransfer) sendFileList(mod Module, opts *Opts, paths []string, exc
 				fec.WriteInt32(gid)
 			}
 
-			if (opts.PreserveDevices && isDev) ||
-				(opts.PreserveSpecials && isSpecial) {
+			if (opts.PreserveDevices() && isDev) ||
+				(opts.PreserveSpecials() && isSpecial) {
 				// 10.  if a special file and -D, the device “rdev” type (integer)
 				rdev, _ := rdevFromFileInfo(info)
 				fec.WriteInt32(rdev)
 			}
 
-			if opts.PreserveLinks && info.Mode().Type()&os.ModeSymlink != 0 {
+			if opts.PreserveLinks() && info.Mode().Type()&os.ModeSymlink != 0 {
 				// 11.  if a symbolic link and -l, the link target's length (integer)
 				// 12.  if a symbolic link and -l, the link target (byte array)
 				target, err := os.Readlink(path)

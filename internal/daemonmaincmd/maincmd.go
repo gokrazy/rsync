@@ -16,6 +16,7 @@ import (
 	"github.com/gokrazy/rsync/internal/anonssh"
 	"github.com/gokrazy/rsync/internal/log"
 	"github.com/gokrazy/rsync/internal/rsyncdconfig"
+	"github.com/gokrazy/rsync/internal/rsyncopts"
 	"github.com/gokrazy/rsync/rsyncd"
 
 	// For profiling and debugging
@@ -35,20 +36,17 @@ func (r *readWriter) Read(p []byte) (n int, err error)  { return r.r.Read(p) }
 func (r *readWriter) Write(p []byte) (n int, err error) { return r.w.Write(p) }
 
 func Main(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer, cfg *rsyncdconfig.Config) error {
-	opts, opt := rsyncd.NewGetOpt()
-	remaining, err := opt.Parse(args[1:])
-	if opt.Called("help") {
-		fmt.Println(opt.Help()) // tridge rsync prints help to stdout
-		os.Exit(0)              // exit with code 0 for compatibility with tridge rsync
-	}
+	pc, err := rsyncopts.ParseArguments(args[1:], true)
 	if err != nil {
 		return err
 	}
+	opts := pc.Options
+	remaining := pc.RemainingArgs
 	// log.Printf("remaining: %v", remaining)
 
 	// calling convention: daemon mode over remote shell
 	// Example: --server --daemon .
-	if opts.Daemon && opts.Server {
+	if opts.Daemon() && opts.Server() {
 		// start_daemon()
 		if cfg == nil {
 			var err error
@@ -70,7 +68,7 @@ func Main(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer,
 
 	// calling convention: command mode (over remote shell or locally)
 	// Example: --server --sender -vvvvlogDtpre.iLsfxCIvu . .
-	if opts.Server {
+	if opts.Server() {
 		// start_server()
 		srv, err := rsyncd.NewServer(nil)
 		if err != nil {
@@ -97,7 +95,7 @@ func Main(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer,
 		return srv.HandleConn(mod, rd, crd, cwr, paths, opts, true)
 	}
 
-	if !opts.Daemon {
+	if !opts.Daemon() {
 		return fmt.Errorf("not implemented yet: client mode")
 	}
 

@@ -353,7 +353,7 @@ func Main(args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer) (*
 		Stdout: stdout,
 		Stderr: stderr,
 	}
-	pc, err := rsyncopts.ParseArguments(args[1:])
+	pc, err := rsyncopts.ParseArguments(args[1:], false)
 	if err != nil {
 		return nil, err
 	}

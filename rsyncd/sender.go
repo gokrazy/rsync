@@ -37,7 +37,7 @@ func (st *sendTransfer) sendFiles(fileList *fileList) error {
 			break
 		}
 
-		if st.opts.DryRun {
+		if st.opts.DryRun() {
 			if err := st.conn.WriteInt32(fileIndex); err != nil {
 				return err
 			}

@@ -15,13 +15,14 @@ import (
 	"github.com/gokrazy/rsync"
 	"github.com/gokrazy/rsync/internal/log"
 	"github.com/gokrazy/rsync/internal/receiver"
+	"github.com/gokrazy/rsync/internal/rsyncopts"
 	"github.com/gokrazy/rsync/internal/rsyncwire"
 )
 
 type sendTransfer struct {
 	// config
 	logger log.Logger
-	opts   *Opts
+	opts   *rsyncopts.Options
 
 	// state
 	conn      *rsyncwire.Conn
@@ -278,10 +279,10 @@ func (s *Server) HandleDaemonConn(ctx context.Context, conn io.ReadWriter, remot
 	}
 
 	s.logger.Printf("flags: %+v", flags)
-	opts, opt := NewGetOpt()
-
-	//getoptions.Debug.SetOutput(os.Stderr)
-	remaining, err := opt.Parse(flags)
+	pc, err := rsyncopts.ParseArguments(flags, false)
+	if err != nil {
+		return err
+	}
 	if err != nil {
 		err = fmt.Errorf("parsing server args: %v", err)
 
@@ -303,10 +304,8 @@ func (s *Server) HandleDaemonConn(ctx context.Context, conn io.ReadWriter, remot
 
 		return err
 	}
-	if opts.D {
-		opts.PreserveDevices = true
-		opts.PreserveSpecials = true
-	}
+	opts := pc.Options
+	remaining := pc.RemainingArgs
 	s.logger.Printf("remaining: %q", remaining)
 	// remaining[0] is always "."
 	// remaining[1] is the first directory
@@ -323,7 +322,7 @@ func (s *Server) HandleDaemonConn(ctx context.Context, conn io.ReadWriter, remot
 }
 
 // handleConn is equivalent to rsync/main.c:start_server
-func (s *Server) HandleConn(module Module, rd io.Reader, crd *countingReader, cwr *countingWriter, paths []string, opts *Opts, negotiate bool) (err error) {
+func (s *Server) HandleConn(module Module, rd io.Reader, crd *countingReader, cwr *countingWriter, paths []string, opts *rsyncopts.Options, negotiate bool) (err error) {
 	// “SHOULD be unique to each connection” as per
 	// https://github.com/JohannesBuchner/Jarsync/blob/master/jarsync/rsync.txt
 	//
@@ -355,7 +354,7 @@ func (s *Server) HandleConn(module Module, rd io.Reader, crd *countingReader, cw
 	mpx := &rsyncwire.MultiplexWriter{Writer: c.Writer}
 	c.Writer = mpx
 
-	if opts.Sender {
+	if opts.Sender() {
 		// If returning an error, send the error to the client for display, too:
 		defer func() {
 			if err != nil {
@@ -376,7 +375,7 @@ func (s *Server) HandleConn(module Module, rd io.Reader, crd *countingReader, cw
 }
 
 // handleConnReceiver is equivalent to rsync/main.c:do_server_recv
-func (s *Server) handleConnReceiver(module Module, crd *countingReader, cwr *countingWriter, paths []string, opts *Opts, negotiate bool, c *rsyncwire.Conn, sessionChecksumSeed int32) (err error) {
+func (s *Server) handleConnReceiver(module Module, crd *countingReader, cwr *countingWriter, paths []string, opts *rsyncopts.Options, negotiate bool, c *rsyncwire.Conn, sessionChecksumSeed int32) (err error) {
 	s.logger.Printf("handleConnReceiver")
 
 	if !module.Writable {
@@ -385,16 +384,16 @@ func (s *Server) handleConnReceiver(module Module, crd *countingReader, cwr *cou
 
 	rt := &receiver.Transfer{
 		Opts: &receiver.TransferOpts{
-			DryRun: opts.DryRun,
+			DryRun: opts.DryRun(),
 
-			DeleteMode:       opts.Delete,
-			PreserveGid:      opts.PreserveGid,
-			PreserveUid:      opts.PreserveUid,
-			PreserveLinks:    opts.PreserveLinks,
-			PreservePerms:    opts.PreservePerms,
-			PreserveDevices:  opts.PreserveDevices,
-			PreserveSpecials: opts.PreserveSpecials,
-			PreserveTimes:    opts.PreserveTimes,
+			DeleteMode:       opts.DeleteMode(),
+			PreserveGid:      opts.PreserveGid(),
+			PreserveUid:      opts.PreserveUid(),
+			PreserveLinks:    opts.PreserveLinks(),
+			PreservePerms:    opts.PreservePerms(),
+			PreserveDevices:  opts.PreserveDevices(),
+			PreserveSpecials: opts.PreserveSpecials(),
+			PreserveTimes:    opts.PreserveMTimes(),
 			// TODO: PreserveHardlinks: opts.PreserveHardlinks,
 		},
 		Dest: module.Path,
@@ -408,7 +407,7 @@ func (s *Server) handleConnReceiver(module Module, crd *countingReader, cwr *cou
 		Seed: sessionChecksumSeed,
 	}
 
-	if opts.Delete {
+	if opts.DeleteMode() {
 		// receive the exclusion list (openrsync’s is always empty)
 		exclusionList, err := recvFilterList(c)
 		if err != nil {
@@ -434,7 +433,7 @@ func (s *Server) handleConnReceiver(module Module, crd *countingReader, cwr *cou
 }
 
 // handleConnSender is equivalent to rsync/main.c:do_server_sender
-func (s *Server) handleConnSender(module Module, crd *countingReader, cwr *countingWriter, paths []string, opts *Opts, negotiate bool, c *rsyncwire.Conn, sessionChecksumSeed int32) (err error) {
+func (s *Server) handleConnSender(module Module, crd *countingReader, cwr *countingWriter, paths []string, opts *rsyncopts.Options, negotiate bool, c *rsyncwire.Conn, sessionChecksumSeed int32) (err error) {
 	st := &sendTransfer{
 		logger: s.logger,
 		opts:   opts,

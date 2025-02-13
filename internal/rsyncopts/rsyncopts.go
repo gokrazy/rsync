@@ -13,6 +13,7 @@ import (
 	"log"
 	"math"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 	"syscall"
@@ -102,7 +103,30 @@ func NewOptions() *Options {
 	}
 }
 
+// GokrazyOptions contains additional command-line flags, prefixed with
+// gokr. (like --gokr.modulemap) to not clash with rsync flag names.
+type GokrazyOptions struct {
+	Config           string
+	Listen           string
+	MonitoringListen string
+	AnonSSHListen    string
+	ModuleMap        string
+}
+
+func (o *GokrazyOptions) table() []poptOption {
+	return []poptOption{
+		/* longName, shortName, argInfo, arg, val */
+		{"gokr.config", "", POPT_ARG_STRING, &o.Config, 0},
+		{"gokr.listen", "", POPT_ARG_STRING, &o.Listen, 0},
+		{"gokr.monitoring_listen", "", POPT_ARG_STRING, &o.MonitoringListen, 0},
+		{"gokr.anonssh_listen", "", POPT_ARG_STRING, &o.AnonSSHListen, 0},
+		{"gokr.modulemap", "", POPT_ARG_STRING, &o.ModuleMap, 0},
+	}
+}
+
 type Options struct {
+	Gokrazy GokrazyOptions
+
 	// not directly referenced in the table, but used in the special case code.
 	do_compression int
 	info           [COUNT_INFO]uint16
@@ -227,6 +251,11 @@ type Options struct {
 	am_server            int
 	am_sender            int
 	am_daemon            int
+
+	daemon_bwlimit int
+	config_file    string
+	daemon_opt     int
+	no_detach      int
 }
 
 type priority int
@@ -505,6 +534,17 @@ For your convenience, here is the rsync --help output:
 
   Use "rsync --daemon --help" to see the daemon-mode command-line options.
 
+In addition, the following gokrazy-specific flags are supported:
+
+  --gokr.config            path to a config file (if unspecified,
+                           os.UserConfigDir()/gokr-rsyncd.toml is used)
+  --gokr.listen            [host]:port listen address for the rsync daemon protocol
+  --gokr.monitoring_listen optional [host]:port listen address for a HTTP debug interface
+  --gokr.anonssh_listen    optional [host]:port listen address for
+                           the rsync daemon protocol via anonymous SSH
+  --gokr.modulemap         <modulename>=<path> pairs for quick setup of the server,
+                           without a config file
+
 See https://github.com/gokrazy/rsync for updates, bug reports, and answers
 `
 }
@@ -523,6 +563,36 @@ func (o *Options) PreserveHardLinks() bool { return o.preserve_hard_links != 0 }
 func (o *Options) Recurse() bool           { return o.recurse != 0 }
 func (o *Options) Verbose() bool           { return o.verbose != 0 }
 func (o *Options) DeleteMode() bool        { return o.delete_mode != 0 }
+func (o *Options) Sender() bool            { return o.am_sender != 0 }
+func (o *Options) Server() bool            { return o.am_server != 0 }
+func (o *Options) Daemon() bool            { return o.am_daemon != 0 }
+
+func (o *Options) daemonTable() []poptOption {
+	return []poptOption{
+		/* longName, shortName, argInfo, arg, val */
+		{"help", "", POPT_ARG_NONE, nil, OPT_HELP},
+		{"address", "", POPT_ARG_STRING, &o.bind_address, 0},
+		{"bwlimit", "", POPT_ARG_INT, &o.daemon_bwlimit, 0},
+		{"config", "", POPT_ARG_STRING, &o.config_file, 0},
+		{"daemon", "", POPT_ARG_NONE, &o.daemon_opt, 0},
+		{"dparam", "M", POPT_ARG_STRING, nil, 'M'},
+		{"ipv4", "4", POPT_ARG_VAL, &o.default_af_hint, syscall.AF_INET},
+		{"ipv6", "6", POPT_ARG_VAL, &o.default_af_hint, syscall.AF_INET6},
+		{"detach", "", POPT_ARG_VAL, &o.no_detach, 0},
+		{"no-detach", "", POPT_ARG_VAL, &o.no_detach, 1},
+		{"log-file", "", POPT_ARG_STRING, &o.logfile_name, 0},
+		{"log-file-format", "", POPT_ARG_STRING, &o.logfile_format, 0},
+		{"port", "", POPT_ARG_INT, &o.rsync_port, 0},
+		{"sockopts", "", POPT_ARG_STRING, &o.sockopts, 0},
+		{"protocol", "", POPT_ARG_INT, &o.protocol_version, 0},
+		{"server", "", POPT_ARG_NONE, &o.am_server, 0},
+		{"temp-dir", "T", POPT_ARG_STRING, &o.tmpdir, 0},
+		{"verbose", "v", POPT_ARG_NONE, 0, 'v'},
+		{"no-verbose", "", POPT_ARG_VAL, &o.verbose, 0},
+		{"no-v", "", POPT_ARG_VAL, &o.verbose, 0},
+		{"help", "h", POPT_ARG_NONE, 0, 'h'},
+	}
+}
 
 func (o *Options) table() []poptOption {
 	return []poptOption{
@@ -785,7 +855,7 @@ func (o *Options) table() []poptOption {
 var errNotYetImplemented = errors.New("option not yet implemented in gokrazy/rsync")
 
 // rsync/options.c:parse_arguments
-func ParseArguments(args []string) (*Context, error) {
+func ParseArguments(args []string, gokrazyTable bool) (*Context, error) {
 	// NOTE: We do not implement support for refusing options per rsyncd.conf
 	// here, as we have our own configuration file.
 
@@ -822,8 +892,45 @@ func ParseArguments(args []string) (*Context, error) {
 			opts.am_sender = 1
 
 		case OPT_DAEMON:
-			// TODO: implement daemon option parsing
-			return nil, errNotYetImplemented
+			// Parse the whole command-line using the daemon options table.
+			table := opts.daemonTable()
+			if gokrazyTable {
+				table = slices.Concat(opts.Gokrazy.table(), table)
+			}
+			pc := Context{
+				Options: opts,
+				table:   table,
+				args:    args,
+			}
+
+			for {
+				opt := pc.poptGetNextOpt()
+				if opt == -1 {
+					break // done
+				}
+				if opt < 0 {
+					return nil, fmt.Errorf("<0 retval: %v", opt)
+				}
+				// Most options are handled by poptGetNextOpt, only special cases
+				// are returned and handled here.
+				switch opt {
+				case 'h':
+					fmt.Println(opts.Help()) // tridge rsync prints help to stdout
+					os.Exit(0)               // exit with code 0 for compatibility with tridge rsync
+				case 'M':
+					return nil, errNotYetImplemented
+
+				case 'v':
+					opts.verbose++
+
+				default:
+					return nil, fmt.Errorf("unhandled special case opt: %v", opt)
+				}
+			}
+
+			opts.am_daemon = 1
+
+			return &pc, nil
 
 		case OPT_FILTER,
 			OPT_EXCLUDE,

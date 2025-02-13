@@ -150,7 +150,7 @@ func TestParseArguments(t *testing.T) {
 			}
 			wantLines := discardKnownDifferences(strings.Split(strings.TrimSpace(string(want)), "\n"))
 
-			pc, err := ParseArguments(tt.args)
+			pc, err := ParseArguments(tt.args, false)
 			if err != nil {
 				t.Fatalf("ParseArguments: %v", err)
 			}
@@ -177,7 +177,7 @@ func TestParseArgumentsError(t *testing.T) {
 		},
 	} {
 		t.Run(strings.Join(tt.args, " "), func(t *testing.T) {
-			_, err := ParseArguments(tt.args)
+			_, err := ParseArguments(tt.args, false)
 			if err == nil {
 				t.Fatalf("ParseArguments unexpectedly did not fail!")
 			}
@@ -202,7 +202,7 @@ func TestParseArgumentsRemaining(t *testing.T) {
 		},
 	} {
 		t.Run(strings.Join(tt.args, " "), func(t *testing.T) {
-			pc, err := ParseArguments(tt.args)
+			pc, err := ParseArguments(tt.args, false)
 			if err != nil {
 				t.Fatalf("ParseArguments: %v", err)
 			}
