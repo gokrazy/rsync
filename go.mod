@@ -10,7 +10,7 @@ require (
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510
 	github.com/mmcloughlin/md4 v0.1.2
 	github.com/stapelberg/rsyncparse v0.0.0-20240130202559-76f2a26bb33f
-	golang.org/x/crypto v0.26.0
-	golang.org/x/sync v0.8.0
-	golang.org/x/sys v0.24.0
+	golang.org/x/crypto v0.33.0
+	golang.org/x/sync v0.11.0
+	golang.org/x/sys v0.30.0
 )
