@@ -862,9 +862,15 @@ func ParseArguments(args []string, gokrazyTable bool) (*Context, error) {
 	version_opt_cnt := 0
 
 	opts := NewOptions()
+	table := opts.table()
+	if gokrazyTable {
+		// We need to make the --gokr.* flags known, otherwise the first parsing
+		// attempt fails and the daemon mode parsing is never run.
+		table = slices.Concat(opts.Gokrazy.table(), table)
+	}
 	pc := Context{
 		Options: opts,
-		table:   opts.table(),
+		table:   table,
 		args:    args,
 	}
 
