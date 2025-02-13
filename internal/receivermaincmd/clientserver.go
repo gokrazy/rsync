@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/gokrazy/rsync"
 	"github.com/gokrazy/rsync/internal/log"
@@ -25,8 +26,14 @@ func socketClient(osenv receiver.Osenv, opts *rsyncopts.Options, src, dest strin
 	if _, _, err := net.SplitHostPort(host); err != nil {
 		host += ":873" // rsync daemon port
 	}
-	log.Printf("Opening TCP connection to %s", host)
-	conn, err := net.Dial("tcp", host)
+	dialer := net.Dialer{}
+	timeoutStr := ""
+	if timeout := opts.ConnectTimeoutSeconds(); timeout > 0 {
+		dialer.Timeout = time.Duration(timeout) * time.Second
+		timeoutStr = fmt.Sprintf(" (timeout: %d seconds)", timeout)
+	}
+	log.Printf("Opening TCP connection to %s%s", host, timeoutStr)
+	conn, err := dialer.Dial("tcp", host)
 	if err != nil {
 		return nil, err
 	}
