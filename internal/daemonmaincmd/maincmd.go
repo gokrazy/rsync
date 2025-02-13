@@ -252,14 +252,14 @@ func Main(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer,
 			return fmt.Errorf("misconfiguration: authorized_keys must not be empty when using an authorized_ssh listener")
 		}
 		log.Printf("rsync daemon listening (authorized SSH) on %s", ln.Addr())
-		return anonssh.Serve(ln, sshListener, cfg, func(args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer) error {
+		return anonssh.Serve(ctx, ln, sshListener, cfg, func(args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer) error {
 			return Main(ctx, args, stdin, stdout, stderr, cfg)
 		})
 	}
 
 	if cfg.Listeners[0].AnonSSH != "" {
 		log.Printf("rsync daemon listening (anon SSH) on %s", ln.Addr())
-		return anonssh.Serve(ln, sshListener, cfg, func(args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer) error {
+		return anonssh.Serve(ctx, ln, sshListener, cfg, func(args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer) error {
 			return Main(ctx, args, stdin, stdout, stderr, cfg)
 		})
 	}

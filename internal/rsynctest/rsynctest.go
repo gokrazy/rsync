@@ -68,6 +68,8 @@ func Listener(ln net.Listener) Option {
 }
 
 func New(t *testing.T, modules []rsyncd.Module, opts ...Option) *TestServer {
+	ctx := t.Context()
+
 	ts := &TestServer{}
 	for _, opt := range opts {
 		opt(ts)
@@ -107,7 +109,7 @@ func New(t *testing.T, modules []rsyncd.Module, opts ...Option) *TestServer {
 			Modules: modules,
 		}
 		go func() {
-			err := anonssh.Serve(ts.listener, sshListener, cfg, func(args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer) error {
+			err := anonssh.Serve(ctx, ts.listener, sshListener, cfg, func(args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer) error {
 				return maincmd.Main(context.Background(), args, stdin, stdout, stderr, cfg)
 			})
 
@@ -128,7 +130,7 @@ func New(t *testing.T, modules []rsyncd.Module, opts ...Option) *TestServer {
 			Modules: modules,
 		}
 		go func() {
-			err := anonssh.Serve(ts.listener, sshListener, cfg, func(args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer) error {
+			err := anonssh.Serve(ctx, ts.listener, sshListener, cfg, func(args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer) error {
 				return maincmd.Main(context.Background(), args, stdin, stdout, stderr, cfg)
 			})
 

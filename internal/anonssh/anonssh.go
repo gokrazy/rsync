@@ -305,7 +305,12 @@ func loadAuthorizedKeys(path string) (map[string]bool, error) {
 	return result, nil
 }
 
-func Serve(ln net.Listener, listener *Listener, cfg *rsyncdconfig.Config, main mainFunc) error {
+func Serve(ctx context.Context, ln net.Listener, listener *Listener, cfg *rsyncdconfig.Config, main mainFunc) error {
+	go func() {
+		<-ctx.Done()
+		ln.Close() // unblocks Accept()
+	}()
+
 	as := &anonssh{
 		main: main,
 	}
@@ -331,6 +336,12 @@ func Serve(ln net.Listener, listener *Listener, cfg *rsyncdconfig.Config, main m
 	for {
 		conn, err := ln.Accept()
 		if err != nil {
+			select {
+			case <-ctx.Done():
+				return nil // ignore expected 'use of closed network connection' error on context cancel
+			default:
+			}
+
 			if errors.Is(err, net.ErrClosed) {
 				return err
 			}
