@@ -2,7 +2,6 @@ package receivermaincmd
 
 import (
 	"bufio"
-	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -361,7 +360,9 @@ func Main(args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer) (*
 	opts := pc.Options
 	remaining := pc.RemainingArgs
 	if len(remaining) == 0 {
-		return nil, errors.New(opts.Help())
+		// help goes to stderr when no arguments were specified
+		fmt.Fprintln(os.Stderr, opts.Help())
+		return nil, fmt.Errorf("rsync error: syntax or usage error")
 	}
 	if len(remaining) == 1 {
 		// Usages with just one SRC arg and no DEST arg list the source files
