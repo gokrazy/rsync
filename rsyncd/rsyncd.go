@@ -239,9 +239,6 @@ func (s *Server) HandleDaemonConn(ctx context.Context, conn io.ReadWriter, remot
 	s.logger.Printf("flags: %+v", flags)
 	pc, err := rsyncopts.ParseArguments(flags, false)
 	if err != nil {
-		return err
-	}
-	if err != nil {
 		err = fmt.Errorf("parsing server args: %v", err)
 
 		// terminate connection with an error about which flag is not supported
