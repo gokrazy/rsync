@@ -185,3 +185,31 @@ func (c *Conn) ReadInt64() (int64, error) {
 	}
 	return data, nil
 }
+
+type CountingReader struct {
+	R         io.Reader
+	BytesRead int64
+}
+
+func (r *CountingReader) Read(p []byte) (n int, err error) {
+	n, err = r.R.Read(p)
+	r.BytesRead += int64(n)
+	return n, err
+}
+
+type CountingWriter struct {
+	W            io.Writer
+	BytesWritten int64
+}
+
+func (w *CountingWriter) Write(p []byte) (n int, err error) {
+	n, err = w.W.Write(p)
+	w.BytesWritten += int64(n)
+	return n, err
+}
+
+func CounterPair(r io.Reader, w io.Writer) (*CountingReader, *CountingWriter) {
+	crd := &CountingReader{R: r}
+	cwr := &CountingWriter{W: w}
+	return crd, cwr
+}

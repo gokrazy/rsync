@@ -8,7 +8,6 @@ import (
 	"io"
 	"net"
 	"os"
-	"sort"
 	"strings"
 
 	"github.com/gokrazy/rsync"
@@ -98,34 +97,6 @@ func (s *Server) formatModuleList() string {
 	return list.String()
 }
 
-type countingReader struct {
-	r    io.Reader
-	read int64
-}
-
-func (r *countingReader) Read(p []byte) (n int, err error) {
-	n, err = r.r.Read(p)
-	r.read += int64(n)
-	return n, err
-}
-
-type countingWriter struct {
-	w       io.Writer
-	written int64
-}
-
-func (w *countingWriter) Write(p []byte) (n int, err error) {
-	n, err = w.w.Write(p)
-	w.written += int64(n)
-	return n, err
-}
-
-func CounterPair(r io.Reader, w io.Writer) (*countingReader, *countingWriter) {
-	crd := &countingReader{r: r}
-	cwr := &countingWriter{w: w}
-	return crd, cwr
-}
-
 func checkACL(acls []string, remoteAddr net.Addr) error {
 	if len(acls) == 0 {
 		return nil
@@ -178,8 +149,8 @@ func (s *Server) HandleDaemonConn(ctx context.Context, conn io.ReadWriter, remot
 	_ = ctx // not implemented. what would be the best thing to do? wrap conn's reader part with cancelable reader?
 
 	const terminationCommand = "@RSYNCD: OK\n"
-	crd := &countingReader{r: conn}
-	cwr := &countingWriter{w: conn}
+	crd := &rsyncwire.CountingReader{R: conn}
+	cwr := &rsyncwire.CountingWriter{W: conn}
 	rd := bufio.NewReader(crd)
 	// send server greeting
 
@@ -277,7 +248,7 @@ func (s *Server) HandleDaemonConn(ctx context.Context, conn io.ReadWriter, remot
 }
 
 // handleConn is equivalent to rsync/main.c:start_server
-func (s *Server) HandleConn(module Module, rd io.Reader, crd *countingReader, cwr *countingWriter, paths []string, opts *rsyncopts.Options, negotiate bool) (err error) {
+func (s *Server) HandleConn(module Module, rd io.Reader, crd *rsyncwire.CountingReader, cwr *rsyncwire.CountingWriter, paths []string, opts *rsyncopts.Options, negotiate bool) (err error) {
 	// “SHOULD be unique to each connection” as per
 	// https://github.com/JohannesBuchner/Jarsync/blob/master/jarsync/rsync.txt
 	//
@@ -330,7 +301,7 @@ func (s *Server) HandleConn(module Module, rd io.Reader, crd *countingReader, cw
 }
 
 // handleConnReceiver is equivalent to rsync/main.c:do_server_recv
-func (s *Server) handleConnReceiver(module Module, crd *countingReader, cwr *countingWriter, paths []string, opts *rsyncopts.Options, negotiate bool, c *rsyncwire.Conn, sessionChecksumSeed int32) (err error) {
+func (s *Server) handleConnReceiver(module Module, crd *rsyncwire.CountingReader, cwr *rsyncwire.CountingWriter, paths []string, opts *rsyncopts.Options, negotiate bool, c *rsyncwire.Conn, sessionChecksumSeed int32) (err error) {
 	s.logger.Printf("handleConnReceiver")
 
 	if !module.Writable {
@@ -388,68 +359,19 @@ func (s *Server) handleConnReceiver(module Module, crd *countingReader, cwr *cou
 }
 
 // handleConnSender is equivalent to rsync/main.c:do_server_sender
-func (s *Server) handleConnSender(module Module, crd *countingReader, cwr *countingWriter, paths []string, opts *rsyncopts.Options, negotiate bool, c *rsyncwire.Conn, sessionChecksumSeed int32) (err error) {
+func (s *Server) handleConnSender(module Module, crd *rsyncwire.CountingReader, cwr *rsyncwire.CountingWriter, paths []string, opts *rsyncopts.Options, negotiate bool, c *rsyncwire.Conn, sessionChecksumSeed int32) (err error) {
 	st := &sender.Transfer{
 		Logger: s.logger,
 		Opts:   opts,
 		Conn:   c,
 		Seed:   sessionChecksumSeed,
 	}
-
-	// receive the exclusion list (openrsync’s is always empty)
-	exclusionList, err := sender.RecvFilterList(c)
-	if err != nil {
-		return err
-	}
-	s.logger.Printf("exclusion list read (entries: %d)", len(exclusionList.Filters))
-
-	// “Update exchange” as per
-	// https://github.com/kristapsdz/openrsync/blob/master/rsync.5
-
-	// send file list
-	fileList, err := st.SendFileList(module.Name, module.Path, opts, paths, exclusionList)
+	stats, err := st.Do(crd, cwr, module.Name, module.Path, paths)
 	if err != nil {
 		return err
 	}
 
-	s.logger.Printf("file list sent")
-
-	// Sort the file list. The client sorts, so we need to sort, too (in the
-	// same way!), otherwise our indices do not match what the client will
-	// request.
-	sort.Slice(fileList.Files, func(i, j int) bool {
-		return fileList.Files[i].Wpath < fileList.Files[j].Wpath
-	})
-
-	if err := st.SendFiles(fileList); err != nil {
-		return err
-	}
-
-	// send statistics:
-	// total bytes read (from network connection)
-	if err := c.WriteInt64(crd.read); err != nil {
-		return err
-	}
-	// total bytes written (to network connection)
-	if err := c.WriteInt64(cwr.written); err != nil {
-		return err
-	}
-	// total size of files
-	if err := c.WriteInt64(fileList.TotalSize); err != nil {
-		return err
-	}
-
-	s.logger.Printf("reading final int32")
-
-	finish, err := c.ReadInt32()
-	if err != nil {
-		return err
-	}
-	if finish != -1 {
-		return fmt.Errorf("protocol error: expected final -1, got %d", finish)
-	}
-
-	s.logger.Printf("handleConnSender done")
+	s.logger.Printf("handleConnSender done. stats: %+v", stats)
 
 	return nil
 }

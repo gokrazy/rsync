@@ -17,6 +17,7 @@ import (
 	"github.com/gokrazy/rsync/internal/log"
 	"github.com/gokrazy/rsync/internal/rsyncdconfig"
 	"github.com/gokrazy/rsync/internal/rsyncopts"
+	"github.com/gokrazy/rsync/internal/rsyncwire"
 	"github.com/gokrazy/rsync/rsyncd"
 
 	// For profiling and debugging
@@ -90,7 +91,7 @@ func Main(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer,
 		}
 		paths := remaining[1:]
 
-		crd, cwr := rsyncd.CounterPair(stdin, stdout)
+		crd, cwr := rsyncwire.CounterPair(stdin, stdout)
 		rd := crd
 		return srv.HandleConn(mod, rd, crd, cwr, paths, opts, true)
 	}
