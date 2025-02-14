@@ -10,25 +10,14 @@ import (
 	"os"
 	"sort"
 	"strings"
-	"time"
 
 	"github.com/gokrazy/rsync"
 	"github.com/gokrazy/rsync/internal/log"
 	"github.com/gokrazy/rsync/internal/receiver"
 	"github.com/gokrazy/rsync/internal/rsyncopts"
 	"github.com/gokrazy/rsync/internal/rsyncwire"
+	"github.com/gokrazy/rsync/internal/sender"
 )
-
-type sendTransfer struct {
-	// config
-	logger log.Logger
-	opts   *rsyncopts.Options
-
-	// state
-	conn      *rsyncwire.Conn
-	seed      int32
-	lastMatch int64
-}
 
 type Module struct {
 	Name     string   `toml:"name"`
@@ -107,37 +96,6 @@ func (s *Server) formatModuleList() string {
 			comment)
 	}
 	return list.String()
-}
-
-type file struct {
-	// TODO: store relative to the root to conserve RAM
-	path    string
-	wpath   string
-	regular bool
-
-	// fields below are used by the receiver (TODO: unify)
-	Name       string
-	Length     int64
-	ModTime    time.Time
-	Mode       int32
-	Uid        int32
-	Gid        int32
-	LinkTarget string
-	Rdev       int32
-}
-
-type fileList struct {
-	totalSize int64
-	files     []file
-}
-
-// rsync/rsync.h defines chunkSize as 32 * 1024, but increasing it to 256K
-// increases throughput with “tridge” rsync as client by 50 Mbit/s.
-const chunkSize = 256 * 1024
-
-type target struct {
-	index int32
-	tag   uint16
 }
 
 type countingReader struct {
@@ -409,11 +367,11 @@ func (s *Server) handleConnReceiver(module Module, crd *countingReader, cwr *cou
 
 	if opts.DeleteMode() {
 		// receive the exclusion list (openrsync’s is always empty)
-		exclusionList, err := recvFilterList(c)
+		exclusionList, err := sender.RecvFilterList(c)
 		if err != nil {
 			return err
 		}
-		s.logger.Printf("exclusion list read (entries: %d)", len(exclusionList.filters))
+		s.logger.Printf("exclusion list read (entries: %d)", len(exclusionList.Filters))
 	}
 
 	// receive file list
@@ -434,25 +392,25 @@ func (s *Server) handleConnReceiver(module Module, crd *countingReader, cwr *cou
 
 // handleConnSender is equivalent to rsync/main.c:do_server_sender
 func (s *Server) handleConnSender(module Module, crd *countingReader, cwr *countingWriter, paths []string, opts *rsyncopts.Options, negotiate bool, c *rsyncwire.Conn, sessionChecksumSeed int32) (err error) {
-	st := &sendTransfer{
-		logger: s.logger,
-		opts:   opts,
-		conn:   c,
-		seed:   sessionChecksumSeed,
+	st := &sender.Transfer{
+		Logger: s.logger,
+		Opts:   opts,
+		Conn:   c,
+		Seed:   sessionChecksumSeed,
 	}
 
 	// receive the exclusion list (openrsync’s is always empty)
-	exclusionList, err := recvFilterList(c)
+	exclusionList, err := sender.RecvFilterList(c)
 	if err != nil {
 		return err
 	}
-	s.logger.Printf("exclusion list read (entries: %d)", len(exclusionList.filters))
+	s.logger.Printf("exclusion list read (entries: %d)", len(exclusionList.Filters))
 
 	// “Update exchange” as per
 	// https://github.com/kristapsdz/openrsync/blob/master/rsync.5
 
 	// send file list
-	fileList, err := st.sendFileList(module, opts, paths, exclusionList)
+	fileList, err := st.SendFileList(module.Name, module.Path, opts, paths, exclusionList)
 	if err != nil {
 		return err
 	}
@@ -462,11 +420,11 @@ func (s *Server) handleConnSender(module Module, crd *countingReader, cwr *count
 	// Sort the file list. The client sorts, so we need to sort, too (in the
 	// same way!), otherwise our indices do not match what the client will
 	// request.
-	sort.Slice(fileList.files, func(i, j int) bool {
-		return fileList.files[i].wpath < fileList.files[j].wpath
+	sort.Slice(fileList.Files, func(i, j int) bool {
+		return fileList.Files[i].Wpath < fileList.Files[j].Wpath
 	})
 
-	if err := st.sendFiles(fileList); err != nil {
+	if err := st.SendFiles(fileList); err != nil {
 		return err
 	}
 
@@ -480,7 +438,7 @@ func (s *Server) handleConnSender(module Module, crd *countingReader, cwr *count
 		return err
 	}
 	// total size of files
-	if err := c.WriteInt64(fileList.totalSize); err != nil {
+	if err := c.WriteInt64(fileList.TotalSize); err != nil {
 		return err
 	}
 

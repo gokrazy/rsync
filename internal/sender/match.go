@@ -1,4 +1,4 @@
-package rsyncd
+package sender
 
 import (
 	"bytes"
@@ -13,9 +13,14 @@ import (
 	"github.com/mmcloughlin/md4"
 )
 
+type target struct {
+	index int32
+	tag   uint16
+}
+
 // rsync/match.c:hash_search
-func (st *sendTransfer) hashSearch(targets []target, tagTable map[uint16]int, head rsync.SumHead, fileIndex int32, fl file) error {
-	st.logger.Printf("hashSearch(path=%s, len(sums)=%d)", fl.path, len(head.Sums))
+func (st *Transfer) hashSearch(targets []target, tagTable map[uint16]int, head rsync.SumHead, fileIndex int32, fl file) error {
+	st.Logger.Printf("hashSearch(path=%s, len(sums)=%d)", fl.path, len(head.Sums))
 	f, err := os.OpenFile(fl.path, os.O_RDONLY|nofollow.Maybe, 0)
 	if err != nil {
 		return err
@@ -30,17 +35,17 @@ func (st *sendTransfer) hashSearch(targets []target, tagTable map[uint16]int, he
 	readSize := max(3*head.BlockLength, 256*1024)
 	ms := mapFile(f, fi.Size(), readSize, head.BlockLength)
 
-	if err := st.conn.WriteInt32(fileIndex); err != nil {
+	if err := st.Conn.WriteInt32(fileIndex); err != nil {
 		return err
 	}
 
-	if err := head.WriteTo(st.conn); err != nil {
+	if err := head.WriteTo(st.Conn); err != nil {
 		return err
 	}
 
 	// sum_init()
 	h := md4.New()
-	binary.Write(h, binary.LittleEndian, st.seed)
+	binary.Write(h, binary.LittleEndian, st.Seed)
 
 	// The following quotes are citations from
 	// https://www.samba.org/~tridge/phd_thesis.pdf, section 3.2.6 The
@@ -58,7 +63,7 @@ func (st *sendTransfer) hashSearch(targets []target, tagTable map[uint16]int, he
 	var s1, s2 uint32
 	var offset int64
 	end := fi.Size() + 1 - head.Sums[len(head.Sums)-1].Len
-	st.logger.Printf("last block len=%d, end=%d", head.Sums[len(head.Sums)-1].Len, end)
+	st.Logger.Printf("last block len=%d, end=%d", head.Sums[len(head.Sums)-1].Len, end)
 
 	readChunk := func() error {
 		k = int(head.BlockLength)
@@ -110,12 +115,12 @@ Outer:
 
 				if !doneCsum2 {
 					buf := ms.ptr(offset, int32(l))
-					sum2 = rsyncchecksum.Checksum2(st.seed, buf[:])
+					sum2 = rsyncchecksum.Checksum2(st.Seed, buf[:])
 					doneCsum2 = true
 				}
 
 				if local, remote := sum2[:head.ChecksumLength], head.Sums[i].Sum2[:head.ChecksumLength]; !bytes.Equal(local, remote) {
-					st.logger.Printf("false alarm: local %x, remote %x", local, remote)
+					st.Logger.Printf("false alarm: local %x, remote %x", local, remote)
 					//falseAlarms++
 					continue
 				}
@@ -199,8 +204,8 @@ Outer:
 
 	{
 		sum := h.Sum(nil)
-		st.logger.Printf("sum: %x (len = %d)", sum, len(sum))
-		if _, err := st.conn.Writer.Write(sum); err != nil {
+		st.Logger.Printf("sum: %x (len = %d)", sum, len(sum))
+		if _, err := st.Conn.Writer.Write(sum); err != nil {
 			return err
 		}
 	}
@@ -210,7 +215,7 @@ Outer:
 }
 
 // rsync/match.c:matched
-func (st *sendTransfer) matched(h hash.Hash, ms *mapStruct, head rsync.SumHead, offset int64, i int32) error {
+func (st *Transfer) matched(h hash.Hash, ms *mapStruct, head rsync.SumHead, offset int64, i int32) error {
 	n := offset - st.lastMatch
 
 	transmitAccumulated := i < 0

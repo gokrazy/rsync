@@ -1,4 +1,4 @@
-package rsyncd
+package sender
 
 import (
 	"os"
@@ -7,11 +7,38 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/gokrazy/rsync"
 	"github.com/gokrazy/rsync/internal/rsyncopts"
 	"github.com/gokrazy/rsync/internal/rsyncwire"
 )
+
+type file struct {
+	// TODO: store relative to the root to conserve RAM
+	path    string
+	Wpath   string
+	regular bool
+
+	// fields below are used by the receiver (TODO: unify)
+	Name       string
+	Length     int64
+	ModTime    time.Time
+	Mode       int32
+	Uid        int32
+	Gid        int32
+	LinkTarget string
+	Rdev       int32
+}
+
+type fileList struct {
+	TotalSize int64
+	Files     []file
+}
+
+// rsync/rsync.h defines chunkSize as 32 * 1024, but increasing it to 256K
+// increases throughput with “tridge” rsync as client by 50 Mbit/s.
+const chunkSize = 256 * 1024
 
 var (
 	lookupOnce      sync.Once
@@ -19,7 +46,7 @@ var (
 )
 
 // rsync/flist.c:send_file_list
-func (st *sendTransfer) sendFileList(mod Module, opts *rsyncopts.Options, paths []string, excl *filterRuleList) (*fileList, error) {
+func (st *Transfer) SendFileList(modName, modPath string, opts *rsyncopts.Options, paths []string, excl *filterRuleList) (*fileList, error) {
 	var fileList fileList
 	fec := &rsyncwire.Buffer{}
 
@@ -31,13 +58,13 @@ func (st *sendTransfer) sendFileList(mod Module, opts *rsyncopts.Options, paths 
 	// TODO: handle info == nil case (permission denied?): should set an i/o
 	// error flag, but traversal should continue
 
-	st.logger.Printf("sendFileList(module=%q)", mod.Name)
+	st.Logger.Printf("sendFileList(module=%q)", modName)
 	// TODO: handle |root| referring to an individual file, symlink or special (skip)
 	for _, requested := range paths {
-		modRoot := mod.Path
-		st.logger.Printf("  path %q (module root %q)", requested, modRoot)
-		root := strings.TrimPrefix(requested, mod.Name+"/")
-		root = filepath.Clean(mod.Path + "/" + root)
+		modRoot := modPath
+		st.Logger.Printf("  path %q (module root %q)", requested, modRoot)
+		root := strings.TrimPrefix(requested, modName+"/")
+		root = filepath.Clean(modPath + "/" + root)
 		// st.logger.Printf("  filepath.Walk(%q)", root)
 		strip := filepath.Dir(filepath.Clean(root)) + "/"
 		if strings.HasSuffix(requested, "/") {
@@ -64,10 +91,10 @@ func (st *sendTransfer) sendFileList(mod Module, opts *rsyncopts.Options, paths 
 				return filepath.SkipDir
 			}
 
-			fileList.files = append(fileList.files, file{
+			fileList.Files = append(fileList.Files, file{
 				path:    path,
 				regular: info.Mode().IsRegular(),
-				wpath:   name,
+				Wpath:   name,
 			})
 
 			// 1.   status byte (integer)
@@ -90,7 +117,7 @@ func (st *sendTransfer) sendFileList(mod Module, opts *rsyncopts.Options, paths 
 			}
 			fec.WriteInt64(size)
 
-			fileList.totalSize += size
+			fileList.TotalSize += size
 
 			// 6.   file modification time (optional, integer)
 			// TODO: this will overflow in 2038! :(
@@ -136,7 +163,7 @@ func (st *sendTransfer) sendFileList(mod Module, opts *rsyncopts.Options, paths 
 						u, err := user.LookupId(strconv.Itoa(int(uid)))
 						if err != nil {
 							lookupOnce.Do(func() {
-								st.logger.Printf("lookup(%d) = %v", uid, err)
+								st.Logger.Printf("lookup(%d) = %v", uid, err)
 							})
 						} else {
 							uidMap[uid] = u.Username
@@ -154,7 +181,7 @@ func (st *sendTransfer) sendFileList(mod Module, opts *rsyncopts.Options, paths 
 						g, err := user.LookupGroupId(strconv.Itoa(int(gid)))
 						if err != nil {
 							lookupGroupOnce.Do(func() {
-								st.logger.Printf("lookupgroup(%d) = %v", gid, err)
+								st.Logger.Printf("lookupgroup(%d) = %v", gid, err)
 							})
 						} else {
 							gidMap[gid] = g.Name
@@ -222,7 +249,7 @@ func (st *sendTransfer) sendFileList(mod Module, opts *rsyncopts.Options, paths 
 	const ioErrors = 0
 	fec.WriteInt32(ioErrors)
 
-	if err := st.conn.WriteString(fec.String()); err != nil {
+	if err := st.Conn.WriteString(fec.String()); err != nil {
 		return nil, err
 	}
 

@@ -1,4 +1,4 @@
-package rsyncd
+package sender
 
 import (
 	"io"
@@ -9,7 +9,7 @@ import (
 )
 
 type filterRuleList struct {
-	filters []*filterRule
+	Filters []*filterRule
 }
 
 // exclude.c:add_rule
@@ -23,12 +23,12 @@ func (l *filterRuleList) addRule(fr *filterRule) {
 	}) {
 		fr.flag |= filtruleWild
 	}
-	l.filters = append(l.filters, fr)
+	l.Filters = append(l.Filters, fr)
 }
 
 // exclude.c:check_filter
 func (l *filterRuleList) matches(name string) bool {
-	for _, fr := range l.filters {
+	for _, fr := range l.Filters {
 		if fr.matches(name) {
 			return true
 		}
@@ -37,7 +37,7 @@ func (l *filterRuleList) matches(name string) bool {
 }
 
 // exclude.c:recv_filter_list
-func recvFilterList(c *rsyncwire.Conn) (*filterRuleList, error) {
+func RecvFilterList(c *rsyncwire.Conn) (*filterRuleList, error) {
 	var l filterRuleList
 	const exclusionListEnd = 0
 	for {

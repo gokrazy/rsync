@@ -1,6 +1,6 @@
 //go:build !linux && !darwin
 
-package rsyncd
+package sender
 
 import "io/fs"
 

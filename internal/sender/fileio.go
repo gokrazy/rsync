@@ -1,4 +1,4 @@
-package rsyncd
+package sender
 
 import (
 	"io"
