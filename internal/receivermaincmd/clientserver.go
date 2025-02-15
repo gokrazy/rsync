@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"io"
 	"net"
-	"net/url"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -14,17 +14,15 @@ import (
 	"github.com/gokrazy/rsync/internal/log"
 	"github.com/gokrazy/rsync/internal/receiver"
 	"github.com/gokrazy/rsync/internal/rsyncopts"
+	"github.com/gokrazy/rsync/internal/rsyncstats"
 )
 
 // rsync/clientserver.c:start_socket_client
-func socketClient(osenv receiver.Osenv, opts *rsyncopts.Options, src, dest string) (*receiver.Stats, error) {
-	u, err := url.Parse(src)
-	if err != nil {
-		return nil, err
-	}
-	host := u.Host
-	if _, _, err := net.SplitHostPort(host); err != nil {
+func socketClient(osenv receiver.Osenv, opts *rsyncopts.Options, host string, path string, port int, dest string) (*rsyncstats.TransferStats, error) {
+	if port == 0 {
 		host += ":873" // rsync daemon port
+	} else {
+		host += ":" + strconv.Itoa(port)
 	}
 	dialer := net.Dialer{}
 	timeoutStr := ""
@@ -37,7 +35,6 @@ func socketClient(osenv receiver.Osenv, opts *rsyncopts.Options, src, dest strin
 	if err != nil {
 		return nil, err
 	}
-	path := strings.TrimPrefix(u.Path, "/")
 	if path == "" {
 		return nil, fmt.Errorf("empty remote path")
 	}

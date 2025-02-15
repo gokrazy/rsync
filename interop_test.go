@@ -27,6 +27,11 @@ func TestMain(m *testing.M) {
 		if err := maincmd.Main(context.Background(), os.Args, os.Stdin, os.Stdout, os.Stderr, nil); err != nil {
 			log.Fatal(err)
 		}
+	} else if len(os.Args) > 1 && os.Args[1] == "--server" {
+		// gokr-rsync is calling this process as a local daemon.
+		if err := maincmd.Main(context.Background(), os.Args, os.Stdin, os.Stdout, os.Stderr, nil); err != nil {
+			log.Fatal(err)
+		}
 	} else {
 		os.Exit(m.Run())
 	}

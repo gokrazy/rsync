@@ -4,29 +4,21 @@ import (
 	"fmt"
 	"sort"
 
+	"github.com/gokrazy/rsync/internal/rsyncstats"
 	"github.com/gokrazy/rsync/internal/rsyncwire"
 )
 
-type Stats struct {
-	Read    int64 // total bytes read (from network connection)
-	Written int64 // total bytes written (to network connection)
-	Size    int64 // total size of files
-}
-
 // rsync/main.c:client_run am_sender
-func (st *Transfer) Do(crd *rsyncwire.CountingReader, cwr *rsyncwire.CountingWriter, modName, modPath string, paths []string) (*Stats, error) {
-	// receive the exclusion list (openrsync’s is always empty)
-	exclusionList, err := RecvFilterList(st.Conn)
-	if err != nil {
-		return nil, err
+func (st *Transfer) Do(crd *rsyncwire.CountingReader, cwr *rsyncwire.CountingWriter, modPrefix, modPath string, paths []string, exclusionList *filterRuleList) (*rsyncstats.TransferStats, error) {
+	if exclusionList == nil {
+		exclusionList = &filterRuleList{}
 	}
-	st.Logger.Printf("exclusion list read (entries: %d)", len(exclusionList.Filters))
 
 	// “Update exchange” as per
 	// https://github.com/kristapsdz/openrsync/blob/master/rsync.5
 
 	// send file list
-	fileList, err := st.SendFileList(modName, modPath, st.Opts, paths, exclusionList)
+	fileList, err := st.SendFileList(modPrefix, modPath, st.Opts, paths, exclusionList)
 	if err != nil {
 		return nil, err
 	}
@@ -68,7 +60,7 @@ func (st *Transfer) Do(crd *rsyncwire.CountingReader, cwr *rsyncwire.CountingWri
 		return nil, fmt.Errorf("protocol error: expected final -1, got %d", finish)
 	}
 
-	return &Stats{
+	return &rsyncstats.TransferStats{
 		Read:    crd.BytesRead,
 		Written: cwr.BytesWritten,
 		Size:    fileList.TotalSize,

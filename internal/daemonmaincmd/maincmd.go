@@ -37,6 +37,7 @@ func (r *readWriter) Read(p []byte) (n int, err error)  { return r.r.Read(p) }
 func (r *readWriter) Write(p []byte) (n int, err error) { return r.w.Write(p) }
 
 func Main(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer, cfg *rsyncdconfig.Config) error {
+	log.Printf("daemon.Main(args=%q", args)
 	pc, err := rsyncopts.ParseArguments(args[1:], true)
 	if err != nil {
 		return err
@@ -75,10 +76,6 @@ func Main(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer,
 		if err != nil {
 			return err
 		}
-		mod := rsyncd.Module{
-			Name: "implicit",
-			Path: "/",
-		}
 
 		// TODO: copy seed+multiplex error handling from handleDaemonConn
 
@@ -90,10 +87,10 @@ func Main(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer,
 			return fmt.Errorf("protocol error: got %q, expected %q", got, want)
 		}
 		paths := remaining[1:]
-
+		log.Printf("paths: %q", paths)
 		crd, cwr := rsyncwire.CounterPair(stdin, stdout)
 		rd := crd
-		return srv.HandleConn(mod, rd, crd, cwr, paths, opts, true)
+		return srv.HandleConn(nil, rd, crd, cwr, paths, opts, true)
 	}
 
 	if !opts.Daemon() {

@@ -45,8 +45,19 @@ var (
 	lookupGroupOnce sync.Once
 )
 
+func getRootStrip(requested, localDir, trimPrefix string) (string, string) {
+	root := strings.TrimPrefix(requested, trimPrefix)
+	root = filepath.Clean(localDir + "/" + root)
+
+	strip := filepath.Dir(filepath.Clean(root)) + "/"
+	if strings.HasSuffix(requested, "/") {
+		strip = filepath.Clean(root) + "/"
+	}
+	return root, strip
+}
+
 // rsync/flist.c:send_file_list
-func (st *Transfer) SendFileList(modName, modPath string, opts *rsyncopts.Options, paths []string, excl *filterRuleList) (*fileList, error) {
+func (st *Transfer) SendFileList(trimPrefix, localDir string, opts *rsyncopts.Options, paths []string, excl *filterRuleList) (*fileList, error) {
 	var fileList fileList
 	fec := &rsyncwire.Buffer{}
 
@@ -58,18 +69,12 @@ func (st *Transfer) SendFileList(modName, modPath string, opts *rsyncopts.Option
 	// TODO: handle info == nil case (permission denied?): should set an i/o
 	// error flag, but traversal should continue
 
-	st.Logger.Printf("sendFileList(module=%q)", modName)
+	st.Logger.Printf("sendFileList()")
 	// TODO: handle |root| referring to an individual file, symlink or special (skip)
 	for _, requested := range paths {
-		modRoot := modPath
-		st.Logger.Printf("  path %q (module root %q)", requested, modRoot)
-		root := strings.TrimPrefix(requested, modName+"/")
-		root = filepath.Clean(modPath + "/" + root)
-		// st.logger.Printf("  filepath.Walk(%q)", root)
-		strip := filepath.Dir(filepath.Clean(root)) + "/"
-		if strings.HasSuffix(requested, "/") {
-			strip = filepath.Clean(root) + "/"
-		}
+		st.Logger.Printf("  path %q (local dir %q)", requested, localDir)
+		root, strip := getRootStrip(requested, localDir, trimPrefix)
+		st.Logger.Printf("  filepath.Walk(%q), strip=%q", root, strip)
 		err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
 			// st.logger.Printf("filepath.WalkFn(path=%s)", path)
 			if err != nil {

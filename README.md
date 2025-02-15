@@ -15,8 +15,6 @@ This repository currently contains:
 
 The following known improvements are not yet implemented:
 
-* Making `gokr-rsync` also implement an rsync sender so that it can **push**
-  (upload) files to a remote rsync server (daemon protocol or SSH).
 * Making `gokr-rsync` chroot (and/or Linux mount namespaces when available?)
   into the destination directory to reduce chances of accidental file system
   manipulation in case of bugs.

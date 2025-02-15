@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"unicode"
@@ -14,7 +15,9 @@ import (
 	"github.com/gokrazy/rsync/internal/log"
 	"github.com/gokrazy/rsync/internal/receiver"
 	"github.com/gokrazy/rsync/internal/rsyncopts"
+	"github.com/gokrazy/rsync/internal/rsyncstats"
 	"github.com/gokrazy/rsync/internal/rsyncwire"
+	"github.com/gokrazy/rsync/internal/sender"
 	"github.com/google/shlex"
 )
 
@@ -129,7 +132,7 @@ func checkForHostspec(src string) (host, path string, port int, _ error) {
 }
 
 // rsync/main.c:start_client
-func rsyncMain(osenv receiver.Osenv, opts *rsyncopts.Options, sources []string, dest string) (*receiver.Stats, error) {
+func rsyncMain(osenv receiver.Osenv, opts *rsyncopts.Options, sources []string, dest string) (*rsyncstats.TransferStats, error) {
 	log.Printf("dest: %q, sources: %q", dest, sources)
 	log.Printf("opts: %+v", opts)
 	for _, src := range sources {
@@ -138,8 +141,27 @@ func rsyncMain(osenv receiver.Osenv, opts *rsyncopts.Options, sources []string, 
 		host, path, port, err := checkForHostspec(src)
 		log.Printf("host=%q, path=%q, port=%d, err=%v", host, path, port, err)
 		if err != nil {
-			// TODO: source is local, check dest arg
-			return nil, fmt.Errorf("push not yet implemented")
+			// source is local, check dest arg
+			opts.SetSender()
+			// TODO: remote_argv == "."?
+			host, path, port, err = checkForHostspec(dest)
+			log.Printf("host=%q, path=%q, port=%d, err=%v", host, path, port, err)
+			if path == "" {
+				log.Printf("source and dest are both local!")
+				host = ""
+				port = 0
+				path = dest
+				opts.SetLocalServer()
+			} else {
+				// dest is remote
+				if port != 0 {
+					if opts.ShellCommand() != "" {
+						daemonConnection = 1 // daemon via remote shell
+					} else {
+						daemonConnection = -1 // daemon via socket
+					}
+				}
+			}
 		} else {
 			// source is remote
 			if port != 0 {
@@ -150,48 +172,55 @@ func rsyncMain(osenv receiver.Osenv, opts *rsyncopts.Options, sources []string, 
 				}
 			}
 		}
+
+		// TODO: if opts.AmSender(), verify extra source args have no hostspec
+		other := dest
+		if opts.Sender() {
+			other = src
+		}
+
 		module := path
 		if idx := strings.IndexByte(module, '/'); idx > -1 {
 			module = module[:idx]
 		}
-		log.Printf("module=%q, path=%q", module, path)
+		log.Printf("module=%q, path=%q, other=%q", module, path, other)
 
 		if daemonConnection < 0 {
-			stats, err := socketClient(osenv, opts, src, dest)
-			if err != nil {
-				return nil, err
-			}
-			return stats, nil
-		} else {
-			machine := host
-			user := ""
-			if idx := strings.IndexByte(machine, '@'); idx > -1 {
-				user = machine[:idx]
-				machine = machine[idx+1:]
-			}
-			rc, wc, err := doCmd(opts, machine, user, path, daemonConnection)
-			if err != nil {
-				return nil, err
-			}
-			defer rc.Close()
-			defer wc.Close()
-			conn := &readWriter{
-				Reader: rc,
-				Writer: wc,
-			}
-			negotiate := true
-			if daemonConnection != 0 {
-				if err := startInbandExchange(opts, conn, module, path); err != nil {
-					return nil, err
-				}
-				negotiate = false // already done
-			}
-			stats, err := clientRun(osenv, opts, conn, dest, negotiate)
+			stats, err := socketClient(osenv, opts, host, path, port, other)
 			if err != nil {
 				return nil, err
 			}
 			return stats, nil
 		}
+
+		machine := host
+		user := ""
+		if idx := strings.IndexByte(machine, '@'); idx > -1 {
+			user = machine[:idx]
+			machine = machine[idx+1:]
+		}
+		rc, wc, err := doCmd(opts, machine, user, path, daemonConnection)
+		if err != nil {
+			return nil, err
+		}
+		defer rc.Close()
+		defer wc.Close()
+		conn := &readWriter{
+			Reader: rc,
+			Writer: wc,
+		}
+		negotiate := true
+		if daemonConnection != 0 {
+			if err := startInbandExchange(opts, conn, module, path); err != nil {
+				return nil, err
+			}
+			negotiate = false // already done
+		}
+		stats, err := clientRun(osenv, opts, conn, other, negotiate)
+		if err != nil {
+			return nil, err
+		}
+		return stats, nil
 	}
 	return nil, nil
 }
@@ -211,29 +240,39 @@ func (prw *readWriter) Write(p []byte) (n int, err error) {
 
 // rsync/main.c:do_cmd
 func doCmd(opts *rsyncopts.Options, machine, user, path string, daemonConnection int) (io.ReadCloser, io.WriteCloser, error) {
-	cmd := opts.ShellCommand()
-	if cmd == "" {
-		cmd = "ssh"
-		if e := os.Getenv("RSYNC_RSH"); e != "" {
-			cmd = e
+	log.Printf("doCmd(machine=%q, user=%q, path=%q, daemonConnection=%d)",
+		machine, user, path, daemonConnection)
+	var args []string
+	if !opts.LocalServer() {
+		cmd := opts.ShellCommand()
+		if cmd == "" {
+			cmd = "ssh"
+			if e := os.Getenv("RSYNC_RSH"); e != "" {
+				cmd = e
+			}
 		}
+
+		// We use shlex.Split(), whereas rsync implements its own shell-style-like
+		// parsing. The nuances likely don’t matter to any users, and if so, users
+		// might prefer shell-style parsing.
+		var err error
+		args, err = shlex.Split(cmd)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		if user != "" && daemonConnection == 0 /* && !dashlset */ {
+			args = append(args, "-l", user)
+		}
+
+		args = append(args, machine)
+
+		args = append(args, "rsync") // TODO: flag
+	} else {
+		// NOTE: tridge rsync will fork and run child_main(), but we create a
+		// new process because that is much simpler/cleaner in Go.
+		args = append(args, os.Args[0])
 	}
-
-	// We use shlex.Split(), whereas rsync implements its own shell-style-like
-	// parsing. The nuances likely don’t matter to any users, and if so, users
-	// might prefer shell-style parsing.
-	args, err := shlex.Split(cmd)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	if user != "" && daemonConnection == 0 /* && !dashlset */ {
-		args = append(args, "-l", user)
-	}
-
-	args = append(args, machine)
-
-	args = append(args, "rsync") // TODO: flag
 
 	if daemonConnection > 0 {
 		args = append(args, "--server", "--daemon")
@@ -274,10 +313,12 @@ func doCmd(opts *rsyncopts.Options, machine, user, path string, daemonConnection
 }
 
 // rsync/main.c:client_run
-func clientRun(osenv receiver.Osenv, opts *rsyncopts.Options, conn io.ReadWriter, dest string, negotiate bool) (*receiver.Stats, error) {
+func clientRun(osenv receiver.Osenv, opts *rsyncopts.Options, conn io.ReadWriter, other string, negotiate bool) (*rsyncstats.TransferStats, error) {
+	crd := &rsyncwire.CountingReader{R: conn}
+	cwr := &rsyncwire.CountingWriter{W: conn}
 	c := &rsyncwire.Conn{
-		Reader: conn,
-		Writer: conn,
+		Reader: crd,
+		Writer: cwr,
 	}
 
 	if negotiate {
@@ -304,6 +345,25 @@ func clientRun(osenv receiver.Osenv, opts *rsyncopts.Options, conn io.ReadWriter
 	rd := bufio.NewReaderSize(mrd, 256*1024)
 	c.Reader = rd
 
+	if opts.Sender() {
+		st := &sender.Transfer{
+			Logger: log.Default(), // TODO: plumb logging
+			Opts:   opts,
+			Conn:   c,
+			Seed:   seed,
+		}
+		log.Printf("sender(other=%q)", other)
+		trimPrefix := filepath.Base(filepath.Clean(other))
+		if strings.HasSuffix(other, "/") {
+			trimPrefix += "/"
+		}
+		stats, err := st.Do(crd, cwr, trimPrefix, other, []string{trimPrefix}, nil)
+		if err != nil {
+			return nil, err
+		}
+		return stats, nil
+	}
+
 	rt := &receiver.Transfer{
 		Opts: &receiver.TransferOpts{
 			Verbose: opts.Verbose(),
@@ -319,11 +379,12 @@ func clientRun(osenv receiver.Osenv, opts *rsyncopts.Options, conn io.ReadWriter
 			PreserveTimes:     opts.PreserveMTimes(),
 			PreserveHardlinks: opts.PreserveHardLinks(),
 		},
-		Dest: dest,
+		Dest: other,
 		Env:  osenv,
 		Conn: c,
 		Seed: seed,
 	}
+	log.Printf("receiving to dest=%s", rt.Dest)
 
 	// TODO: this is different for client/server
 	// client always sends exclusion list, server always receives
@@ -347,7 +408,7 @@ func clientRun(osenv receiver.Osenv, opts *rsyncopts.Options, conn io.ReadWriter
 	return rt.Do(c, fileList, false)
 }
 
-func Main(args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer) (*receiver.Stats, error) {
+func Main(args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer) (*rsyncstats.TransferStats, error) {
 	osenv := receiver.Osenv{
 		Stdin:  stdin,
 		Stdout: stdout,

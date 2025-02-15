@@ -244,11 +244,11 @@ func (s *Server) HandleDaemonConn(ctx context.Context, conn io.ReadWriter, remot
 	paths := remaining[1:]
 	s.logger.Printf("paths: %q", paths)
 
-	return s.HandleConn(module, rd, crd, cwr, paths, opts, false)
+	return s.HandleConn(&module, rd, crd, cwr, paths, opts, false)
 }
 
 // handleConn is equivalent to rsync/main.c:start_server
-func (s *Server) HandleConn(module Module, rd io.Reader, crd *rsyncwire.CountingReader, cwr *rsyncwire.CountingWriter, paths []string, opts *rsyncopts.Options, negotiate bool) (err error) {
+func (s *Server) HandleConn(module *Module, rd io.Reader, crd *rsyncwire.CountingReader, cwr *rsyncwire.CountingWriter, paths []string, opts *rsyncopts.Options, negotiate bool) (err error) {
 	// “SHOULD be unique to each connection” as per
 	// https://github.com/JohannesBuchner/Jarsync/blob/master/jarsync/rsync.txt
 	//
@@ -301,8 +301,18 @@ func (s *Server) HandleConn(module Module, rd io.Reader, crd *rsyncwire.Counting
 }
 
 // handleConnReceiver is equivalent to rsync/main.c:do_server_recv
-func (s *Server) handleConnReceiver(module Module, crd *rsyncwire.CountingReader, cwr *rsyncwire.CountingWriter, paths []string, opts *rsyncopts.Options, negotiate bool, c *rsyncwire.Conn, sessionChecksumSeed int32) (err error) {
-	s.logger.Printf("handleConnReceiver")
+func (s *Server) handleConnReceiver(module *Module, crd *rsyncwire.CountingReader, cwr *rsyncwire.CountingWriter, paths []string, opts *rsyncopts.Options, negotiate bool, c *rsyncwire.Conn, sessionChecksumSeed int32) (err error) {
+	if module == nil {
+		if len(paths) != 1 {
+			return fmt.Errorf("precisely one destination path required, got %q", paths)
+		}
+		module = &Module{
+			Name:     "implicit",
+			Path:     paths[0],
+			Writable: true,
+		}
+	}
+	s.logger.Printf("handleConnReceiver(module=%+v)", module)
 
 	if !module.Writable {
 		return fmt.Errorf("ERROR: module is read only")
@@ -359,14 +369,28 @@ func (s *Server) handleConnReceiver(module Module, crd *rsyncwire.CountingReader
 }
 
 // handleConnSender is equivalent to rsync/main.c:do_server_sender
-func (s *Server) handleConnSender(module Module, crd *rsyncwire.CountingReader, cwr *rsyncwire.CountingWriter, paths []string, opts *rsyncopts.Options, negotiate bool, c *rsyncwire.Conn, sessionChecksumSeed int32) (err error) {
+func (s *Server) handleConnSender(module *Module, crd *rsyncwire.CountingReader, cwr *rsyncwire.CountingWriter, paths []string, opts *rsyncopts.Options, negotiate bool, c *rsyncwire.Conn, sessionChecksumSeed int32) (err error) {
+	if module == nil {
+		module = &Module{
+			Name: "implicit",
+			Path: "/",
+		}
+	}
+
 	st := &sender.Transfer{
 		Logger: s.logger,
 		Opts:   opts,
 		Conn:   c,
 		Seed:   sessionChecksumSeed,
 	}
-	stats, err := st.Do(crd, cwr, module.Name, module.Path, paths)
+	// receive the exclusion list (openrsync’s is always empty)
+	exclusionList, err := sender.RecvFilterList(st.Conn)
+	if err != nil {
+		return err
+	}
+	st.Logger.Printf("exclusion list read (entries: %d)", len(exclusionList.Filters))
+
+	stats, err := st.Do(crd, cwr, module.Name+"/", module.Path, paths, exclusionList)
 	if err != nil {
 		return err
 	}

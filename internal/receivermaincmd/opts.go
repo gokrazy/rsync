@@ -18,7 +18,9 @@ func serverOptions(clientOptions *rsyncopts.Options) []string {
 	// 	return;
 	// }
 
-	sargv = append(sargv, "--sender")
+	if !clientOptions.Sender() {
+		sargv = append(sargv, "--sender")
+	}
 
 	argstr := "-"
 	// x = 1;

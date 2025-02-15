@@ -7,15 +7,10 @@ import (
 	"strings"
 
 	"github.com/gokrazy/rsync/internal/log"
+	"github.com/gokrazy/rsync/internal/rsyncstats"
 	"github.com/gokrazy/rsync/internal/rsyncwire"
 	"golang.org/x/sync/errgroup"
 )
-
-type Stats struct {
-	Read    int64 // total bytes read (from network connection)
-	Written int64 // total bytes written (to network connection)
-	Size    int64 // total size of files
-}
 
 func isTopDir(f *File) bool {
 	// TODO: once we check the f.Flags:
@@ -77,7 +72,7 @@ func (rt *Transfer) deleteFiles(fileList []*File) error {
 }
 
 // rsync/main.c:do_recv
-func (rt *Transfer) Do(c *rsyncwire.Conn, fileList []*File, noReport bool) (*Stats, error) {
+func (rt *Transfer) Do(c *rsyncwire.Conn, fileList []*File, noReport bool) (*rsyncstats.TransferStats, error) {
 	if rt.Opts.DeleteMode {
 		if err := rt.deleteFiles(fileList); err != nil {
 			return nil, err
@@ -107,7 +102,7 @@ func (rt *Transfer) Do(c *rsyncwire.Conn, fileList []*File, noReport bool) (*Sta
 		return nil, err
 	}
 
-	var stats *Stats
+	var stats *rsyncstats.TransferStats
 	if !noReport {
 		var err error
 		stats, err = report(c)
@@ -125,7 +120,7 @@ func (rt *Transfer) Do(c *rsyncwire.Conn, fileList []*File, noReport bool) (*Sta
 }
 
 // rsync/main.c:report
-func report(c *rsyncwire.Conn) (*Stats, error) {
+func report(c *rsyncwire.Conn) (*rsyncstats.TransferStats, error) {
 	// read statistics:
 	// total bytes read (from network connection)
 	read, err := c.ReadInt64()
@@ -144,7 +139,7 @@ func report(c *rsyncwire.Conn) (*Stats, error) {
 	}
 	log.Printf("server sent stats: read=%d, written=%d, size=%d", read, written, size)
 
-	return &Stats{
+	return &rsyncstats.TransferStats{
 		Read:    read,
 		Written: written,
 		Size:    size,

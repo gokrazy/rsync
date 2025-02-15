@@ -130,6 +130,7 @@ type Options struct {
 	// not directly referenced in the table, but used in the special case code.
 	do_compression int
 	info           [COUNT_INFO]uint16
+	local_server   int
 
 	// order matches long_options order
 	verbose                int
@@ -564,6 +565,9 @@ func (o *Options) Recurse() bool              { return o.recurse != 0 }
 func (o *Options) Verbose() bool              { return o.verbose != 0 }
 func (o *Options) DeleteMode() bool           { return o.delete_mode != 0 }
 func (o *Options) Sender() bool               { return o.am_sender != 0 }
+func (o *Options) SetSender()                 { o.am_sender = 1 }
+func (o *Options) LocalServer() bool          { return o.local_server != 0 }
+func (o *Options) SetLocalServer()            { o.local_server = 1 }
 func (o *Options) Server() bool               { return o.am_server != 0 }
 func (o *Options) Daemon() bool               { return o.am_daemon != 0 }
 func (o *Options) ConnectTimeoutSeconds() int { return o.connect_timeout }
