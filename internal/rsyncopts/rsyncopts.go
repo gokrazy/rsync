@@ -880,12 +880,12 @@ func ParseArguments(args []string, gokrazyTable bool) (*Context, error) {
 	}
 
 	for {
-		opt := pc.poptGetNextOpt()
+		opt, err := pc.poptGetNextOpt()
+		if err != nil {
+			return nil, err
+		}
 		if opt == -1 {
 			break // done
-		}
-		if opt < 0 {
-			return nil, fmt.Errorf("<0 retval: %v", opt)
 		}
 		// Most options are handled by poptGetNextOpt, only special cases
 		// are returned and handled here.
@@ -915,12 +915,12 @@ func ParseArguments(args []string, gokrazyTable bool) (*Context, error) {
 			}
 
 			for {
-				opt := pc.poptGetNextOpt()
+				opt, err := pc.poptGetNextOpt()
+				if err != nil {
+					return nil, err
+				}
 				if opt == -1 {
 					break // done
-				}
-				if opt < 0 {
-					return nil, fmt.Errorf("<0 retval: %v", opt)
 				}
 				// Most options are handled by poptGetNextOpt, only special cases
 				// are returned and handled here.

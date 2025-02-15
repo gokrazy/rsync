@@ -169,7 +169,7 @@ func TestParseArguments(t *testing.T) {
 func TestParseArgumentsError(t *testing.T) {
 	for _, tt := range []struct {
 		args []string
-		want int
+		want int32
 	}{
 		{
 			args: []string{"--delete=thoroughly"},
@@ -181,11 +181,9 @@ func TestParseArgumentsError(t *testing.T) {
 			if err == nil {
 				t.Fatalf("ParseArguments unexpectedly did not fail!")
 			}
-			// TODO: programmatically inspectable error
-			want := fmt.Sprintf("<0 retval: %v", tt.want)
-			got := err.Error()
-			if got != want {
-				t.Errorf("unexpected error: got %q, want %q", got, want)
+			got := err.(*PoptError).Errno
+			if got != tt.want {
+				t.Errorf("unexpected error: got %q, want %q", got, tt.want)
 			}
 		})
 	}

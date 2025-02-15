@@ -1,6 +1,7 @@
 package rsyncopts
 
 import (
+	"fmt"
 	"math"
 	"strconv"
 	"strings"
@@ -14,6 +15,13 @@ type poptOption struct {
 	val       int // 0 means don't return, just update arg
 	// descrip    string
 	// argDescrip string
+}
+
+func (o *poptOption) name() string {
+	if o.longName == "" {
+		return "-" + o.shortName
+	}
+	return "--" + o.longName
 }
 
 // see popt(3)
@@ -44,6 +52,15 @@ const (
 const (
 	POPT_BIT_SET = POPT_ARG_VAL | POPT_ARGFLAG_OR
 )
+
+type PoptError struct {
+	Errno int32
+	Err   error
+}
+
+func (pe *PoptError) Unwrap() error { return pe.Err }
+
+func (pe *PoptError) Error() string { return pe.Err.Error() }
 
 // TODO(later): turn these into sentinel error values
 // which stringify like poptStrerror()
@@ -125,19 +142,22 @@ func (pc *Context) poptSaveArg(opt *poptOption, nextArg string) int32 {
 	return POPT_ERROR_BADOPERATION
 }
 
-func (pc *Context) poptGetNextOpt() int32 {
+func (pc *Context) poptGetNextOpt() (int32, error) {
 	var opt *poptOption
 	for {
 		var longArg string
 		if pc.nextCharArg == "" && len(pc.args) == 0 {
-			return -1 // done
+			return -1, nil // done
 		}
 		if pc.nextCharArg == "" {
 			// process next long option
 			origOptString := pc.args[0]
 			pc.args = pc.args[1:]
 			if origOptString == "" {
-				return POPT_ERROR_BADOPT
+				return -1, &PoptError{
+					Errno: POPT_ERROR_BADOPT,
+					Err:   fmt.Errorf("unknown option: origOptString empty"),
+				}
 			}
 			if origOptString[0] != '-' || origOptString == "-" {
 				pc.RemainingArgs = append(pc.RemainingArgs, origOptString)
@@ -164,18 +184,27 @@ func (pc *Context) poptGetNextOpt() int32 {
 			// process next short option
 			opt = pc.findOption("", pc.nextCharArg[:1])
 			if opt == nil {
-				return POPT_ERROR_BADOPT
+				return -1, &PoptError{
+					Errno: POPT_ERROR_BADOPT,
+					Err:   fmt.Errorf("option %q not found", pc.nextCharArg[:1]),
+				}
 			}
 			pc.nextCharArg = pc.nextCharArg[1:]
 		}
 		if opt == nil {
 			// neither long nor short? how can we end up here?
-			return POPT_ERROR_BADOPT
+			return -1, &PoptError{
+				Errno: POPT_ERROR_BADOPT,
+				Err:   fmt.Errorf("neither long nor short option found?!"),
+			}
 		}
 		argType := opt.argInfo & POPT_ARG_MASK
 		if argType == POPT_ARG_NONE || argType == POPT_ARG_VAL {
 			if longArg != "" || strings.HasPrefix(pc.nextCharArg, "=") {
-				return POPT_ERROR_UNWANTEDARG
+				return -1, &PoptError{
+					Errno: POPT_ERROR_UNWANTEDARG,
+					Err:   fmt.Errorf("option %s does not take an argument", opt.name()),
+				}
 			}
 			if opt.arg != nil {
 				val := 1
@@ -183,7 +212,10 @@ func (pc *Context) poptGetNextOpt() int32 {
 					val = opt.val
 				}
 				if !pc.poptSaveInt(opt, val) {
-					return POPT_ERROR_BADOPERATION
+					return -1, &PoptError{
+						Errno: POPT_ERROR_BADOPERATION,
+						Err:   fmt.Errorf("poptSaveInt"),
+					}
 				}
 			}
 		} else {
@@ -194,7 +226,10 @@ func (pc *Context) poptGetNextOpt() int32 {
 				pc.nextCharArg = ""
 			} else {
 				if len(pc.args) == 0 {
-					return POPT_ERROR_NOARG
+					return -1, &PoptError{
+						Errno: POPT_ERROR_NOARG,
+						Err:   fmt.Errorf("missing argument for option %s", opt.name()),
+					}
 				}
 				nextArg = pc.args[0]
 				pc.args = pc.args[1:]
@@ -202,12 +237,15 @@ func (pc *Context) poptGetNextOpt() int32 {
 			pc.nextArg = nextArg
 			if opt.arg != nil {
 				if errno := pc.poptSaveArg(opt, nextArg); errno != 0 {
-					return errno
+					return -1, &PoptError{
+						Errno: errno,
+						Err:   fmt.Errorf("poptSaveArg"),
+					}
 				}
 			}
 		}
 		if opt.val != 0 && argType != POPT_ARG_VAL {
-			return int32(opt.val)
+			return int32(opt.val), nil
 		}
 	}
 }
