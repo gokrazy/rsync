@@ -13,6 +13,8 @@ import (
 )
 
 func TestSyncExtended(t *testing.T) {
+	rsyncBin := rsynctest.TridgeOrGTFO(t, "TODO: reason")
+
 	tmp := t.TempDir()
 	source := filepath.Join(tmp, "source")
 	dest := filepath.Join(tmp, "dest")
@@ -27,7 +29,7 @@ func TestSyncExtended(t *testing.T) {
 	srv := rsynctest.New(t, rsynctest.InteropModule(source))
 
 	sync := func() *rsyncparse.Stats {
-		rsync := exec.Command("rsync", //"/home/michael/src/openrsync/openrsync",
+		rsync := exec.Command(rsyncBin,
 			//		"--debug=all4",
 			"--archive",
 			// A verbosity level of 3 is enough, any higher than that and rsync

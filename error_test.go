@@ -27,7 +27,7 @@ func TestErrors(t *testing.T) {
 
 	// sync into dest dir
 	var buf bytes.Buffer
-	rsync := exec.Command("rsync", //"/home/michael/src/openrsync/openrsync",
+	rsync := exec.Command(rsynctest.AnyRsync(t),
 		//		"--debug=all4",
 		"--archive",
 		"-v", "-v", "-v", "-v",
@@ -60,7 +60,7 @@ func TestNoSuchModule(t *testing.T) {
 
 	// sync into dest dir
 	var buf bytes.Buffer
-	rsync := exec.Command("rsync", //"/home/michael/src/openrsync/openrsync",
+	rsync := exec.Command(rsynctest.AnyRsync(t),
 		//		"--debug=all4",
 		"--archive",
 		"-v", "-v", "-v", "-v",
@@ -109,7 +109,7 @@ func TestNoReadPermission(t *testing.T) {
 
 	// sync into dest dir
 	var buf bytes.Buffer
-	rsync := exec.Command("rsync", //"/home/michael/src/openrsync/openrsync",
+	rsync := exec.Command(rsynctest.AnyRsync(t),
 		//		"--debug=all4",
 		"--archive",
 		"-v", "-v", "-v", "-v",

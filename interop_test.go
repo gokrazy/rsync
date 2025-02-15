@@ -40,8 +40,7 @@ func TestMain(m *testing.M) {
 func TestRsyncVersion(t *testing.T) {
 	// This function is not an actual test, just used to include the rsync
 	// version in test output.
-	rsync := exec.Command("rsync", //"/home/michael/src/openrsync/openrsync",
-		"--version")
+	rsync := exec.Command(rsynctest.AnyRsync(t), "--version")
 	rsync.Stdout = os.Stdout
 	rsync.Stderr = os.Stderr
 	if err := rsync.Run(); err != nil {
@@ -49,7 +48,21 @@ func TestRsyncVersion(t *testing.T) {
 	}
 }
 
+func TestTridgeRsyncVersion(t *testing.T) {
+	// This function is not an actual test, just used to include the rsync
+	// version in test output.
+	rsyncBin := rsynctest.TridgeOrGTFO(t, "--version")
+	tridgeRsync := exec.Command(rsyncBin, "--version")
+	tridgeRsync.Stdout = os.Stdout
+	tridgeRsync.Stderr = os.Stderr
+	if err := tridgeRsync.Run(); err != nil {
+		t.Fatalf("%v: %v", tridgeRsync.Args, err)
+	}
+}
+
 func TestModuleListing(t *testing.T) {
+	rsyncBin := rsynctest.TridgeOrGTFO(t, "TODO: add reason")
+
 	tmp := t.TempDir()
 
 	// start a server to sync from
@@ -57,7 +70,7 @@ func TestModuleListing(t *testing.T) {
 
 	// request module list
 	var buf bytes.Buffer
-	rsync := exec.Command("rsync", //"/home/michael/src/openrsync/openrsync",
+	rsync := exec.Command(rsyncBin,
 		//		"--debug=all4",
 		"--archive",
 		"-v", "-v", "-v", "-v",
@@ -126,7 +139,7 @@ func TestInterop(t *testing.T) {
 	// 		if err := os.WriteFile(config, []byte(rsyncdConfig), 0644); err != nil {
 	// 			t.Fatal(err)
 	// 		}
-	// 		srv := exec.Command("rsync",
+	// 		srv := exec.Command(rsynctest.AnyRsync(t),
 	// 			"--daemon",
 	// 			"--config="+config,
 	// 			"--verbose",
@@ -149,7 +162,7 @@ func TestInterop(t *testing.T) {
 	// 	}
 
 	// dry run (slight differences in protocol)
-	rsync := exec.Command("rsync", //"/home/michael/src/openrsync/openrsync",
+	rsync := exec.Command(rsynctest.AnyRsync(t),
 		//		"--debug=all4",
 		"--archive",
 		"-v", "-v", "-v", "-v",
@@ -165,7 +178,7 @@ func TestInterop(t *testing.T) {
 	}
 
 	// sync into dest dir
-	rsync = exec.Command("rsync", //"/home/michael/src/openrsync/openrsync",
+	rsync = exec.Command(rsynctest.AnyRsync(t),
 		//		"--debug=all4",
 		"--archive",
 		"-v", "-v", "-v", "-v",
@@ -205,7 +218,7 @@ func TestInterop(t *testing.T) {
 
 	// Run rsync again. This should not modify any files, but will result in
 	// rsync sending sums to the sender.
-	rsync = exec.Command("rsync", //"/home/michael/src/openrsync/openrsync",
+	rsync = exec.Command(rsynctest.AnyRsync(t),
 		//		"--debug=all4",
 		"--archive",
 		// TODO: should this be --checksum instead?
@@ -295,7 +308,7 @@ func TestInteropSubdir(t *testing.T) {
 	srv := rsynctest.New(t, rsynctest.InteropModule(source))
 
 	// sync into dest dir
-	rsync := exec.Command("rsync", //"/home/michael/src/openrsync/openrsync",
+	rsync := exec.Command(rsynctest.AnyRsync(t),
 		append(
 			append([]string{
 				//		"--debug=all4",
@@ -322,7 +335,7 @@ func TestInteropSubdirExclude(t *testing.T) {
 	srv := rsynctest.New(t, rsynctest.InteropModule(source))
 
 	// sync into dest dir
-	rsync := exec.Command("rsync", //"/home/michael/src/openrsync/openrsync",
+	rsync := exec.Command(rsynctest.AnyRsync(t),
 		append(
 			append([]string{
 				//		"--debug=all4",
@@ -374,7 +387,7 @@ func TestInteropSubdirExcludeMultipleNested(t *testing.T) {
 	srv := rsynctest.New(t, rsynctest.InteropModule(source))
 
 	// sync into dest dir
-	rsync := exec.Command("rsync", //"/home/michael/src/openrsync/openrsync",
+	rsync := exec.Command(rsynctest.AnyRsync(t),
 		append(
 			append([]string{
 				//		"--debug=all4",
@@ -417,7 +430,7 @@ func TestInteropRemoteCommand(t *testing.T) {
 	}
 
 	// sync into dest dir
-	rsync := exec.Command("rsync", //*/ "/home/michael/src/openrsync/openrsync",
+	rsync := exec.Command(rsynctest.AnyRsync(t),
 		append(
 			append([]string{
 				//		"--debug=all4",
@@ -439,6 +452,8 @@ func TestInteropRemoteCommand(t *testing.T) {
 }
 
 func TestInteropRemoteDaemon(t *testing.T) {
+	rsyncBin := rsynctest.TridgeOrGTFO(t, "TODO: reason")
+
 	tmp, source, dest := createSourceFiles(t)
 
 	homeDir := filepath.Join(tmp, "home")
@@ -480,7 +495,7 @@ func TestInteropRemoteDaemon(t *testing.T) {
 	// does openrsync send the wrong command?
 
 	// sync into dest dir
-	rsync := exec.Command("rsync", //*/ "/home/michael/src/openrsync/openrsync",
+	rsync := exec.Command(rsyncBin,
 		append(
 			append([]string{
 				//		"--debug=all4",
@@ -505,6 +520,8 @@ func TestInteropRemoteDaemon(t *testing.T) {
 }
 
 func TestInteropRemoteDaemonAnonSSH(t *testing.T) {
+	rsyncBin := rsynctest.TridgeOrGTFO(t, "TODO: reason")
+
 	tmp, source, dest := createSourceFiles(t)
 
 	// start a server to sync from
@@ -528,7 +545,7 @@ func TestInteropRemoteDaemonAnonSSH(t *testing.T) {
 	}
 
 	// sync into dest dir
-	rsync := exec.Command("rsync", //*/ "/home/michael/src/openrsync/openrsync",
+	rsync := exec.Command(rsyncBin,
 		append(
 			append([]string{
 				//		"--debug=all4",
@@ -549,6 +566,8 @@ func TestInteropRemoteDaemonAnonSSH(t *testing.T) {
 }
 
 func TestInteropRemoteDaemonAuthorizedSSHFail(t *testing.T) {
+	rsyncBin := rsynctest.TridgeOrGTFO(t, "TODO: reason")
+
 	tmp, source, dest := createSourceFiles(t)
 
 	// ensure the user running the tests (root when doing the privileged run!)
@@ -582,7 +601,7 @@ func TestInteropRemoteDaemonAuthorizedSSHFail(t *testing.T) {
 		}))
 
 	// sync into dest dir
-	rsync := exec.Command("rsync", //*/ "/home/michael/src/openrsync/openrsync",
+	rsync := exec.Command(rsyncBin,
 		append(
 			append([]string{
 				//		"--debug=all4",
@@ -599,6 +618,8 @@ func TestInteropRemoteDaemonAuthorizedSSHFail(t *testing.T) {
 }
 
 func TestInteropRemoteDaemonAuthorizedSSHPass(t *testing.T) {
+	rsyncBin := rsynctest.TridgeOrGTFO(t, "TODO: reason")
+
 	tmp, source, dest := createSourceFiles(t)
 
 	// ensure the user running the tests (root when doing the privileged run!)
@@ -636,7 +657,7 @@ func TestInteropRemoteDaemonAuthorizedSSHPass(t *testing.T) {
 		}))
 
 	// sync into dest dir
-	rsync := exec.Command("rsync", //*/ "/home/michael/src/openrsync/openrsync",
+	rsync := exec.Command(rsyncBin,
 		append(
 			append([]string{
 				//		"--debug=all4",

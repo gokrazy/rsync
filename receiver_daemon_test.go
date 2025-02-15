@@ -12,6 +12,8 @@ import (
 )
 
 func TestDaemonReceiverSync(t *testing.T) {
+	rsyncBin := rsynctest.TridgeOrGTFO(t, "TODO: reason")
+
 	tmp := t.TempDir()
 	source := filepath.Join(tmp, "source")
 	dest := filepath.Join(tmp, "dest")
@@ -25,7 +27,7 @@ func TestDaemonReceiverSync(t *testing.T) {
 	// start a server which receives data
 	srv := rsynctest.New(t, rsynctest.WritableInteropModule(dest))
 
-	rsync := exec.Command("rsync", //"/home/michael/src/openrsync/openrsync",
+	rsync := exec.Command(rsyncBin,
 		//		"--debug=all4",
 		"--archive",
 		// A verbosity level of 3 is enough, any higher than that and rsync
@@ -51,6 +53,8 @@ func TestDaemonReceiverSync(t *testing.T) {
 }
 
 func TestDaemonReceiverDelete(t *testing.T) {
+	rsyncBin := rsynctest.TridgeOrGTFO(t, "TODO: reason")
+
 	tmp := t.TempDir()
 	source := filepath.Join(tmp, "source")
 	dest := filepath.Join(tmp, "dest")
@@ -65,7 +69,7 @@ func TestDaemonReceiverDelete(t *testing.T) {
 	srv := rsynctest.New(t, rsynctest.WritableInteropModule(dest))
 
 	run := func() {
-		rsync := exec.Command("rsync", //"/home/michael/src/openrsync/openrsync",
+		rsync := exec.Command(rsyncBin,
 			//		"--debug=all4",
 			"--archive",
 			"--delete",

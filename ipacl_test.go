@@ -41,6 +41,8 @@ func (c *connWithRemoteAddr) RemoteAddr() net.Addr {
 }
 
 func TestIPACL(t *testing.T) {
+	rsyncBin := rsynctest.TridgeOrGTFO(t, "TODO: reason")
+
 	tmp := t.TempDir()
 	source := filepath.Join(tmp, "source")
 	dest := filepath.Join(tmp, "dest")
@@ -97,7 +99,7 @@ acl = [
 
 			// request module list: this should work regardless of the source IP
 			var buf bytes.Buffer
-			rsync := exec.Command("rsync", //"/home/michael/src/openrsync/openrsync",
+			rsync := exec.Command(rsyncBin,
 				//		"--debug=all4",
 				"--archive",
 				"-v", "-v", "-v", "-v",
@@ -117,7 +119,7 @@ acl = [
 			buf.Reset()
 			// actually transfer the interop module (in dry-run mode) to trigger
 			// the ACL check dry run (slight differences in protocol)
-			rsync = exec.Command("rsync", //"/home/michael/src/openrsync/openrsync",
+			rsync = exec.Command(rsynctest.AnyRsync(t),
 				//		"--debug=all4",
 				"--archive",
 				"-v", "-v", "-v", "-v",

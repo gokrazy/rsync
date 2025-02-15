@@ -11,6 +11,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strings"
 	"syscall"
 	"testing"
@@ -301,4 +302,42 @@ func DataFileMatches(fn string, headPattern, bodyPattern, endPattern []byte) err
 	}
 
 	return nil
+}
+
+func TridgeOrGTFO(t *testing.T, reason string) string {
+	// For tests that need tridge rsync, explicitly check
+	// a few well-known locations.
+	locations := []string{
+		// If rsync is installed from homebrew,
+		// that will typically be the latest / preferred version.
+		"/opt/homebrew/bin/rsync",
+	}
+	if runtime.GOOS == "darwin" {
+		// macOS 15 replaced rsync with a wrapper that
+		// dispatches to openrsync by default, unless
+		// it finds an option that it knows needs tridge rsync.
+		// They will probably stop shipping tridge rsync
+		// eventually, but for now check this location:
+		locations = append(locations, "/usr/libexec/rsync/rsync.samba")
+	}
+	for _, loc := range locations {
+		if _, err := os.Stat(loc); err == nil {
+			return loc
+		}
+	}
+	version, err := exec.Command("rsync", "--version").Output()
+	if err != nil {
+		// Gotta set some boundaries.
+		// We need *some* rsync.
+		t.Fatalf("no rsync installed")
+	}
+	if strings.Contains(string(version), "openrsync:") {
+		// we did not find tridge rsync and the default rsync is openrsync
+		t.Skipf("tridge rsync not found, cannot run this test: %v", reason)
+	}
+	return "rsync"
+}
+
+func AnyRsync(t *testing.T) string {
+	return "rsync"
 }

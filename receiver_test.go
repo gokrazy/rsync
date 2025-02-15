@@ -345,7 +345,7 @@ func TestReceiverCommand(t *testing.T) {
 	}
 
 	// // sync into dest dir
-	// rsync := exec.Command("rsync", //*/ "/home/michael/src/openrsync/openrsync",
+	// rsync := exec.Command(rsynctest.AnyRsync(t),
 	// 	append(
 	// 		append([]string{
 	// 			//		"--debug=all4",
