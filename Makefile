@@ -1,4 +1,4 @@
-.PHONY: all run systemd test docker raspi mac
+.PHONY: all run systemd test privileged-test docker raspi mac
 
 all:
 	CGO_ENABLED=0 go install github.com/gokrazy/rsync/cmd/...
@@ -16,6 +16,8 @@ systemd: all
 
 test:
 	GOGC=off CGO_ENABLED=0 go test -fullpath ./...
+
+privileged-test:
 	GOGC=off CGO_ENABLED=0 sudo go test -fullpath ./integration/interop ./integration/receiver
 
 docker:
