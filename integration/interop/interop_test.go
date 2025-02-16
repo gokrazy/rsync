@@ -533,23 +533,12 @@ func TestInteropRemoteDaemon(t *testing.T) {
 	}
 }
 
-func TestInteropRemoteDaemonAnonSSH(t *testing.T) {
+func TestInteropRemoteDaemonSSH(t *testing.T) {
 	t.Parallel()
-
-	rsyncBin := rsynctest.TridgeOrGTFO(t, "TODO: reason")
-
-	tmp, source, dest := createSourceFiles(t)
-
-	// start a server to sync from
-	srv := rsynctest.New(t,
-		rsynctest.InteropModule(source),
-		rsynctest.Listeners([]rsyncdconfig.Listener{
-			{AnonSSH: "localhost:0"},
-		}))
 
 	// ensure the user running the tests (root when doing the privileged run!)
 	// has an SSH private key:
-	privKeyPath := filepath.Join(tmp, "ssh_private_key")
+	privKeyPath := filepath.Join(t.TempDir(), "ssh_private_key")
 	genKey := exec.Command("ssh-keygen",
 		"-N", "",
 		"-t", "ed25519",
@@ -560,139 +549,128 @@ func TestInteropRemoteDaemonAnonSSH(t *testing.T) {
 		t.Fatalf("%v: %v", genKey.Args, err)
 	}
 
-	// sync into dest dir
-	rsync := exec.Command(rsyncBin,
-		append(
-			append([]string{
-				//		"--debug=all4",
-				"--archive",
-				"-v", "-v", "-v", "-v",
-				"-e", "ssh -vv -o IdentityFile=" + privKeyPath + " -o StrictHostKeyChecking=no -o CheckHostIP=no -o UserKnownHostsFile=/dev/null -p " + srv.Port,
-			}, sourcesArgs(t)...),
-			dest)...)
-	rsync.Stdout = os.Stdout
-	rsync.Stderr = os.Stderr
-	if err := rsync.Run(); err != nil {
-		t.Fatalf("%v: %v", rsync.Args, err)
-	}
+	t.Run("Anon", func(t *testing.T) {
+		t.Parallel()
 
-	if err := sourceFullySyncedTo(t, dest); err != nil {
-		t.Fatal(err)
-	}
-}
+		rsyncBin := rsynctest.TridgeOrGTFO(t, "TODO: reason")
 
-func TestInteropRemoteDaemonAuthorizedSSHFail(t *testing.T) {
-	t.Parallel()
+		_, source, dest := createSourceFiles(t)
 
-	rsyncBin := rsynctest.TridgeOrGTFO(t, "TODO: reason")
+		// start a server to sync from
+		srv := rsynctest.New(t,
+			rsynctest.InteropModule(source),
+			rsynctest.Listeners([]rsyncdconfig.Listener{
+				{AnonSSH: "localhost:0"},
+			}))
 
-	tmp, source, dest := createSourceFiles(t)
+		// sync into dest dir
+		rsync := exec.Command(rsyncBin,
+			append(
+				append([]string{
+					//		"--debug=all4",
+					"--archive",
+					"-v", "-v", "-v", "-v",
+					"-e", "ssh -o IdentityFile=" + privKeyPath + " -o StrictHostKeyChecking=no -o CheckHostIP=no -o UserKnownHostsFile=/dev/null -p " + srv.Port,
+				}, sourcesArgs(t)...),
+				dest)...)
+		rsync.Stdout = os.Stdout
+		rsync.Stderr = os.Stderr
+		if err := rsync.Run(); err != nil {
+			t.Fatalf("%v: %v", rsync.Args, err)
+		}
 
-	// ensure the user running the tests (root when doing the privileged run!)
-	// has an SSH private key:
-	privKeyPath := filepath.Join(tmp, "ssh_private_key")
-	genKey := exec.Command("ssh-keygen",
-		"-N", "",
-		"-t", "ed25519",
-		"-f", privKeyPath)
-	genKey.Stdout = os.Stdout
-	genKey.Stderr = os.Stderr
-	if err := genKey.Run(); err != nil {
-		t.Fatalf("%v: %v", genKey.Args, err)
-	}
+		if err := sourceFullySyncedTo(t, dest); err != nil {
+			t.Fatal(err)
+		}
+	})
 
-	authorizedKeysPath := filepath.Join(tmp, "authorized_keys")
-	if err := os.WriteFile(authorizedKeysPath, []byte("# no keys authorized"), 0644); err != nil {
-		t.Fatal(err)
-	}
+	t.Run("AuthorizedFail", func(t *testing.T) {
+		t.Parallel()
 
-	// start a server to sync from
-	srv := rsynctest.New(t,
-		rsynctest.InteropModule(source),
-		rsynctest.Listeners([]rsyncdconfig.Listener{
-			{
-				AuthorizedSSH: rsyncdconfig.SSHListener{
-					Address:        "localhost:0",
-					AuthorizedKeys: authorizedKeysPath,
+		rsyncBin := rsynctest.TridgeOrGTFO(t, "TODO: reason")
+
+		tmp, source, dest := createSourceFiles(t)
+
+		authorizedKeysPath := filepath.Join(tmp, "authorized_keys")
+		if err := os.WriteFile(authorizedKeysPath, []byte("# no keys authorized"), 0644); err != nil {
+			t.Fatal(err)
+		}
+
+		// start a server to sync from
+		srv := rsynctest.New(t,
+			rsynctest.InteropModule(source),
+			rsynctest.Listeners([]rsyncdconfig.Listener{
+				{
+					AuthorizedSSH: rsyncdconfig.SSHListener{
+						Address:        "localhost:0",
+						AuthorizedKeys: authorizedKeysPath,
+					},
 				},
-			},
-		}))
+			}))
 
-	// sync into dest dir
-	rsync := exec.Command(rsyncBin,
-		append(
-			append([]string{
-				//		"--debug=all4",
-				"--archive",
-				"-v", "-v", "-v", "-v",
-				"-e", "ssh -vv -o IdentityFile=" + privKeyPath + " -o StrictHostKeyChecking=no -o CheckHostIP=no -o UserKnownHostsFile=/dev/null -p " + srv.Port,
-			}, sourcesArgs(t)...),
-			dest)...)
-	rsync.Stdout = os.Stdout
-	rsync.Stderr = os.Stderr
-	if err := rsync.Run(); err == nil {
-		t.Fatalf("rsync unexpectedly succeeded")
-	}
-}
+		// sync into dest dir
+		rsync := exec.Command(rsyncBin,
+			append(
+				append([]string{
+					//		"--debug=all4",
+					"--archive",
+					"-v", "-v", "-v", "-v",
+					"-e", "ssh -o IdentityFile=" + privKeyPath + " -o StrictHostKeyChecking=no -o CheckHostIP=no -o UserKnownHostsFile=/dev/null -p " + srv.Port,
+				}, sourcesArgs(t)...),
+				dest)...)
+		rsync.Stdout = os.Stdout
+		rsync.Stderr = os.Stderr
+		if err := rsync.Run(); err == nil {
+			t.Fatalf("rsync unexpectedly succeeded")
+		}
+	})
 
-func TestInteropRemoteDaemonAuthorizedSSHPass(t *testing.T) {
-	t.Parallel()
+	t.Run("AuthorizedPass", func(t *testing.T) {
+		t.Parallel()
 
-	rsyncBin := rsynctest.TridgeOrGTFO(t, "TODO: reason")
+		rsyncBin := rsynctest.TridgeOrGTFO(t, "TODO: reason")
 
-	tmp, source, dest := createSourceFiles(t)
+		tmp, source, dest := createSourceFiles(t)
 
-	// ensure the user running the tests (root when doing the privileged run!)
-	// has an SSH private key:
-	privKeyPath := filepath.Join(tmp, "ssh_private_key")
-	genKey := exec.Command("ssh-keygen",
-		"-N", "",
-		"-t", "ed25519",
-		"-f", privKeyPath)
-	genKey.Stdout = os.Stdout
-	genKey.Stderr = os.Stderr
-	if err := genKey.Run(); err != nil {
-		t.Fatalf("%v: %v", genKey.Args, err)
-	}
+		authorizedKeysPath := filepath.Join(tmp, "authorized_keys")
+		pubKey, err := os.ReadFile(privKeyPath + ".pub")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(authorizedKeysPath, pubKey, 0644); err != nil {
+			t.Fatal(err)
+		}
 
-	authorizedKeysPath := filepath.Join(tmp, "authorized_keys")
-	pubKey, err := os.ReadFile(privKeyPath + ".pub")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(authorizedKeysPath, pubKey, 0644); err != nil {
-		t.Fatal(err)
-	}
-
-	// start a server to sync from
-	srv := rsynctest.New(t,
-		rsynctest.InteropModule(source),
-		rsynctest.Listeners([]rsyncdconfig.Listener{
-			{
-				AuthorizedSSH: rsyncdconfig.SSHListener{
-					Address:        "localhost:0",
-					AuthorizedKeys: authorizedKeysPath,
+		// start a server to sync from
+		srv := rsynctest.New(t,
+			rsynctest.InteropModule(source),
+			rsynctest.Listeners([]rsyncdconfig.Listener{
+				{
+					AuthorizedSSH: rsyncdconfig.SSHListener{
+						Address:        "localhost:0",
+						AuthorizedKeys: authorizedKeysPath,
+					},
 				},
-			},
-		}))
+			}))
 
-	// sync into dest dir
-	rsync := exec.Command(rsyncBin,
-		append(
-			append([]string{
-				//		"--debug=all4",
-				"--archive",
-				"-v", "-v", "-v", "-v",
-				"-e", "ssh -vv -o IdentityFile=" + privKeyPath + " -o StrictHostKeyChecking=no -o CheckHostIP=no -o UserKnownHostsFile=/dev/null -p " + srv.Port,
-			}, sourcesArgs(t)...),
-			dest)...)
-	rsync.Stdout = os.Stdout
-	rsync.Stderr = os.Stderr
-	if err := rsync.Run(); err != nil {
-		t.Fatalf("%v: %v", rsync.Args, err)
-	}
+		// sync into dest dir
+		rsync := exec.Command(rsyncBin,
+			append(
+				append([]string{
+					//		"--debug=all4",
+					"--archive",
+					"-v", "-v", "-v", "-v",
+					"-e", "ssh -o IdentityFile=" + privKeyPath + " -o StrictHostKeyChecking=no -o CheckHostIP=no -o UserKnownHostsFile=/dev/null -p " + srv.Port,
+				}, sourcesArgs(t)...),
+				dest)...)
+		rsync.Stdout = os.Stdout
+		rsync.Stderr = os.Stderr
+		if err := rsync.Run(); err != nil {
+			t.Fatalf("%v: %v", rsync.Args, err)
+		}
 
-	if err := sourceFullySyncedTo(t, dest); err != nil {
-		t.Fatal(err)
-	}
+		if err := sourceFullySyncedTo(t, dest); err != nil {
+			t.Fatal(err)
+		}
+	})
 }
