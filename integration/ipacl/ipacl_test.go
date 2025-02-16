@@ -1,4 +1,4 @@
-package rsync_test
+package ipacl_test
 
 import (
 	"bytes"
