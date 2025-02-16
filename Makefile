@@ -15,10 +15,8 @@ systemd: all
 	sudo systemctl restart gokr-rsyncd.socket)
 
 test:
-	go test -count=1 -mod=mod -v github.com/gokrazy/rsync/internal/...
-	go test -mod=mod -c && \
-		echo unprivileged && ./rsync.test -test.v && \
-		echo privileged && sudo ./rsync.test -test.v -test.run="TestInterop|TestReceiver"
+	go test -fullpath ./...
+	sudo go test -fullpath ./integration/interop ./integration/receiver
 
 docker:
 	CGO_ENABLED=0 GOBIN=$$PWD/docker go install github.com/gokrazy/rsync/cmd/gokr-rsyncd
