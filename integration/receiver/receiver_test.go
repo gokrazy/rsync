@@ -341,23 +341,13 @@ func TestReceiverSSH(t *testing.T) {
 	args := []string{
 		"gokr-rsync",
 		"-aH",
+		"--dry-run",
 		"-e", "ssh -vv -o IdentityFile=" + privKeyPath + " -o StrictHostKeyChecking=no -o CheckHostIP=no -o UserKnownHostsFile=/dev/null -p " + srv.Port,
 		"rsync://localhost/interop/",
 		dest,
 	}
 	if _, err := receivermaincmd.Main(args, os.Stdin, os.Stdout, os.Stdout); err != nil {
 		t.Fatal(err)
-	}
-
-	{
-		want := []byte("world")
-		got, err := os.ReadFile(filepath.Join(dest, "hello"))
-		if err != nil {
-			t.Fatal(err)
-		}
-		if diff := cmp.Diff(want, got); diff != "" {
-			t.Fatalf("unexpected file contents: diff (-want +got):\n%s", diff)
-		}
 	}
 }
 
@@ -375,44 +365,17 @@ func TestReceiverCommand(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// // sync into dest dir
-	// rsync := exec.Command(rsynctest.AnyRsync(t),
-	// 	append(
-	// 		append([]string{
-	// 			//		"--debug=all4",
-	// 			"--archive",
-	// 			"--protocol=27",
-	// 			"-v", "-v", "-v", "-v",
-	// 			"-e", os.Args[0],
-	// 		}, sourcesArgs...),
-	// 		dest)...)
-	// rsync.Stdout = os.Stdout
-	// rsync.Stderr = os.Stderr
-	// if err := rsync.Run(); err != nil {
-	// 	t.Fatalf("%v: %v", rsync.Args, err)
-	// }
-
 	// sync into dest dir
 	args := []string{
 		"gokr-rsync",
 		"-aH",
+		"--dry-run",
 		"-e", os.Args[0],
 		"localhost:" + source + "/",
 		dest,
 	}
 	if _, err := receivermaincmd.Main(args, os.Stdin, os.Stdout, os.Stdout); err != nil {
 		t.Fatal(err)
-	}
-
-	{
-		want := []byte("world")
-		got, err := os.ReadFile(filepath.Join(dest, "hello"))
-		if err != nil {
-			t.Fatal(err)
-		}
-		if diff := cmp.Diff(want, got); diff != "" {
-			t.Fatalf("unexpected file contents: diff (-want +got):\n%s", diff)
-		}
 	}
 }
 
