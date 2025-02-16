@@ -1,4 +1,4 @@
-package rsync_test
+package interop_test
 
 import (
 	"bytes"
