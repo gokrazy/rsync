@@ -41,6 +41,11 @@ func (rt *Transfer) RecvFiles(fileList []*File) error {
 }
 
 func (rt *Transfer) recvFile1(f *File) error {
+	if rt.Opts.DryRun {
+		fmt.Println(f.Name)
+		return nil
+	}
+
 	localFile, err := rt.openLocalFile(f)
 	if err != nil && !os.IsNotExist(err) {
 		log.Printf("opening local file failed, continuing: %v", err)
