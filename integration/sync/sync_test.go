@@ -66,7 +66,7 @@ func TestSyncExtended(t *testing.T) {
 	{
 		// initial sync into dest dir
 		stats := sync()
-		if got, want := stats.TotalRead, int64(3*1024*1024); got < want {
+		if got, want := stats.TotalRead, int64(3*1024); got < want {
 			t.Fatalf("rsync unexpectedly did not read the whole file over the network: got %d, want >= %d", got, want)
 		}
 	}

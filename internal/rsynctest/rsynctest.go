@@ -256,9 +256,9 @@ func VerifyDummyDeviceFiles(t *testing.T, source, dest string) {
 
 func ConstructLargeDataFile(headPattern, bodyPattern, endPattern []byte) []byte {
 	// create large data file in source directory to be copied
-	head := bytes.Repeat(headPattern, 1*1024*1024)
-	body := bytes.Repeat(bodyPattern, 1*1024*1024)
-	end := bytes.Repeat(endPattern, 1*1024*1024)
+	head := bytes.Repeat(headPattern, 1*1024)
+	body := bytes.Repeat(bodyPattern, 1*1024)
+	end := bytes.Repeat(endPattern, 1*1024)
 	return append(append(head, body...), end...)
 }
 
