@@ -297,6 +297,11 @@ func DataFileMatches(fn string, headPattern, bodyPattern, endPattern []byte) err
 	if err != nil {
 		return err
 	}
+	// fast path: using bytes.Equal for an equality check uses much less
+	// resources compared to cmp.Diff.
+	if bytes.Equal(want, got) {
+		return nil
+	}
 	if diff := cmp.Diff(want, got); diff != "" {
 		return fmt.Errorf("unexpected file contents: diff (-want +got):\n%s", diff)
 	}
