@@ -13,6 +13,7 @@ import (
 	"regexp"
 	"runtime"
 	"strings"
+	"sync"
 	"syscall"
 	"testing"
 
@@ -309,7 +310,19 @@ func DataFileMatches(fn string, headPattern, bodyPattern, endPattern []byte) err
 	return nil
 }
 
-func TridgeOrGTFO(t *testing.T, reason string) string {
+type discovered struct {
+	rsync       string // path to any rsync, typically "rsync"
+	tridgeRsync string // path to tridge rsync if discovered
+}
+
+func (d discovered) anyRsync() string {
+	if d.tridgeRsync != "" {
+		return d.tridgeRsync
+	}
+	return d.rsync
+}
+
+var discoverOnce = sync.OnceValue(func() discovered {
 	// For tests that need tridge rsync, explicitly check
 	// a few well-known locations.
 	locations := []string{
@@ -327,22 +340,33 @@ func TridgeOrGTFO(t *testing.T, reason string) string {
 	}
 	for _, loc := range locations {
 		if _, err := os.Stat(loc); err == nil {
-			return loc
+			return discovered{tridgeRsync: loc}
 		}
 	}
 	version, err := exec.Command("rsync", "--version").Output()
 	if err != nil {
+		return discovered{}
+	}
+	if strings.Contains(string(version), "openrsync:") {
+		return discovered{rsync: "rsync"}
+	}
+	return discovered{tridgeRsync: "rsync"}
+})
+
+func TridgeOrGTFO(t *testing.T, reason string) string {
+	discovered := discoverOnce()
+	if discovered.anyRsync() == "" {
 		// Gotta set some boundaries.
 		// We need *some* rsync.
 		t.Fatalf("no rsync installed")
 	}
-	if strings.Contains(string(version), "openrsync:") {
+	if discovered.tridgeRsync == "" {
 		// we did not find tridge rsync and the default rsync is openrsync
 		t.Skipf("tridge rsync not found, cannot run this test: %v", reason)
 	}
-	return "rsync"
+	return discovered.tridgeRsync
 }
 
 func AnyRsync(t *testing.T) string {
-	return "rsync"
+	return discoverOnce().anyRsync()
 }
