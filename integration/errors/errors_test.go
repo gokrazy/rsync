@@ -13,6 +13,8 @@ import (
 )
 
 func TestErrors(t *testing.T) {
+	t.Parallel()
+
 	tmp := t.TempDir()
 
 	dest := filepath.Join(tmp, "dest")
@@ -51,6 +53,8 @@ func TestErrors(t *testing.T) {
 }
 
 func TestNoSuchModule(t *testing.T) {
+	t.Parallel()
+
 	tmp := t.TempDir()
 
 	dest := filepath.Join(tmp, "dest")
@@ -81,6 +85,8 @@ func TestNoSuchModule(t *testing.T) {
 }
 
 func TestNoReadPermission(t *testing.T) {
+	t.Parallel()
+
 	tmp := t.TempDir()
 	source := filepath.Join(tmp, "source")
 	dest := filepath.Join(tmp, "dest")

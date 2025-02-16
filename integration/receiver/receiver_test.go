@@ -68,6 +68,8 @@ func setUid(t *testing.T, fn string) (uid, gid int, verify bool) {
 }
 
 func TestReceiver(t *testing.T) {
+	t.Parallel()
+
 	tmp := t.TempDir()
 	source := filepath.Join(tmp, "source")
 	dest := filepath.Join(tmp, "dest")
@@ -207,6 +209,8 @@ func TestReceiver(t *testing.T) {
 }
 
 func TestReceiverSync(t *testing.T) {
+	t.Parallel()
+
 	tmp := t.TempDir()
 	source := filepath.Join(tmp, "source")
 	dest := filepath.Join(tmp, "dest")
@@ -253,6 +257,8 @@ func TestReceiverSync(t *testing.T) {
 }
 
 func TestReceiverSyncDelete(t *testing.T) {
+	t.Parallel()
+
 	tmp := t.TempDir()
 	source := filepath.Join(tmp, "source")
 	dest := filepath.Join(tmp, "dest")
@@ -298,6 +304,8 @@ func TestReceiverSyncDelete(t *testing.T) {
 }
 
 func TestReceiverSSH(t *testing.T) {
+	t.Parallel()
+
 	tmp := t.TempDir()
 	source := filepath.Join(tmp, "source")
 	dest := filepath.Join(tmp, "dest")
@@ -354,6 +362,8 @@ func TestReceiverSSH(t *testing.T) {
 }
 
 func TestReceiverCommand(t *testing.T) {
+	t.Parallel()
+
 	tmp := t.TempDir()
 	source := filepath.Join(tmp, "source")
 	dest := filepath.Join(tmp, "dest")
@@ -409,6 +419,8 @@ func TestReceiverCommand(t *testing.T) {
 // TestReceiverSymlinkTraversal passes by default but is useful to simulate
 // a symlink race TOCTOU attack by modifying rsyncd/rsyncd.go.
 func TestReceiverSymlinkTraversal(t *testing.T) {
+	t.Parallel()
+
 	tmp := t.TempDir()
 	if err := os.WriteFile(filepath.Join(tmp, "passwd"), []byte("secret"), 0644); err != nil {
 		t.Fatal(err)

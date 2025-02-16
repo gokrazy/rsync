@@ -66,6 +66,8 @@ func setUid(t *testing.T, fn string) (uid, gid int, verify bool) {
 }
 
 func TestSender(t *testing.T) {
+	t.Parallel()
+
 	tmp := t.TempDir()
 	source := filepath.Join(tmp, "source")
 	dest := filepath.Join(tmp, "dest")
@@ -207,6 +209,8 @@ func TestSender(t *testing.T) {
 // like TestSender, but without a trailing slash, i.e. do not copy directory
 // contents, but the directory itself.
 func TestSenderNoSlash(t *testing.T) {
+	t.Parallel()
+
 	tmp := t.TempDir()
 	source := filepath.Join(tmp, "source")
 	dest := filepath.Join(tmp, "dest")
@@ -349,6 +353,8 @@ func TestSenderNoSlash(t *testing.T) {
 
 // like TestSender, but both source and dest are local directories
 func TestSenderBothLocal(t *testing.T) {
+	t.Parallel()
+
 	tmp := t.TempDir()
 	source := filepath.Join(tmp, "source")
 	dest := filepath.Join(tmp, "dest")

@@ -61,6 +61,8 @@ func TestTridgeRsyncVersion(t *testing.T) {
 }
 
 func TestModuleListing(t *testing.T) {
+	t.Parallel()
+
 	rsyncBin := rsynctest.TridgeOrGTFO(t, "TODO: add reason")
 
 	tmp := t.TempDir()
@@ -89,6 +91,8 @@ func TestModuleListing(t *testing.T) {
 }
 
 func TestInterop(t *testing.T) {
+	t.Parallel()
+
 	tmp := t.TempDir()
 	source := filepath.Join(tmp, "source")
 	dest := filepath.Join(tmp, "dest")
@@ -302,6 +306,8 @@ func sourceFullySyncedTo(t *testing.T, dest string) error {
 }
 
 func TestInteropSubdir(t *testing.T) {
+	t.Parallel()
+
 	_, source, dest := createSourceFiles(t)
 
 	// start a server to sync from
@@ -329,6 +335,8 @@ func TestInteropSubdir(t *testing.T) {
 }
 
 func TestInteropSubdirExclude(t *testing.T) {
+	t.Parallel()
+
 	_, source, dest := createSourceFiles(t)
 
 	// start a server to sync from
@@ -367,6 +375,8 @@ func TestInteropSubdirExclude(t *testing.T) {
 }
 
 func TestInteropSubdirExcludeMultipleNested(t *testing.T) {
+	t.Parallel()
+
 	_, source, dest := createSourceFiles(t)
 
 	nested := filepath.Join(source, "nested")
@@ -420,6 +430,8 @@ func TestInteropSubdirExcludeMultipleNested(t *testing.T) {
 }
 
 func TestInteropRemoteCommand(t *testing.T) {
+	t.Parallel()
+
 	_, source, dest := createSourceFiles(t)
 
 	sourcesArgs := []string{
@@ -452,6 +464,8 @@ func TestInteropRemoteCommand(t *testing.T) {
 }
 
 func TestInteropRemoteDaemon(t *testing.T) {
+	t.Parallel()
+
 	rsyncBin := rsynctest.TridgeOrGTFO(t, "TODO: reason")
 
 	tmp, source, dest := createSourceFiles(t)
@@ -520,6 +534,8 @@ func TestInteropRemoteDaemon(t *testing.T) {
 }
 
 func TestInteropRemoteDaemonAnonSSH(t *testing.T) {
+	t.Parallel()
+
 	rsyncBin := rsynctest.TridgeOrGTFO(t, "TODO: reason")
 
 	tmp, source, dest := createSourceFiles(t)
@@ -566,6 +582,8 @@ func TestInteropRemoteDaemonAnonSSH(t *testing.T) {
 }
 
 func TestInteropRemoteDaemonAuthorizedSSHFail(t *testing.T) {
+	t.Parallel()
+
 	rsyncBin := rsynctest.TridgeOrGTFO(t, "TODO: reason")
 
 	tmp, source, dest := createSourceFiles(t)
@@ -618,6 +636,8 @@ func TestInteropRemoteDaemonAuthorizedSSHFail(t *testing.T) {
 }
 
 func TestInteropRemoteDaemonAuthorizedSSHPass(t *testing.T) {
+	t.Parallel()
+
 	rsyncBin := rsynctest.TridgeOrGTFO(t, "TODO: reason")
 
 	tmp, source, dest := createSourceFiles(t)

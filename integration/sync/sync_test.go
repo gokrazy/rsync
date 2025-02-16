@@ -13,6 +13,8 @@ import (
 )
 
 func TestSyncExtended(t *testing.T) {
+	t.Parallel()
+
 	rsyncBin := rsynctest.TridgeOrGTFO(t, "TODO: reason")
 
 	tmp := t.TempDir()

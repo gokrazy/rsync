@@ -20,6 +20,8 @@ func init() {
 }
 
 func TestReceiverListing(t *testing.T) {
+	t.Parallel()
+
 	tmp := t.TempDir()
 	source := filepath.Join(tmp, "source")
 

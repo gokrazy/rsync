@@ -84,6 +84,8 @@ acl = [
 		},
 	} {
 		t.Run(tt.remoteAddr, func(t *testing.T) {
+			t.Parallel()
+
 			ln, err := net.Listen("tcp", "localhost:0")
 			if err != nil {
 				t.Fatal(err)
