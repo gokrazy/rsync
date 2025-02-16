@@ -25,6 +25,11 @@ func (f *fakeLogger) Printf(msg string, a ...interface{}) {
 	fmt.Fprintf(f.out, msg, a...)
 }
 
+func (f *fakeLogger) Output(calldepth int, s string) error {
+	fmt.Fprintf(f.out, "%s", s)
+	return nil
+}
+
 func Test_SetLogger(t *testing.T) {
 	defer func() {
 		log.SetLogger(golog.Default())
