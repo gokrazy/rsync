@@ -40,17 +40,17 @@ jobs:
     - name: run tests (linux)
       if: matrix.os == 'ubuntu-latest'
       run: |
-        go test -v ./internal/... && go test -c
+        go test -v ./...
         echo "::group::rsync from Debian"
-        docker run -v $PWD:/usr/src/rsync/ -w /usr/src/rsync rsync-debian ./rsync.test -test.v
+        docker run -v $PWD:/usr/src/rsync/ -w /usr/src/rsync rsync-debian go test ./...
         echo "::endgroup::"
         echo "::group::rsync from Fedora"
-        docker run -v $PWD:/usr/src/rsync/ -w /usr/src/rsync rsync-fedora ./rsync.test -test.v
+        docker run -v $PWD:/usr/src/rsync/ -w /usr/src/rsync rsync-fedora go test ./...
         echo "::endgroup::"
 
     - name: run tests (macos)
       if: matrix.os == 'macos-latest'
-      run: go test -v ./internal/... && go test -c && sudo ./rsync.test -test.v
+      run: sudo go test -v ./...
 
     - name: run tests (windows)
       if: matrix.os == 'windows-latest'
