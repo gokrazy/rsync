@@ -1,4 +1,4 @@
-package rsync_test
+package errors_test
 
 import (
 	"bytes"
