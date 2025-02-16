@@ -15,8 +15,8 @@ systemd: all
 	sudo systemctl restart gokr-rsyncd.socket)
 
 test:
-	go test -fullpath ./...
-	sudo go test -fullpath ./integration/interop ./integration/receiver
+	GOGC=off CGO_ENABLED=0 go test -fullpath ./...
+	GOGC=off CGO_ENABLED=0 sudo go test -fullpath ./integration/interop ./integration/receiver
 
 docker:
 	CGO_ENABLED=0 GOBIN=$$PWD/docker go install github.com/gokrazy/rsync/cmd/gokr-rsyncd
