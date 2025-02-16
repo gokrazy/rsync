@@ -55,6 +55,8 @@ func TestDaemonReceiverSync(t *testing.T) {
 }
 
 func TestDaemonReceiverDelete(t *testing.T) {
+	t.Parallel()
+
 	rsyncBin := rsynctest.TridgeOrGTFO(t, "TODO: reason")
 
 	tmp := t.TempDir()
