@@ -1,6 +1,8 @@
-package rsync_test
+package receiver_test
 
 import (
+	"context"
+	"log"
 	"os"
 	"os/exec"
 	"os/user"
@@ -10,12 +12,31 @@ import (
 	"testing"
 	"time"
 
+	maincmd "github.com/gokrazy/rsync/internal/daemonmaincmd"
 	"github.com/gokrazy/rsync/internal/receivermaincmd"
 	"github.com/gokrazy/rsync/internal/rsyncdconfig"
 	"github.com/gokrazy/rsync/internal/rsynctest"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/renameio/v2"
 )
+
+func TestMain(m *testing.M) {
+	if len(os.Args) > 1 && os.Args[1] == "localhost" {
+		// Strip first 2 args (./rsync.test localhost) from command line:
+		// rsync(1) is calling this process as a remote shell.
+		os.Args = os.Args[2:]
+		if err := maincmd.Main(context.Background(), os.Args, os.Stdin, os.Stdout, os.Stderr, nil); err != nil {
+			log.Fatal(err)
+		}
+	} else if len(os.Args) > 1 && os.Args[1] == "--server" {
+		// gokr-rsync is calling this process as a local daemon.
+		if err := maincmd.Main(context.Background(), os.Args, os.Stdin, os.Stdout, os.Stderr, nil); err != nil {
+			log.Fatal(err)
+		}
+	} else {
+		os.Exit(m.Run())
+	}
+}
 
 func setUid(t *testing.T, fn string) (uid, gid int, verify bool) {
 	if os.Getuid() != 0 {

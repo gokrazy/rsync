@@ -2,7 +2,9 @@ package rsync_test
 
 import (
 	"os"
+	"os/user"
 	"path/filepath"
+	"strconv"
 	"syscall"
 	"testing"
 	"time"
@@ -12,6 +14,35 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/renameio/v2"
 )
+
+func setUid(t *testing.T, fn string) (uid, gid int, verify bool) {
+	if os.Getuid() != 0 {
+		return 0, 0, false
+	}
+
+	u, err := user.Lookup("nobody")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	uid64, err := strconv.ParseInt(u.Uid, 0, 64)
+	if err != nil {
+		t.Fatal(err)
+	}
+	uid = int(uid64)
+
+	gid64, err := strconv.ParseInt(u.Gid, 0, 64)
+	if err != nil {
+		t.Fatal(err)
+	}
+	gid = int(gid64)
+
+	if err := os.Chown(fn, uid, gid); err != nil {
+		t.Fatal(err)
+	}
+
+	return uid, gid, true
+}
 
 func TestSender(t *testing.T) {
 	tmp := t.TempDir()
