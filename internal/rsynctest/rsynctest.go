@@ -151,24 +151,6 @@ func New(t *testing.T, modules []rsyncd.Module, opts ...Option) *TestServer {
 	return ts
 }
 
-var rsyncVersionRe = regexp.MustCompile(`rsync\s*version ([v0-9.]+)`)
-
-func RsyncVersion(t *testing.T) string {
-	version := exec.Command("rsync", "--version")
-	version.Stderr = os.Stderr
-	b, err := version.Output()
-	if err != nil {
-		t.Fatalf("%v: %v", version.Args, err)
-	}
-	matches := rsyncVersionRe.FindStringSubmatch(string(b))
-	if len(matches) == 0 {
-		t.Fatalf("rsync: version number not found in rsync --version output")
-	}
-	// rsync 2.6.9 does not print a v prefix,
-	// but rsync v3.2.3 does print a v prefix.
-	return strings.TrimPrefix(matches[1], "v")
-}
-
 func CreateDummyDeviceFiles(t *testing.T, dir string) {
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		t.Fatal(err)
@@ -368,5 +350,39 @@ func TridgeOrGTFO(t *testing.T, reason string) string {
 }
 
 func AnyRsync(t *testing.T) string {
-	return discoverOnce().anyRsync()
+	any := discoverOnce().anyRsync()
+	if any == "" {
+		// Gotta set some boundaries.
+		// We need *some* rsync.
+		t.Fatalf("no rsync installed")
+	}
+	return any
+}
+
+var rsyncVersionRe = regexp.MustCompile(`rsync\s*version ([v0-9.]+)`)
+var rsyncVersionOnce = sync.OnceValue(func() string {
+	any := discoverOnce().anyRsync()
+	version := exec.Command(any, "--version")
+	version.Stderr = os.Stderr
+	b, err := version.Output()
+	if err != nil {
+		return fmt.Sprintf("BUG: %s --version: %v", any, err)
+	}
+	matches := rsyncVersionRe.FindStringSubmatch(string(b))
+	if len(matches) == 0 {
+		return fmt.Sprintf("BUG: rsync version number not found in output %q", string(b))
+	}
+	// rsync 2.6.9 does not print a v prefix,
+	// but rsync v3.2.3 does print a v prefix.
+	return strings.TrimPrefix(matches[1], "v")
+})
+
+func RsyncVersion(t *testing.T) string {
+	any := discoverOnce().anyRsync()
+	if any == "" {
+		// Gotta set some boundaries.
+		// We need *some* rsync.
+		t.Fatalf("no rsync installed")
+	}
+	return rsyncVersionOnce()
 }
