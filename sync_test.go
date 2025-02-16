@@ -35,6 +35,7 @@ func TestSyncExtended(t *testing.T) {
 			// A verbosity level of 3 is enough, any higher than that and rsync
 			// will start listing individual chunk matches.
 			"-v", "-v", "-v", // "-v",
+			"--checksum",
 			"--port="+srv.Port,
 			"rsync://localhost/interop/", // copy contents of source
 			dest)

@@ -2,6 +2,8 @@ package rsyncchecksum
 
 import (
 	"encoding/binary"
+	"io"
+	"os"
 
 	"github.com/mmcloughlin/md4"
 )
@@ -54,3 +56,18 @@ func Checksum2(seed int32, buf []byte) []byte {
 	binary.Write(h, binary.LittleEndian, seed)
 	return h.Sum(nil)
 }
+
+func FileChecksum(fn string) ([]byte, error) {
+	f, err := os.Open(fn)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	h := md4.New()
+	if _, err := io.Copy(h, f); err != nil {
+		return nil, err
+	}
+	return h.Sum(nil), nil
+}
+
+const Size = md4.Size

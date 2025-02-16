@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/gokrazy/rsync"
+	"github.com/gokrazy/rsync/internal/rsyncchecksum"
 	"github.com/gokrazy/rsync/internal/rsyncopts"
 	"github.com/gokrazy/rsync/internal/rsyncwire"
 )
@@ -213,6 +214,21 @@ func (st *Transfer) SendFileList(trimPrefix, localDir string, opts *rsyncopts.Op
 				}
 				fec.WriteInt32(int32(len(target)))
 				fec.WriteString(target)
+			}
+
+			if opts.AlwaysChecksum() {
+				var emptyChecksum [rsyncchecksum.Size]byte
+				checksum := emptyChecksum[:]
+				if info.Mode().IsRegular() {
+					// TODO: send md4 checksum of this file
+					checksum, err = rsyncchecksum.FileChecksum(path)
+					if err != nil {
+						return err
+					}
+				} else {
+					// send empty md4 checksum
+				}
+				fec.WriteString(string(checksum))
 			}
 
 			// The status byte may consist of the following bits and determines which of the optional fields are transmitted.
