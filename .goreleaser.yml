@@ -17,34 +17,9 @@ builds:
   - arm64
   - 386
 
-- id: "rsyncd-linux"
-  main: "./cmd/gokr-rsyncd"
-  binary: "gokr-rsyncd"
-  env:
-  - CGO_ENABLED=0
-  goos:
-  - linux
-  goarch:
-  - amd64
-  - arm
-  - arm64
-  - 386
-
 - id: "rsync-windows"
   main: "./cmd/gokr-rsync"
   binary: "gokr-rsync"
-  env:
-  - CGO_ENABLED=0
-  goos:
-  - windows
-  goarch:
-  - arm64
-  - amd64
-  - 386
-
-- id: "rsyncd-windows"
-  main: "./cmd/gokr-rsyncd"
-  binary: "gokr-rsyncd"
   env:
   - CGO_ENABLED=0
   goos:
@@ -65,17 +40,6 @@ builds:
   - arm64
   - amd64
 
-- id: "rsyncd-macos"
-  main: "./cmd/gokr-rsyncd"
-  binary: "gokr-rsyncd"
-  env:
-  - CGO_ENABLED=0
-  goos:
-  - darwin
-  goarch:
-  - arm64
-  - amd64
-
 archives:
 - id: linux
   name_template: >-
@@ -84,7 +48,7 @@ archives:
     {{- if eq .Arch "amd64" }}x86_64
     {{- else if eq .Arch "386" }}i386
     {{- else}}{{ .Arch }}{{ end }}
-  builds: ["rsync-linux", "rsyncd-linux"]
+  builds: ["rsync-linux"]
 
 - id: windows
   name_template: >-
@@ -93,7 +57,7 @@ archives:
     {{- if eq .Arch "amd64" }}x86_64
     {{- else if eq .Arch "386" }}i386
     {{- else}}{{ .Arch }}{{ end }}
-  builds: ["rsync-windows", "rsyncd-windows"]
+  builds: ["rsync-windows"]
   format: zip
 
 - id: macos
@@ -102,7 +66,7 @@ archives:
     {{- if eq .Arch "amd64" }}Intel
     {{- else if eq .Arch "arm64" }}Apple_Silicon
     {{- else}}{{ .Arch }}{{ end }}
-  builds: ["rsync-macos", "rsyncd-macos"]
+  builds: ["rsync-macos"]
   format: zip
 
 signs:
