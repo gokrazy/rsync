@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gokrazy/rsync/internal/receivermaincmd"
+	maincmd "github.com/gokrazy/rsync/internal/daemonmaincmd"
 	"github.com/gokrazy/rsync/internal/rsynctest"
 	"github.com/google/go-cmp/cmp"
 )
@@ -52,7 +52,7 @@ func TestReceiverListing(t *testing.T) {
 		"rsync://localhost:" + srv.Port + "/interop/",
 	}
 	var stdout bytes.Buffer
-	if _, err := receivermaincmd.ClientMain(args, os.Stdin, &stdout, &stdout); err != nil {
+	if _, err := maincmd.ClientMain(args, os.Stdin, &stdout, &stdout); err != nil {
 		t.Fatal(err)
 	}
 	want := `drwxr-xr-x        4096 2009/11/10 23:00:00 .

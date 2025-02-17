@@ -12,7 +12,7 @@ import (
 	"time"
 
 	maincmd "github.com/gokrazy/rsync/internal/daemonmaincmd"
-	"github.com/gokrazy/rsync/internal/receivermaincmd"
+
 	"github.com/gokrazy/rsync/internal/rsynctest"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/renameio/v2"
@@ -114,7 +114,7 @@ func TestSender(t *testing.T) {
 		source + "/",
 		"rsync://localhost:" + srv.Port + "/interop/",
 	}
-	firstStats, err := receivermaincmd.ClientMain(args, os.Stdin, os.Stdout, os.Stdout)
+	firstStats, err := maincmd.ClientMain(args, os.Stdin, os.Stdout, os.Stdout)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -156,7 +156,7 @@ func TestSender(t *testing.T) {
 		rsynctest.VerifyDummyDeviceFiles(t, devices, filepath.Join(dest, "devices"))
 	}
 
-	incrementalStats, err := receivermaincmd.ClientMain(args, os.Stdin, os.Stdout, os.Stdout)
+	incrementalStats, err := maincmd.ClientMain(args, os.Stdin, os.Stdout, os.Stdout)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -180,7 +180,7 @@ func TestSender(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := receivermaincmd.ClientMain(args, os.Stdin, os.Stdout, os.Stdout); err != nil {
+	if _, err := maincmd.ClientMain(args, os.Stdin, os.Stdout, os.Stdout); err != nil {
 		t.Fatal(err)
 	}
 
@@ -257,7 +257,7 @@ func TestSenderNoSlash(t *testing.T) {
 		source,
 		"rsync://localhost:" + srv.Port + "/interop/",
 	}
-	firstStats, err := receivermaincmd.ClientMain(args, os.Stdin, os.Stdout, os.Stdout)
+	firstStats, err := maincmd.ClientMain(args, os.Stdin, os.Stdout, os.Stdout)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -301,7 +301,7 @@ func TestSenderNoSlash(t *testing.T) {
 		rsynctest.VerifyDummyDeviceFiles(t, devices, filepath.Join(dest, "devices"))
 	}
 
-	incrementalStats, err := receivermaincmd.ClientMain(args, os.Stdin, os.Stdout, os.Stdout)
+	incrementalStats, err := maincmd.ClientMain(args, os.Stdin, os.Stdout, os.Stdout)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -325,7 +325,7 @@ func TestSenderNoSlash(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := receivermaincmd.ClientMain(args, os.Stdin, os.Stdout, os.Stdout); err != nil {
+	if _, err := maincmd.ClientMain(args, os.Stdin, os.Stdout, os.Stdout); err != nil {
 		t.Fatal(err)
 	}
 
@@ -398,7 +398,7 @@ func TestSenderBothLocal(t *testing.T) {
 		source,
 		dest,
 	}
-	firstStats, err := receivermaincmd.ClientMain(args, os.Stdin, os.Stdout, os.Stdout)
+	firstStats, err := maincmd.ClientMain(args, os.Stdin, os.Stdout, os.Stdout)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -442,7 +442,7 @@ func TestSenderBothLocal(t *testing.T) {
 		rsynctest.VerifyDummyDeviceFiles(t, devices, filepath.Join(dest, "devices"))
 	}
 
-	incrementalStats, err := receivermaincmd.ClientMain(args, os.Stdin, os.Stdout, os.Stdout)
+	incrementalStats, err := maincmd.ClientMain(args, os.Stdin, os.Stdout, os.Stdout)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -466,7 +466,7 @@ func TestSenderBothLocal(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := receivermaincmd.ClientMain(args, os.Stdin, os.Stdout, os.Stdout); err != nil {
+	if _, err := maincmd.ClientMain(args, os.Stdin, os.Stdout, os.Stdout); err != nil {
 		t.Fatal(err)
 	}
 

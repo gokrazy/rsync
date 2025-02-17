@@ -5,11 +5,11 @@ import (
 	"log"
 	"os"
 
-	"github.com/gokrazy/rsync/internal/receivermaincmd"
+	maincmd "github.com/gokrazy/rsync/internal/daemonmaincmd"
 )
 
 func main() {
-	if _, err := receivermaincmd.ClientMain(os.Args, os.Stdin, os.Stdout, os.Stderr); err != nil {
+	if _, err := maincmd.ClientMain(os.Args, os.Stdin, os.Stdout, os.Stderr); err != nil {
 		log.Fatal(err)
 	}
 }
