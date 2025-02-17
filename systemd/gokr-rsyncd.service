@@ -2,7 +2,7 @@
 Description=gokrazy rsync server daemon (for serving files)
 
 [Service]
-ExecStart=/usr/bin/gokr-rsyncd
+ExecStart=/usr/bin/gokr-rsync --daemon
 
 # See also http://0pointer.net/blog/dynamic-users-with-systemd.html
 DynamicUser=yes
