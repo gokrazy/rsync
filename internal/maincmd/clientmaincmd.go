@@ -283,7 +283,7 @@ func clientRun(osenv receiver.Osenv, opts *rsyncopts.Options, conn io.ReadWriter
 	return rt.Do(c, fileList, false)
 }
 
-func ClientMain(args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer) (*rsyncstats.TransferStats, error) {
+func clientMain(args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer) (*rsyncstats.TransferStats, error) {
 	osenv := receiver.Osenv{
 		Stdin:  stdin,
 		Stdout: stdout,

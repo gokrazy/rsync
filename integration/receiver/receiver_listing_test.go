@@ -52,7 +52,7 @@ func TestReceiverListing(t *testing.T) {
 		"rsync://localhost:" + srv.Port + "/interop/",
 	}
 	var stdout bytes.Buffer
-	if _, err := maincmd.ClientMain(args, os.Stdin, &stdout, &stdout); err != nil {
+	if _, err := maincmd.Main(t.Context(), args, os.Stdin, &stdout, &stdout, nil); err != nil {
 		t.Fatal(err)
 	}
 	want := `drwxr-xr-x        4096 2009/11/10 23:00:00 .

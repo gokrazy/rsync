@@ -112,7 +112,8 @@ func New(t *testing.T, modules []rsyncd.Module, opts ...Option) *TestServer {
 		}
 		go func() {
 			err := anonssh.Serve(ctx, ts.listener, sshListener, cfg, func(args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer) error {
-				return maincmd.Main(context.Background(), args, stdin, stdout, stderr, cfg)
+				_, err := maincmd.Main(context.Background(), args, stdin, stdout, stderr, cfg)
+				return err
 			})
 
 			if errors.Is(err, net.ErrClosed) {
@@ -133,7 +134,8 @@ func New(t *testing.T, modules []rsyncd.Module, opts ...Option) *TestServer {
 		}
 		go func() {
 			err := anonssh.Serve(ctx, ts.listener, sshListener, cfg, func(args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer) error {
-				return maincmd.Main(context.Background(), args, stdin, stdout, stderr, cfg)
+				_, err := maincmd.Main(context.Background(), args, stdin, stdout, stderr, cfg)
+				return err
 			})
 
 			if errors.Is(err, net.ErrClosed) {

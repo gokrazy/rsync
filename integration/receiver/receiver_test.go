@@ -25,12 +25,12 @@ func TestMain(m *testing.M) {
 		// Strip first 2 args (./rsync.test localhost) from command line:
 		// rsync(1) is calling this process as a remote shell.
 		os.Args = os.Args[2:]
-		if err := maincmd.Main(context.Background(), os.Args, os.Stdin, os.Stdout, os.Stderr, nil); err != nil {
+		if _, err := maincmd.Main(context.Background(), os.Args, os.Stdin, os.Stdout, os.Stderr, nil); err != nil {
 			log.Fatal(err)
 		}
 	} else if len(os.Args) > 1 && os.Args[1] == "--server" {
 		// gokr-rsync is calling this process as a local daemon.
-		if err := maincmd.Main(context.Background(), os.Args, os.Stdin, os.Stdout, os.Stderr, nil); err != nil {
+		if _, err := maincmd.Main(context.Background(), os.Args, os.Stdin, os.Stdout, os.Stderr, nil); err != nil {
 			log.Fatal(err)
 		}
 	} else {
@@ -116,7 +116,7 @@ func TestReceiver(t *testing.T) {
 		"rsync://localhost:" + srv.Port + "/interop/",
 		dest,
 	}
-	firstStats, err := maincmd.ClientMain(args, os.Stdin, os.Stdout, os.Stdout)
+	firstStats, err := maincmd.Main(t.Context(), args, os.Stdin, os.Stdout, os.Stdout, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -158,7 +158,7 @@ func TestReceiver(t *testing.T) {
 		rsynctest.VerifyDummyDeviceFiles(t, devices, filepath.Join(dest, "devices"))
 	}
 
-	incrementalStats, err := maincmd.ClientMain(args, os.Stdin, os.Stdout, os.Stdout)
+	incrementalStats, err := maincmd.Main(t.Context(), args, os.Stdin, os.Stdout, os.Stdout, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -182,7 +182,7 @@ func TestReceiver(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := maincmd.ClientMain(args, os.Stdin, os.Stdout, os.Stdout); err != nil {
+	if _, err := maincmd.Main(t.Context(), args, os.Stdin, os.Stdout, os.Stdout, nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -230,7 +230,7 @@ func TestReceiverSync(t *testing.T) {
 		"rsync://localhost:" + srv.Port + "/interop/",
 		dest,
 	}
-	firstStats, err := maincmd.ClientMain(args, os.Stdin, os.Stdout, os.Stdout)
+	firstStats, err := maincmd.Main(t.Context(), args, os.Stdin, os.Stdout, os.Stdout, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -246,7 +246,7 @@ func TestReceiverSync(t *testing.T) {
 	// modify the large data file
 	rsynctest.WriteLargeDataFile(t, source, headPattern, bodyPattern, endPattern)
 
-	incrementalStats, err := maincmd.ClientMain(args, os.Stdin, os.Stdout, os.Stdout)
+	incrementalStats, err := maincmd.Main(t.Context(), args, os.Stdin, os.Stdout, os.Stdout, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -279,7 +279,7 @@ func TestReceiverSyncDelete(t *testing.T) {
 		"rsync://localhost:" + srv.Port + "/interop/",
 		dest,
 	}
-	firstStats, err := maincmd.ClientMain(args, os.Stdin, os.Stdout, os.Stdout)
+	firstStats, err := maincmd.Main(t.Context(), args, os.Stdin, os.Stdout, os.Stdout, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -295,7 +295,7 @@ func TestReceiverSyncDelete(t *testing.T) {
 	if err := os.WriteFile(extra, []byte("deleteme"), 0644); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := maincmd.ClientMain(args, os.Stdin, os.Stdout, os.Stdout); err != nil {
+	if _, err := maincmd.Main(t.Context(), args, os.Stdin, os.Stdout, os.Stdout, nil); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := os.Stat(extra); !os.IsNotExist(err) {
@@ -346,7 +346,7 @@ func TestReceiverSSH(t *testing.T) {
 		"rsync://localhost/interop/",
 		dest,
 	}
-	if _, err := maincmd.ClientMain(args, os.Stdin, os.Stdout, os.Stdout); err != nil {
+	if _, err := maincmd.Main(t.Context(), args, os.Stdin, os.Stdout, os.Stdout, nil); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -374,7 +374,7 @@ func TestReceiverCommand(t *testing.T) {
 		"localhost:" + source + "/",
 		dest,
 	}
-	if _, err := maincmd.ClientMain(args, os.Stdin, os.Stdout, os.Stdout); err != nil {
+	if _, err := maincmd.Main(t.Context(), args, os.Stdin, os.Stdout, os.Stdout, nil); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -408,8 +408,7 @@ func TestReceiverSymlinkTraversal(t *testing.T) {
 		"rsync://localhost:" + srv.Port + "/interop/",
 		dest,
 	}
-	_, err := maincmd.ClientMain(args, os.Stdin, os.Stdout, os.Stdout)
-	if err != nil {
+	if _, err := maincmd.Main(t.Context(), args, os.Stdin, os.Stdout, os.Stdout, nil); err != nil {
 		t.Fatal(err)
 	}
 

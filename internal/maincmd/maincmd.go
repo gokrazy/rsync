@@ -17,6 +17,7 @@ import (
 	"github.com/gokrazy/rsync/internal/log"
 	"github.com/gokrazy/rsync/internal/rsyncdconfig"
 	"github.com/gokrazy/rsync/internal/rsyncopts"
+	"github.com/gokrazy/rsync/internal/rsyncstats"
 	"github.com/gokrazy/rsync/internal/rsyncwire"
 	"github.com/gokrazy/rsync/rsyncd"
 
@@ -36,11 +37,11 @@ type readWriter struct {
 func (r *readWriter) Read(p []byte) (n int, err error)  { return r.r.Read(p) }
 func (r *readWriter) Write(p []byte) (n int, err error) { return r.w.Write(p) }
 
-func Main(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer, cfg *rsyncdconfig.Config) error {
-	log.Printf("daemon.Main(args=%q", args)
+func Main(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer, cfg *rsyncdconfig.Config) (*rsyncstats.TransferStats, error) {
+	log.Printf("Main(args=%q)", args)
 	pc, err := rsyncopts.ParseArguments(args[1:], true)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	opts := pc.Options
 	remaining := pc.RemainingArgs
@@ -54,18 +55,18 @@ func Main(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer,
 			var err error
 			cfg, _, err = rsyncdconfig.FromDefaultFiles()
 			if err != nil {
-				return err
+				return nil, err
 			}
 		}
 		srv, err := rsyncd.NewServer(cfg.Modules)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		rw := readWriter{
 			r: stdin,
 			w: stdout,
 		}
-		return srv.HandleDaemonConn(ctx, &rw, nil)
+		return nil, srv.HandleDaemonConn(ctx, &rw, nil)
 	}
 
 	// calling convention: command mode (over remote shell or locally)
@@ -74,27 +75,27 @@ func Main(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer,
 		// start_server()
 		srv, err := rsyncd.NewServer(nil)
 		if err != nil {
-			return err
+			return nil, err
 		}
 
 		// TODO: copy seed+multiplex error handling from handleDaemonConn
 
 		// TODO: remove duplication with handleDaemonConn
 		if len(remaining) < 2 {
-			return fmt.Errorf("invalid args: at least one directory required")
+			return nil, fmt.Errorf("invalid args: at least one directory required")
 		}
 		if got, want := remaining[0], "."; got != want {
-			return fmt.Errorf("protocol error: got %q, expected %q", got, want)
+			return nil, fmt.Errorf("protocol error: got %q, expected %q", got, want)
 		}
 		paths := remaining[1:]
 		log.Printf("paths: %q", paths)
 		crd, cwr := rsyncwire.CounterPair(stdin, stdout)
 		rd := crd
-		return srv.HandleConn(nil, rd, crd, cwr, paths, opts, true)
+		return nil, srv.HandleConn(nil, rd, crd, cwr, paths, opts, true)
 	}
 
 	if !opts.Daemon() {
-		return fmt.Errorf("not implemented yet: client mode")
+		return clientMain(args, stdin, stdout, stderr)
 	}
 
 	// daemon_main()
@@ -126,7 +127,7 @@ func Main(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer,
 					Modules: []rsyncd.Module{},
 				}
 			} else {
-				return cfgErr
+				return nil, cfgErr
 			}
 		} else {
 			log.Printf("config file %s loaded", cfgfn)
@@ -136,7 +137,7 @@ func Main(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer,
 	if os.IsNotExist(cfgErr) {
 		if opts.Gokrazy.Listen == "" &&
 			opts.Gokrazy.AnonSSHListen == "" {
-			return fmt.Errorf("neither -gokr.listen nor -gokr.anonssh_listen specified, and config file not found: %v", cfgErr)
+			return nil, fmt.Errorf("neither -gokr.listen nor -gokr.anonssh_listen specified, and config file not found: %v", cfgErr)
 		}
 		// If no config file was found, and the user did not specify a
 		// -gokr.modulemap flag, use a default value to force the user to
@@ -149,7 +150,7 @@ func Main(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer,
 			(cfg.Listeners[0].Rsyncd == "" &&
 				cfg.Listeners[0].AnonSSH == "" &&
 				cfg.Listeners[0].AuthorizedSSH.Address == "") {
-			return fmt.Errorf("no rsyncd listeners configured, add a [[listener]] to %s", cfgfn)
+			return nil, fmt.Errorf("no rsyncd listeners configured, add a [[listener]] to %s", cfgfn)
 		}
 	}
 	// TODO: loosen this restriction, create multiple listeners
@@ -158,7 +159,7 @@ func Main(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer,
 		(cfg.Listeners[0].Rsyncd == "" &&
 			cfg.Listeners[0].AnonSSH == "" &&
 			cfg.Listeners[0].AuthorizedSSH.Address == "") {
-		return fmt.Errorf("not precisely 1 rsyncd listener specified")
+		return nil, fmt.Errorf("not precisely 1 rsyncd listener specified")
 	}
 
 	var sshListener *anonssh.Listener
@@ -170,13 +171,13 @@ func Main(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer,
 			var err error
 			sshListener, err = anonssh.ListenerFromConfig(cfg.Listeners[0])
 			if err != nil {
-				return err
+				return nil, err
 			}
 		} else {
 			var err error
 			sshListener, err = anonssh.ListenerFromConfig(cfg.Listeners[0])
 			if err != nil {
-				return err
+				return nil, err
 			}
 		}
 	}
@@ -184,7 +185,7 @@ func Main(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer,
 	if moduleMap := opts.Gokrazy.ModuleMap; moduleMap != "" {
 		parts := strings.Split(moduleMap, "=")
 		if len(parts) != 2 {
-			return fmt.Errorf("malformed -gokr.modulemap parameter %q, expected <modulename>=<path>", moduleMap)
+			return nil, fmt.Errorf("malformed -gokr.modulemap parameter %q, expected <modulename>=<path>", moduleMap)
 		}
 		module := rsyncd.Module{
 			Name: parts[0],
@@ -195,22 +196,22 @@ func Main(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer,
 	if cfg.DontNamespace {
 		if cfg.Listeners[0].Rsyncd != "" ||
 			cfg.Listeners[0].AnonSSH != "" {
-			return fmt.Errorf("dont_namespace must be used with authorized_ssh listeners only")
+			return nil, fmt.Errorf("dont_namespace must be used with authorized_ssh listeners only")
 		}
 		version()
 		log.Printf("environment: not namespace due to dont_namespace option")
 	} else {
 		if err := namespace(cfg.Modules, listenAddr); err == errIsParent {
-			return nil
+			return nil, nil
 		} else if err != nil {
-			return fmt.Errorf("namespace: %v", err)
+			return nil, fmt.Errorf("namespace: %v", err)
 		}
 	}
 	log.Printf("%d rsync modules configured in total", len(cfg.Modules))
 	for _, mod := range cfg.Modules {
 		if !cfg.DontNamespace {
 			if err := canUnexpectedlyWriteTo(mod.Path); err != nil {
-				return err
+				return nil, err
 			}
 		}
 
@@ -228,12 +229,12 @@ func Main(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer,
 
 	srv, err := rsyncd.NewServer(cfg.Modules)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	var ln net.Listener
 	listeners, err := systemdListeners()
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if len(listeners) > 0 {
 		ln = listeners[0]
@@ -241,27 +242,29 @@ func Main(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer,
 		log.Printf("not using systemd socket activation, creating listener")
 		ln, err = net.Listen("tcp", listenAddr)
 		if err != nil {
-			return err
+			return nil, err
 		}
 	}
 
 	if cfg.Listeners[0].AuthorizedSSH.Address != "" {
 		if cfg.Listeners[0].AuthorizedSSH.AuthorizedKeys == "" {
-			return fmt.Errorf("misconfiguration: authorized_keys must not be empty when using an authorized_ssh listener")
+			return nil, fmt.Errorf("misconfiguration: authorized_keys must not be empty when using an authorized_ssh listener")
 		}
 		log.Printf("rsync daemon listening (authorized SSH) on %s", ln.Addr())
-		return anonssh.Serve(ctx, ln, sshListener, cfg, func(args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer) error {
-			return Main(ctx, args, stdin, stdout, stderr, cfg)
+		return nil, anonssh.Serve(ctx, ln, sshListener, cfg, func(args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer) error {
+			_, err := Main(ctx, args, stdin, stdout, stderr, cfg)
+			return err
 		})
 	}
 
 	if cfg.Listeners[0].AnonSSH != "" {
 		log.Printf("rsync daemon listening (anon SSH) on %s", ln.Addr())
-		return anonssh.Serve(ctx, ln, sshListener, cfg, func(args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer) error {
-			return Main(ctx, args, stdin, stdout, stderr, cfg)
+		return nil, anonssh.Serve(ctx, ln, sshListener, cfg, func(args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer) error {
+			_, err := Main(ctx, args, stdin, stdout, stderr, cfg)
+			return err
 		})
 	}
 
 	log.Printf("rsync daemon listening on rsync://%s", ln.Addr())
-	return srv.Serve(ctx, ln)
+	return nil, srv.Serve(ctx, ln)
 }

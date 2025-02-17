@@ -24,12 +24,12 @@ func TestMain(m *testing.M) {
 		// Strip first 2 args (./rsync.test localhost) from command line:
 		// rsync(1) is calling this process as a remote shell.
 		os.Args = os.Args[2:]
-		if err := maincmd.Main(context.Background(), os.Args, os.Stdin, os.Stdout, os.Stderr, nil); err != nil {
+		if _, err := maincmd.Main(context.Background(), os.Args, os.Stdin, os.Stdout, os.Stderr, nil); err != nil {
 			log.Fatal(err)
 		}
 	} else if len(os.Args) > 1 && os.Args[1] == "--server" {
 		// gokr-rsync is calling this process as a local daemon.
-		if err := maincmd.Main(context.Background(), os.Args, os.Stdin, os.Stdout, os.Stderr, nil); err != nil {
+		if _, err := maincmd.Main(context.Background(), os.Args, os.Stdin, os.Stdout, os.Stderr, nil); err != nil {
 			log.Fatal(err)
 		}
 	} else {
