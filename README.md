@@ -55,8 +55,8 @@ any issues you run into!
 To serve the current directory via rsync on `localhost:8730`, use:
 
 ```
-go install github.com/gokrazy/rsync/cmd/gokr-rsyncd@latest
-gokr-rsyncd --daemon --gokr.listen=localhost:8730 --gokr.modulemap=pwd=$PWD
+go install github.com/gokrazy/rsync/cmd/gokr-rsync@latest
+gokr-rsync --daemon --gokr.listen=localhost:8730 --gokr.modulemap=pwd=$PWD
 ```
 
 You can then copy the contents of the current directory with clients such as
@@ -123,7 +123,7 @@ contents.
 Prefer setup 2 instead.
 
 Example:
-* Server: `gokr-rsyncd --daemon --gokr.modulemap=module=/srv/rsync-module`
+* Server: `gokr-rsync --daemon --gokr.modulemap=module=/srv/rsync-module`
 * Client: `rsync rsync://webserver/module/path`
 
 ### Setup 2: anon SSH (daemon)
@@ -132,7 +132,7 @@ This setup is well suited for serving world-readable files without
 authentication.
 
 Example:
-* Server: `gokr-rsyncd --daemon --gokr.modulemap=module=/srv/rsync-module --gokr.anonssh_listen=:22873`
+* Server: `gokr-rsync --daemon --gokr.modulemap=module=/srv/rsync-module --gokr.anonssh_listen=:22873`
 * Client: `rsync -e ssh rsync://webserver/module/path`
 
 
@@ -141,7 +141,7 @@ Example:
 This setup is well suited for interactive one-off transfers or regular backups,
 and uses SSH for both encryption and authentication.
 
-Note that because `gokr-rsyncd` is invoked with user privileges (not root
+Note that because `gokr-rsync` is invoked with user privileges (not root
 privileges), it cannot do [namespacing](#privileged-linux-including-gokrazyorg)
 and hence retains more privileges. When serving public data, it is generally
 preferable to use setup 2 instead.
@@ -150,11 +150,11 @@ Note that `rsync(1)` assumes the server process understands all flags that it
 sends, i.e. is running the same version on client and server, or at least a
 compatible-enough version. You can either specify `--protocol=27` on the client,
 or use setup 4, which negotiates the protocol version, side-stepping possible
-compatibility gaps between rsync clients and `gokr-rsyncd`.
+compatibility gaps between rsync clients and `gokr-rsync`.
 
 Example:
 * Server will be started via SSH
-* Client: `rsync --rsync-path=gokr-rsyncd webserver:path`
+* Client: `rsync --rsync-path=gokr-rsync webserver:path`
 
 ### Setup 4: SSH (daemon)
 
@@ -169,15 +169,15 @@ so you might need to explicitly start /usr/libexec/rsync/rsync.samba on Macs.
 
 Example:
 * Server will be started via SSH
-* Client: `rsync -e ssh --rsync-path=gokr-rsyncd rsync://webserver/module/path`
+* Client: `rsync -e ssh --rsync-path=gokr-rsync rsync://webserver/module/path`
 
 ## Limitations
 
 ### Bandwidth
 
-In my tests, `gokr-rsyncd` can easily transfer data at > 6 Gbit/s. The current
+In my tests, `gokr-rsync` can easily transfer data at > 6 Gbit/s. The current
 bottleneck is the MD4 algorithm itself (not sure whether in the “tridge” rsync
-client, or in `gokr-rsyncd`). Implementing support for more recent protocol
+client, or in `gokr-rsync`). Implementing support for more recent protocol
 versions would help here, as these include hash algorithm negotiation with more
 recent choices.
 
@@ -198,14 +198,14 @@ Supported environments:
 In all environments, the default instructions will take care that:
 
 * (On Linux only) Only configured rsync modules from the host file system are
-  mounted **read-only** into a Linux mount namespace for `gokr-rsyncd`, to guard
+  mounted **read-only** into a Linux mount namespace for `gokr-rsync`, to guard
   against data modification and data exfiltration.
-* `gokr-rsyncd` is running without privileges, as user `nobody`, to limit the
+* `gokr-rsync` is running without privileges, as user `nobody`, to limit the
   scope of what an attacker can do when exploiting a vulnerability.
 
 Known gaps:
 
-* `gokr-rsyncd` does not guard against denial of service attacks, i.e. consuming
+* `gokr-rsync` does not guard against denial of service attacks, i.e. consuming
   too many resources (connections, bandwidth, CPU, …).
   * See also [Per-IP rate limiting with
     iptables](https://making.pusher.com/per-ip-rate-limiting-with-iptables/).
@@ -229,7 +229,7 @@ In the opened editor, change the file to:
 ```
 [Service]
 ExecStart=
-ExecStart=/usr/bin/gokr-rsyncd --gokr.modulemap=pwd=/etc/tmpfiles.d
+ExecStart=/usr/bin/gokr-rsync --daemon --gokr.modulemap=pwd=/etc/tmpfiles.d
 ```
 
 Close the editor and install the service using:
@@ -242,7 +242,7 @@ Additional hardening recommendations:
 
 * Restrict which IP addresses are allowed to connect to your rsync server, for example:
   * using iptables or nftables on your host system
-  * using [`gokr-rsyncd`’s built-in IP allow/deny mechanism](https://github.com/gokrazy/rsync/issues/4) (once implemented)
+  * using [`gokr-rsync`’s built-in IP allow/deny mechanism](https://github.com/gokrazy/rsync/issues/4) (once implemented)
   * using [systemd’s `IPAddressDeny` and `IPAddressAllow`](https://manpages.debian.org/systemd.resource-control.5) in `gokr-rsyncd.socket`
 * To reduce the impact of Denial Of Service attacks, you can restrict resources
   with systemd, see [Managing
@@ -274,33 +274,33 @@ Additional hardening recommendations:
 
 * Restrict which IP addresses are allowed to connect to your rsync server, for example:
   * using iptables or nftables on your host system
-  * using [`gokr-rsyncd`’s built-in IP allow/deny mechanism](https://github.com/gokrazy/rsync/issues/4) (once implemented)
+  * using [`gokr-rsync`’s built-in IP allow/deny mechanism](https://github.com/gokrazy/rsync/issues/4) (once implemented)
     * Be sure to set up Docker such that the remote IPv4 or IPv6 address is available inside the container, see https://michael.stapelberg.ch/posts/2018-12-12-docker-ipv6/
 
 ### privileged Linux (including gokrazy.org)
 
-When started as `root` on Linux, `gokr-rsyncd` will create a [Linux mount
+When started as `root` on Linux, `gokr-rsync` will create a [Linux mount
 namespace](https://manpages.debian.org/mount_namespaces.7), mount all configured
 rsync modules read-only into the namespace, then change into the namespace using
 [`chroot(2)`](https://manpages.debian.org/chroot.2) and drop privileges using
 [`setuid(2)`](https://manpages.debian.org/setuid.2).
 
 **Tip:** you can verify which file system objects the daemon process can see by
-using `ls -l /proc/$(pidof gokr-rsyncd)/root/`.
+using `ls -l /proc/$(pidof gokr-rsync)/root/`.
 
 Additional hardening recommendations:
 
 * Restrict which IP addresses are allowed to connect to your rsync server, for example:
   * using iptables or nftables on your host system
-  * using [`gokr-rsyncd`’s built-in IP allow/deny mechanism](https://github.com/gokrazy/rsync/issues/4) (once implemented)
+  * using [`gokr-rsync`’s built-in IP allow/deny mechanism](https://github.com/gokrazy/rsync/issues/4) (once implemented)
 
 ### privileged non-Linux (e.g. Mac)
 
-When started as `root` on non-Linux (e.g. Mac), `gokr-rsyncd` will drop
+When started as `root` on non-Linux (e.g. Mac), `gokr-rsync` will drop
 privileges using [`setuid(2)`](https://manpages.debian.org/setuid.2).
 
 ### unprivileged with write permission (e.g. from a shell)
 
-To prevent accidental misconfiguration, `gokr-rsyncd` refuses to start when it
+To prevent accidental misconfiguration, `gokr-rsync` refuses to start when it
 detects that it has write permission in any configured rsync module.
 
