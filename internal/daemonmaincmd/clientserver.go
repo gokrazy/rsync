@@ -1,4 +1,4 @@
-package receivermaincmd
+package maincmd
 
 import (
 	"bufio"
