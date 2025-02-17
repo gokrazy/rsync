@@ -18,8 +18,8 @@ import (
 	"testing"
 
 	"github.com/gokrazy/rsync/internal/anonssh"
-	maincmd "github.com/gokrazy/rsync/internal/daemonmaincmd"
 	"github.com/gokrazy/rsync/internal/log"
+	"github.com/gokrazy/rsync/internal/maincmd"
 	"github.com/gokrazy/rsync/internal/rsyncdconfig"
 	"github.com/gokrazy/rsync/rsyncd"
 	"github.com/google/go-cmp/cmp"

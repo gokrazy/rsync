@@ -12,7 +12,7 @@ import (
 	"testing"
 
 	"github.com/BurntSushi/toml"
-	maincmd "github.com/gokrazy/rsync/internal/daemonmaincmd"
+	"github.com/gokrazy/rsync/internal/maincmd"
 	"github.com/gokrazy/rsync/internal/rsyncdconfig"
 	"github.com/gokrazy/rsync/internal/rsynctest"
 	"github.com/gokrazy/rsync/rsyncd"

@@ -5,7 +5,7 @@ import (
 	"log"
 	"os"
 
-	maincmd "github.com/gokrazy/rsync/internal/daemonmaincmd"
+	"github.com/gokrazy/rsync/internal/maincmd"
 )
 
 func main() {
