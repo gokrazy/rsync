@@ -3,22 +3,17 @@
 [![tests](https://github.com/gokrazy/rsync/actions/workflows/main.yml/badge.svg)](https://github.com/gokrazy/rsync/actions/workflows/main.yml)
 [![Sourcegraph](https://sourcegraph.com/github.com/gokrazy/rsync/-/badge.svg)](https://sourcegraph.com/github.com/gokrazy/rsync??badge)
 
-Package rsync contains a native Go rsync implementation.
-
-This repository currently contains:
-
-1. `gokr-rsyncd`, a rsync daemon Go implementation of rsyncd. It implements the
-   rsync daemon network protocol (port 873/tcp by default), but can be used over
-   SSH or locally as well.
-2. `gokr-rsync` is an rsync receiver implementation that can download files via
-   rsync (daemon protocol or SSH).
+This repository contains a native Go rsync implementation: the `gokr-rsync`
+command implements an rsync client and server, which can send or receive files
+(all directions supported). Daemon mode is supported, meaning you can deploy
+`gokr-rsync` behind SSH (anonymous or authorized), as command or daemon, or
+listening directly on the network (on port 873/tcp by default).
 
 The following known improvements are not yet implemented:
 
 * Making `gokr-rsync` chroot (and/or Linux mount namespaces when available?)
   into the destination directory to reduce chances of accidental file system
   manipulation in case of bugs.
-* Merging `gokr-rsyncd` and `gokr-rsync` into a single binary.
 
 This project accepts contributions as time permits to merge them (best effort).
 
