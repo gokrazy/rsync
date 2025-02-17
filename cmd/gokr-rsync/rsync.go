@@ -9,7 +9,7 @@ import (
 )
 
 func main() {
-	if _, err := receivermaincmd.Main(os.Args, os.Stdin, os.Stdout, os.Stderr); err != nil {
+	if _, err := receivermaincmd.ClientMain(os.Args, os.Stdin, os.Stdout, os.Stderr); err != nil {
 		log.Fatal(err)
 	}
 }

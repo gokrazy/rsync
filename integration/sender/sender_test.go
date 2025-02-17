@@ -114,7 +114,7 @@ func TestSender(t *testing.T) {
 		source + "/",
 		"rsync://localhost:" + srv.Port + "/interop/",
 	}
-	firstStats, err := receivermaincmd.Main(args, os.Stdin, os.Stdout, os.Stdout)
+	firstStats, err := receivermaincmd.ClientMain(args, os.Stdin, os.Stdout, os.Stdout)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -156,7 +156,7 @@ func TestSender(t *testing.T) {
 		rsynctest.VerifyDummyDeviceFiles(t, devices, filepath.Join(dest, "devices"))
 	}
 
-	incrementalStats, err := receivermaincmd.Main(args, os.Stdin, os.Stdout, os.Stdout)
+	incrementalStats, err := receivermaincmd.ClientMain(args, os.Stdin, os.Stdout, os.Stdout)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -180,7 +180,7 @@ func TestSender(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := receivermaincmd.Main(args, os.Stdin, os.Stdout, os.Stdout); err != nil {
+	if _, err := receivermaincmd.ClientMain(args, os.Stdin, os.Stdout, os.Stdout); err != nil {
 		t.Fatal(err)
 	}
 
@@ -257,7 +257,7 @@ func TestSenderNoSlash(t *testing.T) {
 		source,
 		"rsync://localhost:" + srv.Port + "/interop/",
 	}
-	firstStats, err := receivermaincmd.Main(args, os.Stdin, os.Stdout, os.Stdout)
+	firstStats, err := receivermaincmd.ClientMain(args, os.Stdin, os.Stdout, os.Stdout)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -301,7 +301,7 @@ func TestSenderNoSlash(t *testing.T) {
 		rsynctest.VerifyDummyDeviceFiles(t, devices, filepath.Join(dest, "devices"))
 	}
 
-	incrementalStats, err := receivermaincmd.Main(args, os.Stdin, os.Stdout, os.Stdout)
+	incrementalStats, err := receivermaincmd.ClientMain(args, os.Stdin, os.Stdout, os.Stdout)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -325,7 +325,7 @@ func TestSenderNoSlash(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := receivermaincmd.Main(args, os.Stdin, os.Stdout, os.Stdout); err != nil {
+	if _, err := receivermaincmd.ClientMain(args, os.Stdin, os.Stdout, os.Stdout); err != nil {
 		t.Fatal(err)
 	}
 
@@ -398,7 +398,7 @@ func TestSenderBothLocal(t *testing.T) {
 		source,
 		dest,
 	}
-	firstStats, err := receivermaincmd.Main(args, os.Stdin, os.Stdout, os.Stdout)
+	firstStats, err := receivermaincmd.ClientMain(args, os.Stdin, os.Stdout, os.Stdout)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -442,7 +442,7 @@ func TestSenderBothLocal(t *testing.T) {
 		rsynctest.VerifyDummyDeviceFiles(t, devices, filepath.Join(dest, "devices"))
 	}
 
-	incrementalStats, err := receivermaincmd.Main(args, os.Stdin, os.Stdout, os.Stdout)
+	incrementalStats, err := receivermaincmd.ClientMain(args, os.Stdin, os.Stdout, os.Stdout)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -466,7 +466,7 @@ func TestSenderBothLocal(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := receivermaincmd.Main(args, os.Stdin, os.Stdout, os.Stdout); err != nil {
+	if _, err := receivermaincmd.ClientMain(args, os.Stdin, os.Stdout, os.Stdout); err != nil {
 		t.Fatal(err)
 	}
 
