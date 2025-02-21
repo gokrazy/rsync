@@ -226,7 +226,7 @@ func (s *Server) HandleDaemonConn(ctx context.Context, conn io.ReadWriter, remot
 		// Switch to multiplexing protocol, but only for server-side transmissions.
 		// Transmissions received from the client are not multiplexed.
 		mpx := &rsyncwire.MultiplexWriter{Writer: c.Writer}
-		mpx.WriteMsg(rsyncwire.MsgError, []byte(fmt.Sprintf("gokr-rsync [sender]: %v\n", err)))
+		mpx.WriteMsg(rsyncwire.MsgError, fmt.Appendf(nil, "gokr-rsync [sender]: %v\n", err))
 
 		return err
 	}

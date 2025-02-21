@@ -269,10 +269,7 @@ func (rt *Transfer) generateAndSendSums(in *os.File, fileLen int64) error {
 	buf := make([]byte, int(sh.BlockLength))
 	remaining := fileLen
 	for i := int32(0); i < sh.ChecksumCount; i++ {
-		n1 := int64(sh.BlockLength)
-		if n1 > remaining {
-			n1 = remaining
-		}
+		n1 := min(int64(sh.BlockLength), remaining)
 		b := buf[:n1]
 		if _, err := io.ReadFull(in, b); err != nil {
 			return err

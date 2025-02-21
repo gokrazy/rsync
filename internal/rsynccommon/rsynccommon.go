@@ -19,10 +19,7 @@ func SumSizesSqroot(contentLen int64) rsync.SumHead {
 	// For reasons unknown, the square root result is rounded up to the nearest multiple of eight.
 
 	// TODO: round this
-	blockLength := int32(math.Sqrt(float64(contentLen)))
-	if blockLength < blockSize {
-		blockLength = blockSize
-	}
+	blockLength := max(int32(math.Sqrt(float64(contentLen))), blockSize)
 
 	// * The checksum size is determined according to:
 	// *     blocksum_bits = BLOCKSUM_EXP + 2*log2(file_len) - log2(block_len)

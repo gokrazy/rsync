@@ -21,7 +21,7 @@ type fakeLogger struct {
 
 var _ log.Logger = (*fakeLogger)(nil)
 
-func (f *fakeLogger) Printf(msg string, a ...interface{}) {
+func (f *fakeLogger) Printf(msg string, a ...any) {
 	fmt.Fprintf(f.out, msg, a...)
 }
 

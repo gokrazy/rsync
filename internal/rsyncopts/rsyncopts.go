@@ -299,7 +299,7 @@ var infoWords = [...]output{
 
 func parseOutputWords(words []output, levels []uint16, str string, prio priority) {
 Level:
-	for _, s := range strings.Split(str, ",") {
+	for s := range strings.SplitSeq(str, ",") {
 		if strings.TrimSpace(s) == "" {
 			continue
 		}
@@ -323,7 +323,7 @@ Level:
 		case "all":
 			all = true
 		}
-		for j := 0; j < len(words); j++ {
+		for j := range words {
 			word := words[j]
 			if strings.ToLower(word.name) == trimmed || all {
 				levels[j] = uint16(lev)

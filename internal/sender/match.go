@@ -159,10 +159,7 @@ Outer:
 
 		// Update the rolling checksum by removing the oldest byte (update[0])
 		// and adding the newest byte (update[k]).
-		backup := offset - st.lastMatch
-		if backup < 0 {
-			backup = 0
-		}
+		backup := max(offset-st.lastMatch, 0)
 
 		more := offset+int64(k) < fi.Size()
 		mmore := int64(0)
