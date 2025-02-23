@@ -71,6 +71,7 @@ func (st *Transfer) SendFileList(trimPrefix, localDir string, opts *rsyncopts.Op
 	// error flag, but traversal should continue
 
 	st.Logger.Printf("sendFileList()")
+	ioErrors := int32(0)
 	// TODO: handle |root| referring to an individual file, symlink or special (skip)
 	for _, requested := range paths {
 		st.Logger.Printf("  path %q (local dir %q)", requested, localDir)
@@ -79,7 +80,14 @@ func (st *Transfer) SendFileList(trimPrefix, localDir string, opts *rsyncopts.Op
 		err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
 			// st.logger.Printf("filepath.WalkFn(path=%s)", path)
 			if err != nil {
-				return err
+				if os.IsNotExist(err) {
+					st.Logger.Printf("file vanished: %v", err)
+				} else {
+					st.Logger.Printf("lstat: %v", err)
+				}
+				// set the I/O error flag, but keep walking
+				ioErrors = 1
+				return nil
 			}
 
 			// Only ever transmit long names, like openrsync
@@ -267,7 +275,6 @@ func (st *Transfer) SendFileList(trimPrefix, localDir string, opts *rsyncopts.Op
 	}
 	fec.WriteInt32(endOfSet)
 
-	const ioErrors = 0
 	fec.WriteInt32(ioErrors)
 
 	if err := st.Conn.WriteString(fec.String()); err != nil {
