@@ -42,9 +42,6 @@ type execR struct {
 }
 
 type session struct {
-	env     []string
-	ptyf    *os.File
-	ttyf    *os.File
 	channel ssh.Channel
 	anonssh *anonssh
 }
@@ -312,6 +309,7 @@ func Serve(ctx context.Context, ln net.Listener, listener *Listener, cfg *rsyncd
 	}()
 
 	as := &anonssh{
+		cfg:  cfg,
 		main: main,
 	}
 

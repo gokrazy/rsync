@@ -347,6 +347,7 @@ func (o *Options) setOutputVerbosity(prio priority) {
 		"CMD2,DELTASUM3,DEL3,EXIT2,FLIST3,ICONV2,OWN2,PROTO,TIME2",
 		"CHDIR,DELTASUM4,FLIST4,FUZZY2,HASH,HLINK",
 	}
+	_ = debugVerbosity
 	infoVerbosity := [...]string{
 		"NONREG",
 		"COPY,DEL,FLIST,MISC,NAME,STATS,SYMSAFE",

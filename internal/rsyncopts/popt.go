@@ -170,9 +170,7 @@ func (pc *Context) poptGetNextOpt() (int32, error) {
 			// remove the one dash we ensured is present
 			before = strings.TrimPrefix(before, "-")
 			// a second dash is permitted
-			if strings.HasPrefix(before, "-") {
-				before = strings.TrimPrefix(before, "-")
-			}
+			before = strings.TrimPrefix(before, "-")
 			opt = pc.findOption(before, "")
 			if opt == nil {
 				// try and parse it as a short option
@@ -195,7 +193,8 @@ func (pc *Context) poptGetNextOpt() (int32, error) {
 			// neither long nor short? how can we end up here?
 			return -1, &PoptError{
 				Errno: POPT_ERROR_BADOPT,
-				Err:   fmt.Errorf("neither long nor short option found?!"),
+				//lint:ignore ST1005 we need this punctuation for dramatic effect!
+				Err: fmt.Errorf("neither long nor short option found?!"),
 			}
 		}
 		argType := opt.argInfo & POPT_ARG_MASK
