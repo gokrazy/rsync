@@ -108,6 +108,7 @@ func rsyncMain(osenv receiver.Osenv, opts *rsyncopts.Options, sources []string, 
 		if err != nil {
 			return nil, err
 		}
+		//lint:ignore SA4004 TODO: refactor to match how rsync handles multiple sources
 		return stats, nil
 	}
 	return nil, nil
