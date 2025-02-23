@@ -5,6 +5,12 @@ on:
   pull_request:
 
 jobs:
+  staticcheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: dominikh/staticcheck-action@v1
+
   tests:
     strategy:
       matrix:
@@ -26,10 +32,6 @@ jobs:
       if: matrix.os == 'ubuntu-latest'
       run: |
         [ "$(gofmt -l $(find . -name '*.go') 2>&1)" = "" ]
-
-    - name: golangci-lint
-      if: matrix.os == 'ubuntu-latest'
-      uses: golangci/golangci-lint-action@v6
 
     - name: install rsync
       if: matrix.os == 'ubuntu-latest'
