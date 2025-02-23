@@ -39,6 +39,8 @@ type Transfer struct {
 	Conn     *rsyncwire.Conn
 	Seed     int32
 	IOErrors int32
+	Users    map[int32]mapping
+	Groups   map[int32]mapping
 }
 
 func (rt *Transfer) listOnly() bool { return rt.Dest == "" }

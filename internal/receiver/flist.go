@@ -231,8 +231,8 @@ func (rt *Transfer) ReceiveFileList() ([]*File, error) {
 		if err != nil {
 			return nil, err
 		}
-		_ = users
-		_ = groups
+		rt.Users = users
+		rt.Groups = groups
 	}
 
 	// read the i/o error flag

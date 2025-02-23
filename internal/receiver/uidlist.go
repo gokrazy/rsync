@@ -3,6 +3,8 @@ package receiver
 import (
 	"io"
 	"log"
+	"os/user"
+	"strconv"
 )
 
 type mapping struct {
@@ -41,8 +43,15 @@ func (rt *Transfer) RecvIdList() (users map[int32]mapping, groups map[int32]mapp
 	if rt.Opts.PreserveUid {
 		var err error
 		users, err = rt.recvIdMapping1(func(remoteUid int32, remoteUsername string) int32 {
-			// TODO: look up local uid by username
-			return remoteUid
+			u, err := user.Lookup(remoteUsername)
+			if err != nil {
+				return remoteUid
+			}
+			uid, err := strconv.ParseInt(u.Uid, 0, 32)
+			if err != nil {
+				return remoteUid
+			}
+			return int32(uid)
 		})
 		if err != nil {
 			return nil, nil, err
@@ -55,8 +64,15 @@ func (rt *Transfer) RecvIdList() (users map[int32]mapping, groups map[int32]mapp
 	if rt.Opts.PreserveGid {
 		var err error
 		groups, err = rt.recvIdMapping1(func(remoteGid int32, remoteGroupname string) int32 {
-			// TODO: look up local gid by groupname
-			return remoteGid
+			g, err := user.LookupGroup(remoteGroupname)
+			if err != nil {
+				return remoteGid
+			}
+			gid, err := strconv.ParseInt(g.Gid, 0, 32)
+			if err != nil {
+				return remoteGid
+			}
+			return int32(gid)
 		})
 		if err != nil {
 			return nil, nil, err
