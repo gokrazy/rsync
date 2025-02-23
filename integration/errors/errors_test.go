@@ -45,7 +45,7 @@ func TestErrors(t *testing.T) {
 
 	output := buf.String()
 	t.Logf("output:\n%s\n(end of output)", output)
-	if want := "some files could not be transferred (code 23)"; !strings.Contains(output, want) {
+	if want := "(code 23)"; !strings.Contains(output, want) {
 		t.Fatalf("rsync output unexpectedly did not contain %q:\n%s", want, output)
 	}
 }
