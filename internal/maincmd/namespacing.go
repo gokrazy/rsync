@@ -1,5 +1,4 @@
 //go:build !linux || nonamespacing
-// +build !linux nonamespacing
 
 package maincmd
 

@@ -25,10 +25,12 @@ func dropPrivileges() error {
 
 	// Defense in depth: exit if we can re-gain uid/gid 0 permission:
 	if err := syscall.Setgid(0); err == nil {
+		//lint:ignore ST1005 we need this punctuation for dramatic effect!
 		return fmt.Errorf("unexpectedly able to re-gain gid 0 permission!")
 	}
 
 	if err := syscall.Setuid(0); err == nil {
+		//lint:ignore ST1005 we need this punctuation for dramatic effect!
 		return fmt.Errorf("unexpectedly able to re-gain uid 0 permission!")
 	}
 
