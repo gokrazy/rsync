@@ -60,7 +60,7 @@ func TestTridgeRsyncVersion(t *testing.T) {
 	}
 }
 
-func TestModuleListing(t *testing.T) {
+func TestModuleListingServer(t *testing.T) {
 	t.Parallel()
 
 	rsyncBin := rsynctest.TridgeOrGTFO(t, "TODO: add reason")
@@ -87,6 +87,30 @@ func TestModuleListing(t *testing.T) {
 	output := buf.String()
 	if want := "interop\tinterop"; !strings.Contains(output, want) {
 		t.Fatalf("rsync output unexpectedly did not contain %q:\n%s", want, output)
+	}
+}
+
+func TestModuleListingClient(t *testing.T) {
+	t.Parallel()
+
+	tmp := t.TempDir()
+
+	// start a server to sync from
+	srv := rsynctest.New(t, rsynctest.InteropModule(tmp))
+
+	// request module list
+	args := []string{
+		"gokr-rsync",
+		"-aH",
+		"rsync://localhost:" + srv.Port + "/",
+	}
+	var stdout bytes.Buffer
+	if _, err := maincmd.Main(t.Context(), args, os.Stdin, &stdout, &stdout, nil); err != nil {
+		t.Fatal(err)
+	}
+
+	if want := "interop\tinterop"; !strings.Contains(stdout.String(), want) {
+		t.Fatalf("rsync output unexpectedly did not contain %q:\n%s", want, stdout.String())
 	}
 }
 

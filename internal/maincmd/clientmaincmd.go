@@ -99,8 +99,12 @@ func rsyncMain(osenv receiver.Osenv, opts *rsyncopts.Options, sources []string, 
 		}
 		negotiate := true
 		if daemonConnection != 0 {
-			if err := startInbandExchange(opts, conn, module, path); err != nil {
+			done, err := startInbandExchange(osenv, opts, conn, module, path)
+			if err != nil {
 				return nil, err
+			}
+			if done {
+				return nil, nil
 			}
 			negotiate = false // already done
 		}
