@@ -1,3 +1,7 @@
+// Package rsyncd implements an rsync server (only), but note that gokrazy/rsync
+// contains a native Go rsync implementation that supports sending and receiving
+// files as client or server, compatible with the original tridge rsync (from
+// the samba project) or openrsync (used on OpenBSD and macOS 15+).
 package rsyncd
 
 import (
