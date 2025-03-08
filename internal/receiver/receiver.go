@@ -42,7 +42,9 @@ func (rt *Transfer) RecvFiles(fileList []*File) error {
 
 func (rt *Transfer) recvFile1(f *File) error {
 	if rt.Opts.DryRun {
-		fmt.Println(f.Name)
+		if !rt.Opts.Server {
+			fmt.Println(f.Name)
+		}
 		return nil
 	}
 

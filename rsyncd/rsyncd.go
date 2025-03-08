@@ -325,6 +325,7 @@ func (s *Server) handleConnReceiver(module *Module, crd *rsyncwire.CountingReade
 	rt := &receiver.Transfer{
 		Opts: &receiver.TransferOpts{
 			DryRun: opts.DryRun(),
+			Server: opts.Server(),
 
 			DeleteMode:       opts.DeleteMode(),
 			PreserveGid:      opts.PreserveGid(),

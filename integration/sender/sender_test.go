@@ -1,9 +1,11 @@
 package sender_test
 
 import (
+	"bytes"
 	"context"
 	"log"
 	"os"
+	"os/exec"
 	"os/user"
 	"path/filepath"
 	"strconv"
@@ -488,5 +490,42 @@ func TestSenderBothLocal(t *testing.T) {
 		if got != want {
 			t.Fatalf("unexpected link target: got %q, want %q", got, want)
 		}
+	}
+}
+
+func TestReceiverCommandDryRun(t *testing.T) {
+	t.Parallel()
+
+	tmp := t.TempDir()
+	source := filepath.Join(tmp, "source")
+	dest := filepath.Join(tmp, "dest")
+
+	if err := os.MkdirAll(source, 0755); err != nil {
+		t.Fatal(err)
+	}
+	hello := filepath.Join(source, "hello")
+	if err := os.WriteFile(hello, []byte("world"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(dest, 0755); err != nil {
+		t.Fatal(err)
+	}
+	hello = filepath.Join(dest, "hello")
+	if err := os.WriteFile(hello, []byte("moon"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	var buf bytes.Buffer
+	rsync := exec.Command(rsynctest.AnyRsync(t),
+		"--dry-run",
+		"-e", os.Args[0],
+		"-a",
+		source+"/",
+		"localhost:"+dest+"/")
+	rsync.Stdout = &buf
+	rsync.Stderr = os.Stderr
+	log.Printf("%v", rsync.Args)
+	if err := rsync.Run(); err != nil {
+		t.Fatalf("rsync error, output:\n%s", buf.String())
 	}
 }

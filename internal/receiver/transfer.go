@@ -16,6 +16,7 @@ type Osenv struct {
 type TransferOpts struct {
 	Verbose bool
 	DryRun  bool
+	Server  bool
 
 	DeleteMode        bool
 	PreserveGid       bool
