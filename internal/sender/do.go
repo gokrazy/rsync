@@ -8,6 +8,28 @@ import (
 	"github.com/gokrazy/rsync/internal/rsyncwire"
 )
 
+// rsync/main.c:handle_stats
+func (st *Transfer) handleStats(crd *rsyncwire.CountingReader, cwr *rsyncwire.CountingWriter, fileList *fileList) error {
+	if !st.Opts.Server() || !st.Opts.Sender() {
+		return nil
+	}
+
+	// send statistics:
+	// total bytes read (from network connection)
+	if err := st.Conn.WriteInt64(crd.BytesRead); err != nil {
+		return err
+	}
+	// total bytes written (to network connection)
+	if err := st.Conn.WriteInt64(cwr.BytesWritten); err != nil {
+		return err
+	}
+	// total size of files
+	if err := st.Conn.WriteInt64(fileList.TotalSize); err != nil {
+		return err
+	}
+	return nil
+}
+
 // rsync/main.c:client_run am_sender
 func (st *Transfer) Do(crd *rsyncwire.CountingReader, cwr *rsyncwire.CountingWriter, modPrefix, modPath string, paths []string, exclusionList *filterRuleList) (*rsyncstats.TransferStats, error) {
 	if exclusionList == nil {
@@ -36,17 +58,7 @@ func (st *Transfer) Do(crd *rsyncwire.CountingReader, cwr *rsyncwire.CountingWri
 		return nil, err
 	}
 
-	// send statistics:
-	// total bytes read (from network connection)
-	if err := st.Conn.WriteInt64(crd.BytesRead); err != nil {
-		return nil, err
-	}
-	// total bytes written (to network connection)
-	if err := st.Conn.WriteInt64(cwr.BytesWritten); err != nil {
-		return nil, err
-	}
-	// total size of files
-	if err := st.Conn.WriteInt64(fileList.TotalSize); err != nil {
+	if err := st.handleStats(crd, cwr, fileList); err != nil {
 		return nil, err
 	}
 
