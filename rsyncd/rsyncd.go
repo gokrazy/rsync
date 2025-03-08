@@ -348,6 +348,10 @@ func (s *Server) handleConnReceiver(module *Module, crd *rsyncwire.CountingReade
 		Seed: sessionChecksumSeed,
 	}
 
+	if opts.PreserveHardLinks() {
+		return fmt.Errorf("support for hard links not yet implemented")
+	}
+
 	if opts.DeleteMode() {
 		// receive the exclusion list (openrsync’s is always empty)
 		exclusionList, err := sender.RecvFilterList(c)
