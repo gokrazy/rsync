@@ -1,14 +1,11 @@
 package receiver_test
 
 import (
-	"bytes"
-
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
 
-	"github.com/gokrazy/rsync/internal/maincmd"
 	"github.com/gokrazy/rsync/internal/rsynctest"
 	"github.com/google/go-cmp/cmp"
 )
@@ -46,19 +43,13 @@ func TestReceiverListing(t *testing.T) {
 	// start a server to sync from
 	srv := rsynctest.New(t, rsynctest.InteropModule(source))
 
-	args := []string{
-		"gokr-rsync",
+	stdout, _ := rsynctest.Output(t, "gokr-rsync",
 		"-aH",
-		"rsync://localhost:" + srv.Port + "/interop/",
-	}
-	var stdout bytes.Buffer
-	if _, err := maincmd.Main(t.Context(), args, os.Stdin, &stdout, &stdout, nil); err != nil {
-		t.Fatal(err)
-	}
+		"rsync://localhost:"+srv.Port+"/interop/")
 	want := `drwxr-xr-x        4096 2009/11/10 23:00:00 .
 -rw-r--r--           5 2009/11/10 23:00:00 hello
 `
-	if diff := cmp.Diff(want, stdout.String()); diff != "" {
+	if diff := cmp.Diff(want, string(stdout)); diff != "" {
 		t.Fatalf("unexpected listing: diff (-want +got):\n%s", diff)
 	}
 }

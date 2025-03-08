@@ -21,6 +21,8 @@ import (
 	"github.com/gokrazy/rsync/internal/log"
 	"github.com/gokrazy/rsync/internal/maincmd"
 	"github.com/gokrazy/rsync/internal/rsyncdconfig"
+	"github.com/gokrazy/rsync/internal/rsyncstats"
+	"github.com/gokrazy/rsync/rsynccmd"
 	"github.com/gokrazy/rsync/rsyncd"
 	"github.com/google/go-cmp/cmp"
 	"golang.org/x/sys/unix"
@@ -151,6 +153,38 @@ func New(t *testing.T, modules []rsyncd.Module, opts ...Option) *TestServer {
 	}
 
 	return ts
+}
+
+func Run(tb testing.TB, args ...string) *rsyncstats.TransferStats {
+	cmd := rsynccmd.Command(args[0], args[1:]...)
+	cmd.Stdout = os.Stdout // TODO: wire to tb.Logf
+	cmd.Stderr = os.Stderr
+	result, err := cmd.Run(tb.Context())
+	if err != nil {
+		tb.Fatal(err)
+	}
+	return result.Stats
+}
+
+func Output(tb testing.TB, args ...string) (stdout []byte, stderr []byte) {
+	var stdoutb, stderrb bytes.Buffer
+	cmd := rsynccmd.Command(args[0], args[1:]...)
+	cmd.Stdout = &stdoutb
+	cmd.Stderr = &stderrb
+	_, err := cmd.Run(context.Background())
+	if err != nil {
+		tb.Fatal(err)
+	}
+	return stdoutb.Bytes(), stderrb.Bytes()
+}
+
+func CombinedOutput(args ...string) ([]byte, error) {
+	var buf bytes.Buffer
+	cmd := rsynccmd.Command(args[0], args[1:]...)
+	cmd.Stdout = &buf
+	cmd.Stderr = &buf
+	_, err := cmd.Run(context.Background())
+	return buf.Bytes(), err
 }
 
 func CreateDummyDeviceFiles(t *testing.T, dir string) {

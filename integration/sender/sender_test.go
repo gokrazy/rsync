@@ -115,10 +115,7 @@ func TestSender(t *testing.T) {
 		source + "/",
 		"rsync://localhost:" + srv.Port + "/interop/",
 	}
-	firstStats, err := maincmd.Main(t.Context(), args, os.Stdin, os.Stdout, os.Stdout, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
+	firstStats := rsynctest.Run(t, args...)
 
 	{
 		want := []byte("world")
@@ -157,10 +154,7 @@ func TestSender(t *testing.T) {
 		rsynctest.VerifyDummyDeviceFiles(t, devices, filepath.Join(dest, "devices"))
 	}
 
-	incrementalStats, err := maincmd.Main(t.Context(), args, os.Stdin, os.Stdout, os.Stdout, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
+	incrementalStats := rsynctest.Run(t, args...)
 	if incrementalStats.Written >= firstStats.Written {
 		t.Fatalf("incremental run unexpectedly not more efficient than first run: incremental wrote %d bytes, first wrote %d bytes", incrementalStats.Written, firstStats.Written)
 	}
@@ -181,9 +175,7 @@ func TestSender(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := maincmd.Main(t.Context(), args, os.Stdin, os.Stdout, os.Stdout, nil); err != nil {
-		t.Fatal(err)
-	}
+	rsynctest.Run(t, args...)
 
 	{
 		want := []byte("world")
@@ -258,10 +250,7 @@ func TestSenderNoSlash(t *testing.T) {
 		source,
 		"rsync://localhost:" + srv.Port + "/interop/",
 	}
-	firstStats, err := maincmd.Main(t.Context(), args, os.Stdin, os.Stdout, os.Stdout, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
+	firstStats := rsynctest.Run(t, args...)
 
 	dest = filepath.Join(dest, "source")
 
@@ -302,10 +291,7 @@ func TestSenderNoSlash(t *testing.T) {
 		rsynctest.VerifyDummyDeviceFiles(t, devices, filepath.Join(dest, "devices"))
 	}
 
-	incrementalStats, err := maincmd.Main(t.Context(), args, os.Stdin, os.Stdout, os.Stdout, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
+	incrementalStats := rsynctest.Run(t, args...)
 	if incrementalStats.Written >= firstStats.Written {
 		t.Fatalf("incremental run unexpectedly not more efficient than first run: incremental wrote %d bytes, first wrote %d bytes", incrementalStats.Written, firstStats.Written)
 	}
@@ -326,9 +312,7 @@ func TestSenderNoSlash(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := maincmd.Main(t.Context(), args, os.Stdin, os.Stdout, os.Stdout, nil); err != nil {
-		t.Fatal(err)
-	}
+	rsynctest.Run(t, args...)
 
 	{
 		want := []byte("world")
@@ -399,10 +383,7 @@ func TestSenderBothLocal(t *testing.T) {
 		source,
 		dest,
 	}
-	firstStats, err := maincmd.Main(t.Context(), args, os.Stdin, os.Stdout, os.Stdout, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
+	firstStats := rsynctest.Run(t, args...)
 
 	dest = filepath.Join(dest, "source")
 
@@ -443,10 +424,7 @@ func TestSenderBothLocal(t *testing.T) {
 		rsynctest.VerifyDummyDeviceFiles(t, devices, filepath.Join(dest, "devices"))
 	}
 
-	incrementalStats, err := maincmd.Main(t.Context(), args, os.Stdin, os.Stdout, os.Stdout, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
+	incrementalStats := rsynctest.Run(t, args...)
 	if incrementalStats.Written >= firstStats.Written {
 		t.Fatalf("incremental run unexpectedly not more efficient than first run: incremental wrote %d bytes, first wrote %d bytes", incrementalStats.Written, firstStats.Written)
 	}
@@ -467,9 +445,7 @@ func TestSenderBothLocal(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := maincmd.Main(t.Context(), args, os.Stdin, os.Stdout, os.Stdout, nil); err != nil {
-		t.Fatal(err)
-	}
+	rsynctest.Run(t, args...)
 
 	{
 		want := []byte("world")

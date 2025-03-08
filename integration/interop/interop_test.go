@@ -15,16 +15,23 @@ import (
 	"github.com/gokrazy/rsync/internal/maincmd"
 	"github.com/gokrazy/rsync/internal/rsyncdconfig"
 	"github.com/gokrazy/rsync/internal/rsynctest"
+	"github.com/gokrazy/rsync/rsynccmd"
 	"github.com/gokrazy/rsync/rsyncd"
 	"github.com/google/go-cmp/cmp"
 )
 
 func TestMain(m *testing.M) {
 	if len(os.Args) > 1 && os.Args[1] == "localhost" {
+		log.Printf("os.Args before: %q", os.Args)
 		// Strip first 2 args (./rsync.test localhost) from command line:
 		// rsync(1) is calling this process as a remote shell.
 		os.Args = os.Args[2:]
-		if _, err := maincmd.Main(context.Background(), os.Args, os.Stdin, os.Stdout, os.Stderr, nil); err != nil {
+		log.Printf("os.Args after: %q", os.Args)
+		cmd := rsynccmd.Command(os.Args[0], os.Args[1:]...)
+		cmd.Stdin = os.Stdin
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		if _, err := cmd.Run(context.Background()); err != nil {
 			log.Fatal(err)
 		}
 	} else if len(os.Args) > 1 && os.Args[1] == "--server" {
@@ -104,13 +111,10 @@ func TestModuleListingClient(t *testing.T) {
 		"-aH",
 		"rsync://localhost:" + srv.Port + "/",
 	}
-	var stdout bytes.Buffer
-	if _, err := maincmd.Main(t.Context(), args, os.Stdin, &stdout, &stdout, nil); err != nil {
-		t.Fatal(err)
-	}
+	stdout, _ := rsynctest.Output(t, args...)
 
-	if want := "interop\tinterop"; !strings.Contains(stdout.String(), want) {
-		t.Fatalf("rsync output unexpectedly did not contain %q:\n%s", want, stdout.String())
+	if want := "interop\tinterop"; !strings.Contains(string(stdout), want) {
+		t.Fatalf("rsync output unexpectedly did not contain %q:\n%s", want, string(stdout))
 	}
 }
 

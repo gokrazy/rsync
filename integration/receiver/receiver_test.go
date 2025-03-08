@@ -116,10 +116,7 @@ func TestReceiver(t *testing.T) {
 		"rsync://localhost:" + srv.Port + "/interop/",
 		dest,
 	}
-	firstStats, err := maincmd.Main(t.Context(), args, os.Stdin, os.Stdout, os.Stdout, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
+	firstStats := rsynctest.Run(t, args...)
 
 	{
 		want := []byte("world")
@@ -158,10 +155,7 @@ func TestReceiver(t *testing.T) {
 		rsynctest.VerifyDummyDeviceFiles(t, devices, filepath.Join(dest, "devices"))
 	}
 
-	incrementalStats, err := maincmd.Main(t.Context(), args, os.Stdin, os.Stdout, os.Stdout, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
+	incrementalStats := rsynctest.Run(t, args...)
 	if incrementalStats.Written >= firstStats.Written {
 		t.Fatalf("incremental run unexpectedly not more efficient than first run: incremental wrote %d bytes, first wrote %d bytes", incrementalStats.Written, firstStats.Written)
 	}
@@ -182,9 +176,7 @@ func TestReceiver(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := maincmd.Main(t.Context(), args, os.Stdin, os.Stdout, os.Stdout, nil); err != nil {
-		t.Fatal(err)
-	}
+	rsynctest.Run(t, args...)
 
 	{
 		want := []byte("world")
@@ -230,10 +222,7 @@ func TestReceiverSync(t *testing.T) {
 		"rsync://localhost:" + srv.Port + "/interop/",
 		dest,
 	}
-	firstStats, err := maincmd.Main(t.Context(), args, os.Stdin, os.Stdout, os.Stdout, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
+	firstStats := rsynctest.Run(t, args...)
 	t.Logf("firstStats: %+v", firstStats)
 	//     receiver_test.go:211: firstStats: &{Read:91 Written:3146087 Size:3149824}
 
@@ -246,10 +235,7 @@ func TestReceiverSync(t *testing.T) {
 	// modify the large data file
 	rsynctest.WriteLargeDataFile(t, source, headPattern, bodyPattern, endPattern)
 
-	incrementalStats, err := maincmd.Main(t.Context(), args, os.Stdin, os.Stdout, os.Stdout, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
+	incrementalStats := rsynctest.Run(t, args...)
 	t.Logf("incrementalStats: %+v", incrementalStats)
 	if got, want := incrementalStats.Written, int64(2*1024*1024); got >= want {
 		t.Fatalf("rsync unexpectedly transferred more data than needed: got %d, want < %d", got, want)
@@ -279,10 +265,7 @@ func TestReceiverSyncDelete(t *testing.T) {
 		"rsync://localhost:" + srv.Port + "/interop/",
 		dest,
 	}
-	firstStats, err := maincmd.Main(t.Context(), args, os.Stdin, os.Stdout, os.Stdout, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
+	firstStats := rsynctest.Run(t, args...)
 	t.Logf("firstStats: %+v", firstStats)
 	//     receiver_test.go:211: firstStats: &{Read:91 Written:3146087 Size:3149824}
 
@@ -295,9 +278,7 @@ func TestReceiverSyncDelete(t *testing.T) {
 	if err := os.WriteFile(extra, []byte("deleteme"), 0644); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := maincmd.Main(t.Context(), args, os.Stdin, os.Stdout, os.Stdout, nil); err != nil {
-		t.Fatal(err)
-	}
+	rsynctest.Run(t, args...)
 	if _, err := os.Stat(extra); !os.IsNotExist(err) {
 		t.Errorf("expected %s to be deleted, but it still exists", extra)
 	}
@@ -338,17 +319,12 @@ func TestReceiverSSH(t *testing.T) {
 	}
 
 	// sync into dest dir
-	args := []string{
-		"gokr-rsync",
+	rsynctest.Run(t, "gokr-rsync",
 		"-aH",
 		"--dry-run",
-		"-e", "ssh -vv -o IdentityFile=" + privKeyPath + " -o StrictHostKeyChecking=no -o CheckHostIP=no -o UserKnownHostsFile=/dev/null -p " + srv.Port,
+		"-e", "ssh -vv -o IdentityFile="+privKeyPath+" -o StrictHostKeyChecking=no -o CheckHostIP=no -o UserKnownHostsFile=/dev/null -p "+srv.Port,
 		"rsync://localhost/interop/",
-		dest,
-	}
-	if _, err := maincmd.Main(t.Context(), args, os.Stdin, os.Stdout, os.Stdout, nil); err != nil {
-		t.Fatal(err)
-	}
+		dest)
 }
 
 func TestReceiverCommand(t *testing.T) {
@@ -366,17 +342,12 @@ func TestReceiverCommand(t *testing.T) {
 	}
 
 	// sync into dest dir
-	args := []string{
-		"gokr-rsync",
+	rsynctest.Run(t, "gokr-rsync",
 		"-aH",
 		"--dry-run",
 		"-e", os.Args[0],
-		"localhost:" + source + "/",
-		dest,
-	}
-	if _, err := maincmd.Main(t.Context(), args, os.Stdin, os.Stdout, os.Stdout, nil); err != nil {
-		t.Fatal(err)
-	}
+		"localhost:"+source+"/",
+		dest)
 }
 
 // TestReceiverSymlinkTraversal passes by default but is useful to simulate
@@ -402,15 +373,10 @@ func TestReceiverSymlinkTraversal(t *testing.T) {
 	// start a server to sync from
 	srv := rsynctest.New(t, rsynctest.InteropModule(source))
 
-	args := []string{
-		"gokr-rsync",
+	rsynctest.Run(t, "gokr-rsync",
 		"-aH",
-		"rsync://localhost:" + srv.Port + "/interop/",
-		dest,
-	}
-	if _, err := maincmd.Main(t.Context(), args, os.Stdin, os.Stdout, os.Stdout, nil); err != nil {
-		t.Fatal(err)
-	}
+		"rsync://localhost:"+srv.Port+"/interop/",
+		dest)
 
 	{
 		want := []byte("benign")
