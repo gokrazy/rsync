@@ -187,6 +187,25 @@ func CombinedOutput(args ...string) ([]byte, error) {
 	return buf.Bytes(), err
 }
 
+func CommandMain(m *testing.M) error {
+	if len(os.Args) > 1 && os.Args[1] == "localhost" {
+		// Strip first 2 args (./rsync.test localhost) from command line:
+		// rsync(1) is calling this process as a remote shell.
+		os.Args = os.Args[2:]
+		if _, err := maincmd.Main(context.Background(), os.Args, os.Stdin, os.Stdout, os.Stderr, nil); err != nil {
+			return err
+		}
+	} else if len(os.Args) > 1 && os.Args[1] == "--server" {
+		// gokr-rsync is calling this process as a local daemon.
+		if _, err := maincmd.Main(context.Background(), os.Args, os.Stdin, os.Stdout, os.Stderr, nil); err != nil {
+			return err
+		}
+	} else {
+		os.Exit(m.Run())
+	}
+	return nil
+}
+
 func CreateDummyDeviceFiles(t *testing.T, dir string) {
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		t.Fatal(err)

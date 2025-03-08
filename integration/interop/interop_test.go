@@ -2,7 +2,6 @@ package interop_test
 
 import (
 	"bytes"
-	"context"
 	"fmt"
 	"log"
 	"os"
@@ -12,35 +11,15 @@ import (
 	"testing"
 
 	"github.com/BurntSushi/toml"
-	"github.com/gokrazy/rsync/internal/maincmd"
 	"github.com/gokrazy/rsync/internal/rsyncdconfig"
 	"github.com/gokrazy/rsync/internal/rsynctest"
-	"github.com/gokrazy/rsync/rsynccmd"
 	"github.com/gokrazy/rsync/rsyncd"
 	"github.com/google/go-cmp/cmp"
 )
 
 func TestMain(m *testing.M) {
-	if len(os.Args) > 1 && os.Args[1] == "localhost" {
-		log.Printf("os.Args before: %q", os.Args)
-		// Strip first 2 args (./rsync.test localhost) from command line:
-		// rsync(1) is calling this process as a remote shell.
-		os.Args = os.Args[2:]
-		log.Printf("os.Args after: %q", os.Args)
-		cmd := rsynccmd.Command(os.Args[0], os.Args[1:]...)
-		cmd.Stdin = os.Stdin
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
-		if _, err := cmd.Run(context.Background()); err != nil {
-			log.Fatal(err)
-		}
-	} else if len(os.Args) > 1 && os.Args[1] == "--server" {
-		// gokr-rsync is calling this process as a local daemon.
-		if _, err := maincmd.Main(context.Background(), os.Args, os.Stdin, os.Stdout, os.Stderr, nil); err != nil {
-			log.Fatal(err)
-		}
-	} else {
-		os.Exit(m.Run())
+	if err := rsynctest.CommandMain(m); err != nil {
+		log.Fatal(err)
 	}
 }
 
