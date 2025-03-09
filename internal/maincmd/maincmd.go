@@ -84,8 +84,6 @@ func Main(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer,
 			return nil, err
 		}
 
-		// TODO: copy seed+multiplex error handling from handleDaemonConn
-
 		// TODO: remove duplication with handleDaemonConn
 		if len(remaining) < 2 {
 			return nil, fmt.Errorf("invalid args: at least one directory required")
