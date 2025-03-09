@@ -2,6 +2,7 @@ package maincmd
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -21,7 +22,7 @@ import (
 )
 
 // rsync/main.c:start_client
-func rsyncMain(osenv rsyncos.Std, opts *rsyncopts.Options, sources []string, dest string) (*rsyncstats.TransferStats, error) {
+func rsyncMain(ctx context.Context, osenv rsyncos.Std, opts *rsyncopts.Options, sources []string, dest string) (*rsyncstats.TransferStats, error) {
 	if opts.Verbose() {
 		log.Printf("dest: %q, sources: %q", dest, sources)
 		log.Printf("opts: %+v", opts)
@@ -87,7 +88,7 @@ func rsyncMain(osenv rsyncos.Std, opts *rsyncopts.Options, sources []string, des
 		}
 
 		if daemonConnection < 0 {
-			stats, err := socketClient(osenv, opts, host, path, port, other)
+			stats, err := socketClient(ctx, osenv, opts, host, path, port, other)
 			if err != nil {
 				return nil, err
 			}
@@ -318,7 +319,7 @@ func clientRun(osenv rsyncos.Std, opts *rsyncopts.Options, conn io.ReadWriter, o
 	return rt.Do(c, fileList, false)
 }
 
-func clientMain(args []string, osenv rsyncos.Std) (*rsyncstats.TransferStats, error) {
+func clientMain(ctx context.Context, args []string, osenv rsyncos.Std) (*rsyncstats.TransferStats, error) {
 	pc, err := rsyncopts.ParseArguments(osenv, args[1:], false)
 	if err != nil {
 		return nil, err
@@ -335,9 +336,9 @@ func clientMain(args []string, osenv rsyncos.Std) (*rsyncstats.TransferStats, er
 		// instead of copying.
 		dest := ""
 		sources := remaining
-		return rsyncMain(osenv, opts, sources, dest)
+		return rsyncMain(ctx, osenv, opts, sources, dest)
 	}
 	dest := remaining[len(remaining)-1]
 	sources := remaining[:len(remaining)-1]
-	return rsyncMain(osenv, opts, sources, dest)
+	return rsyncMain(ctx, osenv, opts, sources, dest)
 }

@@ -2,6 +2,7 @@ package maincmd
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"io"
 	"net"
@@ -17,7 +18,7 @@ import (
 )
 
 // rsync/clientserver.c:start_socket_client
-func socketClient(osenv rsyncos.Std, opts *rsyncopts.Options, host string, path string, port int, dest string) (*rsyncstats.TransferStats, error) {
+func socketClient(ctx context.Context, osenv rsyncos.Std, opts *rsyncopts.Options, host string, path string, port int, dest string) (*rsyncstats.TransferStats, error) {
 	if port < 0 {
 		host += ":873" // rsync daemon port
 	} else {
@@ -30,7 +31,7 @@ func socketClient(osenv rsyncos.Std, opts *rsyncopts.Options, host string, path 
 		timeoutStr = fmt.Sprintf(" (timeout: %d seconds)", timeout)
 	}
 	log.Printf("Opening TCP connection to %s%s", host, timeoutStr)
-	conn, err := dialer.Dial("tcp", host)
+	conn, err := dialer.DialContext(ctx, "tcp", host)
 	if err != nil {
 		return nil, err
 	}
