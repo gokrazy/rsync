@@ -474,7 +474,7 @@ func TestInteropRemoteCommand(t *testing.T) {
 func TestInteropRemoteDaemon(t *testing.T) {
 	t.Parallel()
 
-	rsyncBin := rsynctest.TridgeOrGTFO(t, "TODO: reason")
+	rsyncBin := rsynctest.TridgeOrGTFO(t, "https://github.com/gokrazy/rsync/issues/33")
 
 	tmp, source, dest := createSourceFiles(t)
 
@@ -512,9 +512,6 @@ func TestInteropRemoteDaemon(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-
-	// TODO: this does not seem to work when using openrsync?
-	// does openrsync send the wrong command?
 
 	// sync into dest dir
 	rsync := exec.Command(rsyncBin,
