@@ -22,21 +22,31 @@ import (
 
 // rsync/main.c:start_client
 func rsyncMain(osenv rsyncos.Std, opts *rsyncopts.Options, sources []string, dest string) (*rsyncstats.TransferStats, error) {
-	log.Printf("dest: %q, sources: %q", dest, sources)
-	log.Printf("opts: %+v", opts)
+	if opts.Verbose() {
+		log.Printf("dest: %q, sources: %q", dest, sources)
+		log.Printf("opts: %+v", opts)
+	}
 	for _, src := range sources {
-		log.Printf("processing src=%s", src)
+		if opts.Verbose() {
+			log.Printf("processing src=%s", src)
+		}
 		daemonConnection := 0 // no daemon
 		host, path, port, err := checkForHostspec(src)
-		log.Printf("host=%q, path=%q, port=%d, err=%v", host, path, port, err)
+		if opts.Verbose() {
+			log.Printf("host=%q, path=%q, port=%d, err=%v", host, path, port, err)
+		}
 		if err != nil {
 			// source is local, check dest arg
 			opts.SetSender()
 			// TODO: remote_argv == "."?
 			host, path, port, err = checkForHostspec(dest)
-			log.Printf("host=%q, path=%q, port=%d, err=%v", host, path, port, err)
+			if opts.Verbose() {
+				log.Printf("host=%q, path=%q, port=%d, err=%v", host, path, port, err)
+			}
 			if path == "" {
-				log.Printf("source and dest are both local!")
+				if opts.Verbose() {
+					log.Printf("source and dest are both local!")
+				}
 				host = ""
 				port = 0
 				path = dest
@@ -72,7 +82,9 @@ func rsyncMain(osenv rsyncos.Std, opts *rsyncopts.Options, sources []string, des
 		if idx := strings.IndexByte(module, '/'); idx > -1 {
 			module = module[:idx]
 		}
-		log.Printf("module=%q, path=%q, other=%q", module, path, other)
+		if opts.Verbose() {
+			log.Printf("module=%q, path=%q, other=%q", module, path, other)
+		}
 
 		if daemonConnection < 0 {
 			stats, err := socketClient(osenv, opts, host, path, port, other)
@@ -121,8 +133,10 @@ func rsyncMain(osenv rsyncos.Std, opts *rsyncopts.Options, sources []string, des
 
 // rsync/main.c:do_cmd
 func doCmd(osenv rsyncos.Std, opts *rsyncopts.Options, machine, user, path string, daemonConnection int) (io.ReadCloser, io.WriteCloser, error) {
-	log.Printf("doCmd(machine=%q, user=%q, path=%q, daemonConnection=%d)",
-		machine, user, path, daemonConnection)
+	if opts.Verbose() {
+		log.Printf("doCmd(machine=%q, user=%q, path=%q, daemonConnection=%d)",
+			machine, user, path, daemonConnection)
+	}
 	var args []string
 	if !opts.LocalServer() {
 		cmd := opts.ShellCommand()
@@ -166,7 +180,9 @@ func doCmd(osenv rsyncos.Std, opts *rsyncopts.Options, machine, user, path strin
 		args = append(args, path)
 	}
 
-	log.Printf("args: %q", args)
+	if opts.Verbose() {
+		log.Printf("args: %q", args)
+	}
 
 	ssh := exec.Command(args[0], args[1:]...)
 	wc, err := ssh.StdinPipe()
@@ -210,7 +226,9 @@ func clientRun(osenv rsyncos.Std, opts *rsyncopts.Options, conn io.ReadWriter, o
 		if err != nil {
 			return nil, err
 		}
-		log.Printf("remote protocol: %d", remoteProtocol)
+		if opts.Verbose() {
+			log.Printf("remote protocol: %d", remoteProtocol)
+		}
 	}
 
 	seed, err := c.ReadInt32()
@@ -233,7 +251,9 @@ func clientRun(osenv rsyncos.Std, opts *rsyncopts.Options, conn io.ReadWriter, o
 			Conn:   c,
 			Seed:   seed,
 		}
-		log.Printf("sender(other=%q)", other)
+		if opts.Verbose() {
+			log.Printf("sender(other=%q)", other)
+		}
 		trimPrefix := filepath.Base(filepath.Clean(other))
 		if strings.HasSuffix(other, "/") {
 			trimPrefix += "/"
@@ -266,7 +286,9 @@ func clientRun(osenv rsyncos.Std, opts *rsyncopts.Options, conn io.ReadWriter, o
 		Conn: c,
 		Seed: seed,
 	}
-	log.Printf("receiving to dest=%s", rt.Dest)
+	if opts.Verbose() {
+		log.Printf("receiving to dest=%s", rt.Dest)
+	}
 
 	// TODO: this is different for client/server
 	// client always sends exclusion list, server always receives
@@ -277,15 +299,21 @@ func clientRun(osenv rsyncos.Std, opts *rsyncopts.Options, conn io.ReadWriter, o
 		return nil, err
 	}
 
-	log.Printf("exclusion list sent")
+	if opts.Verbose() { // TODO: should be DebugGTE(RECV, 1)
+		log.Printf("exclusion list sent")
+	}
 
 	// receive file list
-	log.Printf("receiving file list")
+	if opts.Verbose() { // TODO: should be debug (FLOG)
+		log.Printf("receiving file list")
+	}
 	fileList, err := rt.ReceiveFileList()
 	if err != nil {
 		return nil, err
 	}
-	log.Printf("received %d names", len(fileList))
+	if opts.Verbose() { // TODO: should be debugGTE(FLIST, 2)
+		log.Printf("received %d names", len(fileList))
+	}
 
 	return rt.Do(c, fileList, false)
 }

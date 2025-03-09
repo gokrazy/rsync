@@ -94,7 +94,9 @@ func Main(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer,
 			return nil, fmt.Errorf("protocol error: got %q, expected %q", got, want)
 		}
 		paths := remaining[1:]
-		log.Printf("paths: %q", paths)
+		if opts.Verbose() {
+			log.Printf("paths: %q", paths)
+		}
 		crd, cwr := rsyncwire.CounterPair(stdin, stdout)
 		rd := crd
 		return nil, srv.HandleConn(osenv, nil, rd, crd, cwr, paths, opts, true)

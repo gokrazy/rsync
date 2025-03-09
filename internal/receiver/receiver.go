@@ -24,18 +24,24 @@ func (rt *Transfer) RecvFiles(fileList []*File) error {
 		if idx == -1 {
 			if phase == 0 {
 				phase++
-				rt.Logger.Printf("recvFiles phase=%d", phase)
+				if rt.Opts.Verbose { // TODO: DebugGTE(RECV, 1)
+					rt.Logger.Printf("recvFiles phase=%d", phase)
+				}
 				// TODO: send done message
 				continue
 			}
 			break
 		}
-		rt.Logger.Printf("receiving file idx=%d: %+v", idx, fileList[idx])
+		if rt.Opts.Verbose { // TODO: DebugGTE(RECV, 1)
+			rt.Logger.Printf("receiving file idx=%d: %+v", idx, fileList[idx])
+		}
 		if err := rt.recvFile1(fileList[idx]); err != nil {
 			return err
 		}
 	}
-	rt.Logger.Printf("recvFiles finished")
+	if rt.Opts.Verbose { // TODO: DebugGTE(RECV, 1)
+		rt.Logger.Printf("recvFiles finished")
+	}
 	return nil
 }
 

@@ -26,19 +26,25 @@ func (rt *Transfer) GenerateFiles(fileList []*File) error {
 		}
 	}
 	phase++
-	rt.Logger.Printf("generateFiles phase=%d", phase)
+	if rt.Opts.Verbose { // TODO: DebugGTE(genr, 1)
+		rt.Logger.Printf("generateFiles phase=%d", phase)
+	}
 	if err := rt.Conn.WriteInt32(-1); err != nil {
 		return err
 	}
 
 	// TODO: re-do any files that failed
 	phase++
-	rt.Logger.Printf("generateFiles phase=%d", phase)
+	if rt.Opts.Verbose { // TODO: DebugGTE(genr, 1)
+		rt.Logger.Printf("generateFiles phase=%d", phase)
+	}
 	if err := rt.Conn.WriteInt32(-1); err != nil {
 		return err
 	}
 
-	rt.Logger.Printf("generateFiles finished")
+	if rt.Opts.Verbose { // TODO: DebugGTE(genr, 1)
+		rt.Logger.Printf("generateFiles finished")
+	}
 	return nil
 }
 
@@ -109,7 +115,9 @@ func (rt *Transfer) recvGenerator(idx int, f *File) error {
 			f.Name)
 		return nil
 	}
-	rt.Logger.Printf("recv_generator(f=%+v)", f)
+	if rt.Opts.Verbose { // TODO: DebugGTE(genr, 1)
+		rt.Logger.Printf("recv_generator(f=%+v)", f)
+	}
 
 	local := filepath.Join(rt.Dest, f.Name)
 	st, err := os.Lstat(local)
@@ -226,7 +234,9 @@ func (rt *Transfer) recvGenerator(idx int, f *File) error {
 		return err
 	}
 	if skip {
-		rt.Logger.Printf("skipping %s", local)
+		if rt.Opts.Verbose { // TODO: InfoGTE(skip, 1)
+			rt.Logger.Printf("skipping %s", local)
+		}
 		if err := rt.setPerms(f); err != nil {
 			return err
 		}

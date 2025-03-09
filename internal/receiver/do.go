@@ -136,7 +136,9 @@ func (rt *Transfer) report(c *rsyncwire.Conn) (*rsyncstats.TransferStats, error)
 	if err != nil {
 		return nil, err
 	}
-	rt.Logger.Printf("server sent stats: read=%d, written=%d, size=%d", read, written, size)
+	if rt.Opts.Verbose { // TODO: InfoGTE(STATS, 1)
+		rt.Logger.Printf("server sent stats: read=%d, written=%d, size=%d", read, written, size)
+	}
 
 	return &rsyncstats.TransferStats{
 		Read:    read,

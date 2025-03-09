@@ -82,8 +82,10 @@ func startInbandExchange(osenv rsyncos.Std, opts *rsyncopts.Options, conn io.Rea
 		return false, fmt.Errorf("server version %d too old", remoteProtocol)
 	}
 
-	log.Printf("(Client) Protocol versions: remote=%d, negotiated=%d", remoteProtocol, rsync.ProtocolVersion)
-	log.Printf("Client checksum: md4")
+	if opts.Verbose() {
+		log.Printf("(Client) Protocol versions: remote=%d, negotiated=%d", remoteProtocol, rsync.ProtocolVersion)
+		log.Printf("Client checksum: md4")
+	}
 
 	// send module name
 	fmt.Fprintf(conn, "%s\n", module)
@@ -93,7 +95,9 @@ func startInbandExchange(osenv rsyncos.Std, opts *rsyncopts.Options, conn io.Rea
 			return false, fmt.Errorf("did not get server startup line: %v", err)
 		}
 		line = strings.TrimSpace(line)
-		log.Printf("read line: %q", line)
+		if opts.Verbose() { // TODO: should be debug
+			log.Printf("read line: %q", line)
+		}
 
 		if strings.HasPrefix(line, "@RSYNCD: AUTHREQD ") {
 			// TODO: implement support for authentication
@@ -122,7 +126,9 @@ func startInbandExchange(osenv rsyncos.Std, opts *rsyncopts.Options, conn io.Rea
 	if path != "" {
 		sargv = append(sargv, path)
 	}
-	log.Printf("sending daemon args: %s", sargv)
+	if opts.Verbose() {
+		log.Printf("sending daemon args: %s", sargv)
+	}
 	for _, argv := range sargv {
 		fmt.Fprintf(conn, "%s\n", argv)
 	}

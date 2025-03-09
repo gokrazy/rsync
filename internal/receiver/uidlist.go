@@ -55,8 +55,10 @@ func (rt *Transfer) RecvIdList() (users map[int32]mapping, groups map[int32]mapp
 		if err != nil {
 			return nil, nil, err
 		}
-		for remoteUid, mapping := range users {
-			rt.Logger.Printf("remote uid %d(%s) maps to local uid %d", remoteUid, mapping.Name, mapping.LocalId)
+		if rt.Opts.Verbose { // TODO: debugGTE(FLIST, 2)
+			for remoteUid, mapping := range users {
+				rt.Logger.Printf("remote uid %d(%s) maps to local uid %d", remoteUid, mapping.Name, mapping.LocalId)
+			}
 		}
 	}
 
@@ -76,8 +78,10 @@ func (rt *Transfer) RecvIdList() (users map[int32]mapping, groups map[int32]mapp
 		if err != nil {
 			return nil, nil, err
 		}
-		for remoteGid, mapping := range groups {
-			rt.Logger.Printf("remote gid %d(%s) maps to local gid %d", remoteGid, mapping.Name, mapping.LocalId)
+		if rt.Opts.Verbose { // TODO: debugGTE(FLIST, 2)
+			for remoteGid, mapping := range groups {
+				rt.Logger.Printf("remote gid %d(%s) maps to local gid %d", remoteGid, mapping.Name, mapping.LocalId)
+			}
 		}
 	}
 

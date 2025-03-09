@@ -212,13 +212,15 @@ func (rt *Transfer) ReceiveFileList() ([]*File, error) {
 		}
 		lastFileEntry = f
 		// TODO: include depth in output?
-		rt.Logger.Printf("[Receiver] i=%d ? %s mode=%o len=%d uid=%d gid=%d flags=?",
-			len(fileList),
-			f.Name,
-			f.Mode,
-			f.Length,
-			f.Uid,
-			f.Gid)
+		if rt.Opts.Verbose { // TODO: should be debug(INFO)
+			rt.Logger.Printf("[Receiver] i=%d ? %s mode=%o len=%d uid=%d gid=%d flags=?",
+				len(fileList),
+				f.Name,
+				f.Mode,
+				f.Length,
+				f.Uid,
+				f.Gid)
+		}
 		fileList = append(fileList, f)
 	}
 
@@ -239,7 +241,9 @@ func (rt *Transfer) ReceiveFileList() ([]*File, error) {
 	if err != nil {
 		return nil, err
 	}
-	rt.Logger.Printf("ioErrors: %v", ioErrors)
+	if rt.Opts.Verbose { // TODO: debugGTE(FLIST, 2)
+		rt.Logger.Printf("ioErrors: %v", ioErrors)
+	}
 	rt.IOErrors = ioErrors
 
 	return fileList, nil

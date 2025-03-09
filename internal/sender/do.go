@@ -45,7 +45,9 @@ func (st *Transfer) Do(crd *rsyncwire.CountingReader, cwr *rsyncwire.CountingWri
 		return nil, err
 	}
 
-	st.Logger.Printf("file list sent")
+	if st.Opts.Verbose() { // TODO: DebugGTE(FLIST, 3)
+		st.Logger.Printf("file list sent")
+	}
 
 	// Sort the file list. The client sorts, so we need to sort, too (in the
 	// same way!), otherwise our indices do not match what the client will
@@ -62,7 +64,9 @@ func (st *Transfer) Do(crd *rsyncwire.CountingReader, cwr *rsyncwire.CountingWri
 		return nil, err
 	}
 
-	st.Logger.Printf("reading final int32")
+	if st.Opts.Verbose() { // TODO: Debug
+		st.Logger.Printf("reading final int32")
+	}
 
 	finish, err := st.Conn.ReadInt32()
 	if err != nil {

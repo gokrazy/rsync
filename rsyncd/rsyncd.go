@@ -286,7 +286,9 @@ func (s *Server) HandleConn(osenv rsyncos.Std, module *Module, rd io.Reader, crd
 		if err != nil {
 			return err
 		}
-		s.logger.Printf("remote protocol: %d", remoteProtocol)
+		if opts.Verbose() {
+			s.logger.Printf("remote protocol: %d", remoteProtocol)
+		}
 		if err := c.WriteInt32(rsync.ProtocolVersion); err != nil {
 			return err
 		}
@@ -333,7 +335,9 @@ func (s *Server) handleConnReceiver(osenv rsyncos.Std, module *Module, crd *rsyn
 			Writable: true,
 		}
 	}
-	s.logger.Printf("handleConnReceiver(module=%+v)", module)
+	if opts.Verbose() {
+		s.logger.Printf("handleConnReceiver(module=%+v)", module)
+	}
 
 	if !module.Writable {
 		return fmt.Errorf("ERROR: module is read only")
@@ -375,18 +379,23 @@ func (s *Server) handleConnReceiver(osenv rsyncos.Std, module *Module, crd *rsyn
 	}
 
 	// receive file list
-	s.logger.Printf("receiving file list")
+	if opts.Verbose() { // TODO: InfoGTE(FLIST, 1)
+		s.logger.Printf("receiving file list")
+	}
 	fileList, err := rt.ReceiveFileList()
 	if err != nil {
 		return err
 	}
-	s.logger.Printf("received %d names", len(fileList))
+	if opts.Verbose() { // TODO: InfoGTE(FLIST, 1)
+		s.logger.Printf("received %d names", len(fileList))
+	}
 	stats, err := rt.Do(c, fileList, true)
 	if err != nil {
 		return err
 	}
-
-	s.logger.Printf("stats: %+v", stats)
+	if opts.Verbose() { // TODO: InfoGTE(STATS, 1)
+		s.logger.Printf("stats: %+v", stats)
+	}
 	return nil
 }
 

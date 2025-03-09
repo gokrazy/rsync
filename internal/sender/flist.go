@@ -70,13 +70,19 @@ func (st *Transfer) SendFileList(trimPrefix, localDir string, opts *rsyncopts.Op
 	// TODO: handle info == nil case (permission denied?): should set an i/o
 	// error flag, but traversal should continue
 
-	st.Logger.Printf("sendFileList()")
+	if opts.Verbose() { // TODO: DebugGTE(FLIST, 1)
+		st.Logger.Printf("sendFileList()")
+	}
 	ioErrors := int32(0)
 	// TODO: handle |root| referring to an individual file, symlink or special (skip)
 	for _, requested := range paths {
-		st.Logger.Printf("  path %q (local dir %q)", requested, localDir)
+		if opts.Verbose() { // TODO: DebugGTE(FLIST, 1)
+			st.Logger.Printf("  path %q (local dir %q)", requested, localDir)
+		}
 		root, strip := getRootStrip(requested, localDir, trimPrefix)
-		st.Logger.Printf("  filepath.Walk(%q), strip=%q", root, strip)
+		if opts.Verbose() { // TODO: DebugGTE(FLIST, 1)
+			st.Logger.Printf("  filepath.Walk(%q), strip=%q", root, strip)
+		}
 		err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
 			// st.logger.Printf("filepath.WalkFn(path=%s)", path)
 			if err != nil {
