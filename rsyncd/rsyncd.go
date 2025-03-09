@@ -265,6 +265,18 @@ func (s *Server) HandleDaemonConn(ctx context.Context, osenv rsyncos.Std, conn i
 	paths := remaining[1:]
 	s.logger.Printf("paths: %q", paths)
 
+	// Strip the module_name/ prefix out of the paths,
+	// see rsync/io.c:read_args, glob_expand_module().
+	for idx, path := range paths {
+		trimmed := strings.TrimPrefix(path, module.Name)
+		if trimmed == "" {
+			trimmed = "."
+		}
+		paths[idx] = trimmed
+	}
+
+	s.logger.Printf("trimmed paths: %q", paths)
+
 	return s.HandleConn(osenv, &module, rd, crd, cwr, paths, opts, false)
 }
 
@@ -421,7 +433,7 @@ func (s *Server) handleConnSender(module *Module, crd *rsyncwire.CountingReader,
 	}
 	st.Logger.Printf("exclusion list read (entries: %d)", len(exclusionList.Filters))
 
-	stats, err := st.Do(crd, cwr, module.Name+"/", module.Path, paths, exclusionList)
+	stats, err := st.Do(crd, cwr, module.Path, paths, exclusionList)
 	if err != nil {
 		return err
 	}

@@ -7,7 +7,6 @@ import (
 	"io"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"strings"
 
 	"github.com/gokrazy/rsync"
@@ -77,8 +76,10 @@ func rsyncMain(ctx context.Context, osenv rsyncos.Std, opts *rsyncopts.Options, 
 
 	// TODO: if opts.AmSender(), verify extra source args have no hostspec
 	other := dest
+	paths := []string{other}
 	if opts.Sender() {
 		other = src
+		paths = sources
 	}
 
 	module := path
@@ -90,7 +91,7 @@ func rsyncMain(ctx context.Context, osenv rsyncos.Std, opts *rsyncopts.Options, 
 	}
 
 	if daemonConnection < 0 {
-		stats, err := socketClient(ctx, osenv, opts, host, path, port, other)
+		stats, err := socketClient(ctx, osenv, opts, host, path, port, paths)
 		if err != nil {
 			return nil, err
 		}
@@ -124,7 +125,7 @@ func rsyncMain(ctx context.Context, osenv rsyncos.Std, opts *rsyncopts.Options, 
 		}
 		negotiate = false // already done
 	}
-	stats, err := clientRun(osenv, opts, conn, []string{other}, negotiate)
+	stats, err := clientRun(osenv, opts, conn, paths, negotiate)
 	if err != nil {
 		return nil, err
 	}
@@ -255,17 +256,7 @@ func clientRun(osenv rsyncos.Std, opts *rsyncopts.Options, conn io.ReadWriter, p
 			log.Printf("sender(paths=%q)", paths)
 		}
 
-		if len(paths) != 1 {
-			// TODO: support more than one source
-			return nil, fmt.Errorf("BUG: expected exactly one path, got %q", paths)
-		}
-
-		other := paths[0]
-		trimPrefix := filepath.Base(filepath.Clean(other))
-		if strings.HasSuffix(other, "/") {
-			trimPrefix += "/"
-		}
-		stats, err := st.Do(crd, cwr, trimPrefix, other, []string{trimPrefix}, nil)
+		stats, err := st.Do(crd, cwr, "/", paths, nil)
 		if err != nil {
 			return nil, err
 		}

@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"sort"
 
+	"github.com/gokrazy/rsync/internal/log"
+	"github.com/gokrazy/rsync/internal/rsyncopts"
 	"github.com/gokrazy/rsync/internal/rsyncstats"
 	"github.com/gokrazy/rsync/internal/rsyncwire"
 )
@@ -31,7 +33,7 @@ func (st *Transfer) handleStats(crd *rsyncwire.CountingReader, cwr *rsyncwire.Co
 }
 
 // rsync/main.c:client_run am_sender
-func (st *Transfer) Do(crd *rsyncwire.CountingReader, cwr *rsyncwire.CountingWriter, modPrefix, modPath string, paths []string, exclusionList *filterRuleList) (*rsyncstats.TransferStats, error) {
+func (st *Transfer) Do(crd *rsyncwire.CountingReader, cwr *rsyncwire.CountingWriter, modPath string, paths []string, exclusionList *filterRuleList) (*rsyncstats.TransferStats, error) {
 	if exclusionList == nil {
 		exclusionList = &filterRuleList{}
 	}
@@ -40,7 +42,11 @@ func (st *Transfer) Do(crd *rsyncwire.CountingReader, cwr *rsyncwire.CountingWri
 	// https://github.com/kristapsdz/openrsync/blob/master/rsync.5
 
 	// send file list
-	fileList, err := st.SendFileList(modPrefix, modPath, st.Opts, paths, exclusionList)
+	log.Printf("SendFileList(modPath=%q, paths=%q)", modPath, paths)
+	fileList, err := func() (*fileList, error) {
+		var opts *rsyncopts.Options = st.Opts
+		return st.SendFileList(modPath, opts, paths, exclusionList)
+	}()
 	if err != nil {
 		return nil, err
 	}

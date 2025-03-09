@@ -12,6 +12,10 @@ import (
 	"github.com/stapelberg/rsyncparse"
 )
 
+func TestMain(m *testing.M) {
+	rsynctest.CommandMain(m)
+}
+
 func TestSyncExtended(t *testing.T) {
 	t.Parallel()
 
@@ -93,5 +97,48 @@ func TestSyncExtended(t *testing.T) {
 		if got, want := stats.TotalRead, int64(2*1024*1024); got >= want {
 			t.Fatalf("rsync unexpectedly transferred more data than needed: got %d, want < %d", got, want)
 		}
+	}
+}
+
+func TestSyncMultipleSources(t *testing.T) {
+	tmp := t.TempDir()
+	src1 := filepath.Join(tmp, "src1")
+	src2 := filepath.Join(tmp, "src2")
+	dest := filepath.Join(tmp, "dest")
+	if err := os.MkdirAll(src1, 0755); err != nil {
+		t.Fatal(err)
+	}
+	const hello = "world"
+	if err := os.WriteFile(filepath.Join(src1, "hello"), []byte(hello), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(src2, 0755); err != nil {
+		t.Fatal(err)
+	}
+	const bye = "moon"
+	if err := os.WriteFile(filepath.Join(src2, "bye"), []byte(bye), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	rsynctest.Run(t, "gokr-rsync",
+		"-av",
+		src1,
+		src2,
+		dest)
+
+	hellob, err := os.ReadFile(filepath.Join(dest, "src1", "hello"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(hellob, []byte(hello)) {
+		t.Errorf("file 'hello' has unexpected contents: got %q, want %q", string(hellob), hello)
+	}
+
+	byeb, err := os.ReadFile(filepath.Join(dest, "src2", "bye"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(byeb, []byte(bye)) {
+		t.Errorf("file 'bye' has unexpected contents: got %q, want %q", string(byeb), bye)
 	}
 }

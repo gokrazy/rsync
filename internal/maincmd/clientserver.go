@@ -18,7 +18,7 @@ import (
 )
 
 // rsync/clientserver.c:start_socket_client
-func socketClient(ctx context.Context, osenv rsyncos.Std, opts *rsyncopts.Options, host string, path string, port int, dest string) (*rsyncstats.TransferStats, error) {
+func socketClient(ctx context.Context, osenv rsyncos.Std, opts *rsyncopts.Options, host string, path string, port int, paths []string) (*rsyncstats.TransferStats, error) {
 	if port < 0 {
 		host += ":873" // rsync daemon port
 	} else {
@@ -47,7 +47,7 @@ func socketClient(ctx context.Context, osenv rsyncos.Std, opts *rsyncopts.Option
 	if done {
 		return nil, nil
 	}
-	stats, err := clientRun(osenv, opts, conn, []string{dest}, false)
+	stats, err := clientRun(osenv, opts, conn, paths, false)
 	if err != nil {
 		return nil, err
 	}

@@ -46,9 +46,8 @@ var (
 	lookupGroupOnce sync.Once
 )
 
-func getRootStrip(requested, localDir, trimPrefix string) (string, string) {
-	root := strings.TrimPrefix(requested, trimPrefix)
-	root = filepath.Clean(localDir + "/" + root)
+func getRootStrip(requested, localDir string) (string, string) {
+	root := filepath.Clean(localDir + "/" + requested)
 
 	strip := filepath.Dir(filepath.Clean(root)) + "/"
 	if strings.HasSuffix(requested, "/") {
@@ -58,7 +57,7 @@ func getRootStrip(requested, localDir, trimPrefix string) (string, string) {
 }
 
 // rsync/flist.c:send_file_list
-func (st *Transfer) SendFileList(trimPrefix, localDir string, opts *rsyncopts.Options, paths []string, excl *filterRuleList) (*fileList, error) {
+func (st *Transfer) SendFileList(localDir string, opts *rsyncopts.Options, paths []string, excl *filterRuleList) (*fileList, error) {
 	var fileList fileList
 	fec := &rsyncwire.Buffer{}
 
@@ -79,12 +78,14 @@ func (st *Transfer) SendFileList(trimPrefix, localDir string, opts *rsyncopts.Op
 		if opts.Verbose() { // TODO: DebugGTE(FLIST, 1)
 			st.Logger.Printf("  path %q (local dir %q)", requested, localDir)
 		}
-		root, strip := getRootStrip(requested, localDir, trimPrefix)
+		// st.Logger.Printf("getRootStrip(requested=%q, localDir=%q", requested, localDir)
+		root, strip := getRootStrip(requested, localDir)
+		// st.Logger.Printf("root=%q, strip=%q", root, strip)
 		if opts.Verbose() { // TODO: DebugGTE(FLIST, 1)
 			st.Logger.Printf("  filepath.Walk(%q), strip=%q", root, strip)
 		}
 		err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
-			// st.logger.Printf("filepath.WalkFn(path=%s)", path)
+			// st.Logger.Printf("filepath.WalkFn(path=%s)", path)
 			if err != nil {
 				if os.IsNotExist(err) {
 					st.Logger.Printf("file vanished: %v", err)
@@ -100,7 +101,7 @@ func (st *Transfer) SendFileList(trimPrefix, localDir string, opts *rsyncopts.Op
 			flags := byte(rsync.XMIT_LONG_NAME)
 
 			name := strings.TrimPrefix(path, strip)
-			// st.logger.Printf("Trim(path=%q, %q) = %q", path, strip, name)
+			// st.Logger.Printf("Trim(path=%q, %q) = %q", path, strip, name)
 			if name == root {
 				name = "."
 				flags |= rsync.XMIT_TOP_DIR
