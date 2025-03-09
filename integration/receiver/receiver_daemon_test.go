@@ -2,7 +2,6 @@ package receiver_test
 
 import (
 	"bytes"
-	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -10,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/gokrazy/rsync/internal/rsynctest"
+	"github.com/gokrazy/rsync/internal/testlogger"
 )
 
 func TestDaemonReceiverSync(t *testing.T) {
@@ -43,9 +43,8 @@ func TestDaemonReceiverSync(t *testing.T) {
 		// Ensure rsync does not localize decimal separators and fractional
 		// points based on the current locale:
 		"LANG=C.UTF-8")
-	var buf bytes.Buffer
-	rsync.Stdout = io.MultiWriter(&buf, os.Stdout)
-	rsync.Stderr = os.Stderr
+	rsync.Stdout = testlogger.New(t)
+	rsync.Stderr = testlogger.New(t)
 	if err := rsync.Run(); err != nil {
 		t.Fatalf("%v: %v", rsync.Args, err)
 	}
@@ -88,9 +87,8 @@ func TestDaemonReceiverDelete(t *testing.T) {
 			// Ensure rsync does not localize decimal separators and fractional
 			// points based on the current locale:
 			"LANG=C.UTF-8")
-		var buf bytes.Buffer
-		rsync.Stdout = io.MultiWriter(&buf, os.Stdout)
-		rsync.Stderr = os.Stderr
+		rsync.Stdout = testlogger.New(t)
+		rsync.Stderr = testlogger.New(t)
 		if err := rsync.Run(); err != nil {
 			t.Fatalf("%v: %v", rsync.Args, err)
 		}

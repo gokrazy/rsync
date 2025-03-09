@@ -3,6 +3,7 @@ package log
 
 import (
 	"fmt"
+	"io"
 	"log"
 )
 
@@ -15,10 +16,12 @@ type Logger interface {
 	Output(calldepth int, s string) error
 }
 
+const logFlags = log.LstdFlags | log.Lshortfile
+
 // instance is the global instance of the logger.
 // Default logger is log.Logger.
 var instance = func() Logger {
-	log.SetFlags(log.LstdFlags | log.Lshortfile)
+	log.SetFlags(logFlags)
 	return log.Default()
 }()
 
@@ -33,7 +36,6 @@ func SetLogger(logger Logger) {
 	instance = logger
 }
 
-// Default returns the global logger instance.
-func Default() Logger {
-	return instance
+func New(out io.Writer) Logger {
+	return log.New(out, "", logFlags)
 }

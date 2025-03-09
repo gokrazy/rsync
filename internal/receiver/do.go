@@ -6,7 +6,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/gokrazy/rsync/internal/log"
 	"github.com/gokrazy/rsync/internal/rsyncstats"
 	"github.com/gokrazy/rsync/internal/rsyncwire"
 	"golang.org/x/sync/errgroup"
@@ -25,7 +24,7 @@ func isTopDir(f *File) bool {
 
 func (rt *Transfer) deleteFiles(fileList []*File) error {
 	if rt.IOErrors > 0 {
-		log.Printf("IO error encountered, skipping file deletion")
+		rt.Logger.Printf("IO error encountered, skipping file deletion")
 		return nil
 	}
 
@@ -33,7 +32,7 @@ func (rt *Transfer) deleteFiles(fileList []*File) error {
 		if !isTopDir(f) {
 			continue
 		}
-		log.Printf("deleting in %s", f.Name)
+		rt.Logger.Printf("deleting in %s", f.Name)
 		root := filepath.Clean(rt.Dest)
 		strip := root + "/"
 		// Other rsync implementations generate a local file list and compare it
@@ -51,7 +50,7 @@ func (rt *Transfer) deleteFiles(fileList []*File) error {
 				return nil
 			}
 			if rt.Opts.Verbose {
-				log.Printf("  deleting %s", name)
+				rt.Logger.Printf("  deleting %s", name)
 			}
 			if rt.Opts.DryRun {
 				return nil
@@ -105,7 +104,7 @@ func (rt *Transfer) Do(c *rsyncwire.Conn, fileList []*File, noReport bool) (*rsy
 	var stats *rsyncstats.TransferStats
 	if !noReport {
 		var err error
-		stats, err = report(c)
+		stats, err = rt.report(c)
 		if err != nil {
 			return nil, err
 		}
@@ -120,7 +119,7 @@ func (rt *Transfer) Do(c *rsyncwire.Conn, fileList []*File, noReport bool) (*rsy
 }
 
 // rsync/main.c:report
-func report(c *rsyncwire.Conn) (*rsyncstats.TransferStats, error) {
+func (rt *Transfer) report(c *rsyncwire.Conn) (*rsyncstats.TransferStats, error) {
 	// read statistics:
 	// total bytes read (from network connection)
 	read, err := c.ReadInt64()
@@ -137,7 +136,7 @@ func report(c *rsyncwire.Conn) (*rsyncstats.TransferStats, error) {
 	if err != nil {
 		return nil, err
 	}
-	log.Printf("server sent stats: read=%d, written=%d, size=%d", read, written, size)
+	rt.Logger.Printf("server sent stats: read=%d, written=%d, size=%d", read, written, size)
 
 	return &rsyncstats.TransferStats{
 		Read:    read,

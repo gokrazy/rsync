@@ -2,13 +2,13 @@ package sync_test
 
 import (
 	"bytes"
-	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"testing"
 
 	"github.com/gokrazy/rsync/internal/rsynctest"
+	"github.com/gokrazy/rsync/internal/testlogger"
 	"github.com/stapelberg/rsyncparse"
 )
 
@@ -46,8 +46,8 @@ func TestSyncExtended(t *testing.T) {
 			// points based on the current locale:
 			"LANG=C.UTF-8")
 		var buf bytes.Buffer
-		rsync.Stdout = io.MultiWriter(&buf, os.Stdout)
-		rsync.Stderr = os.Stderr
+		rsync.Stdout = &buf
+		rsync.Stderr = testlogger.New(t)
 		if err := rsync.Run(); err != nil {
 			t.Fatalf("%v: %v", rsync.Args, err)
 		}

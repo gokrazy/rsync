@@ -17,6 +17,7 @@ import (
 	"github.com/gokrazy/rsync/internal/log"
 	"github.com/gokrazy/rsync/internal/rsyncdconfig"
 	"github.com/gokrazy/rsync/internal/rsyncopts"
+	"github.com/gokrazy/rsync/internal/rsyncos"
 	"github.com/gokrazy/rsync/internal/rsyncstats"
 	"github.com/gokrazy/rsync/internal/rsyncwire"
 	"github.com/gokrazy/rsync/rsyncd"
@@ -38,8 +39,13 @@ func (r *readWriter) Read(p []byte) (n int, err error)  { return r.r.Read(p) }
 func (r *readWriter) Write(p []byte) (n int, err error) { return r.w.Write(p) }
 
 func Main(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer, cfg *rsyncdconfig.Config) (*rsyncstats.TransferStats, error) {
+	osenv := rsyncos.Std{
+		Stdin:  stdin,
+		Stdout: stdout,
+		Stderr: stderr,
+	}
 	log.Printf("Main(args=%q)", args)
-	pc, err := rsyncopts.ParseArguments(args[1:], true)
+	pc, err := rsyncopts.ParseArguments(osenv, args[1:], true)
 	if err != nil {
 		return nil, err
 	}
@@ -58,7 +64,7 @@ func Main(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer,
 				return nil, err
 			}
 		}
-		srv, err := rsyncd.NewServer(cfg.Modules)
+		srv, err := rsyncd.NewServer(cfg.Modules, rsyncd.WithStderr(stderr))
 		if err != nil {
 			return nil, err
 		}
@@ -66,14 +72,14 @@ func Main(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer,
 			r: stdin,
 			w: stdout,
 		}
-		return nil, srv.HandleDaemonConn(ctx, &rw, nil)
+		return nil, srv.HandleDaemonConn(ctx, osenv, &rw, nil)
 	}
 
 	// calling convention: command mode (over remote shell or locally)
 	// Example: --server --sender -vvvvlogDtpre.iLsfxCIvu . .
 	if opts.Server() {
 		// start_server()
-		srv, err := rsyncd.NewServer(nil)
+		srv, err := rsyncd.NewServer(nil, rsyncd.WithStderr(stderr))
 		if err != nil {
 			return nil, err
 		}
@@ -91,11 +97,11 @@ func Main(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer,
 		log.Printf("paths: %q", paths)
 		crd, cwr := rsyncwire.CounterPair(stdin, stdout)
 		rd := crd
-		return nil, srv.HandleConn(nil, rd, crd, cwr, paths, opts, true)
+		return nil, srv.HandleConn(osenv, nil, rd, crd, cwr, paths, opts, true)
 	}
 
 	if !opts.Daemon() {
-		return clientMain(args, stdin, stdout, stderr)
+		return clientMain(args, osenv)
 	}
 
 	// daemon_main()
@@ -227,7 +233,7 @@ func Main(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer,
 		}()
 	}
 
-	srv, err := rsyncd.NewServer(cfg.Modules)
+	srv, err := rsyncd.NewServer(cfg.Modules, rsyncd.WithStderr(stderr))
 	if err != nil {
 		return nil, err
 	}

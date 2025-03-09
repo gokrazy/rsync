@@ -2,7 +2,6 @@ package receiver
 
 import (
 	"io"
-	"log"
 	"os/user"
 	"strconv"
 )
@@ -57,7 +56,7 @@ func (rt *Transfer) RecvIdList() (users map[int32]mapping, groups map[int32]mapp
 			return nil, nil, err
 		}
 		for remoteUid, mapping := range users {
-			log.Printf("remote uid %d(%s) maps to local uid %d", remoteUid, mapping.Name, mapping.LocalId)
+			rt.Logger.Printf("remote uid %d(%s) maps to local uid %d", remoteUid, mapping.Name, mapping.LocalId)
 		}
 	}
 
@@ -78,7 +77,7 @@ func (rt *Transfer) RecvIdList() (users map[int32]mapping, groups map[int32]mapp
 			return nil, nil, err
 		}
 		for remoteGid, mapping := range groups {
-			log.Printf("remote gid %d(%s) maps to local gid %d", remoteGid, mapping.Name, mapping.LocalId)
+			rt.Logger.Printf("remote gid %d(%s) maps to local gid %d", remoteGid, mapping.Name, mapping.LocalId)
 		}
 	}
 

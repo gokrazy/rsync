@@ -13,6 +13,7 @@ import (
 	"github.com/BurntSushi/toml"
 	"github.com/gokrazy/rsync/internal/rsyncdconfig"
 	"github.com/gokrazy/rsync/internal/rsynctest"
+	"github.com/gokrazy/rsync/internal/testlogger"
 	"github.com/gokrazy/rsync/rsyncd"
 	"github.com/google/go-cmp/cmp"
 )
@@ -27,8 +28,8 @@ func TestRsyncVersion(t *testing.T) {
 	// This function is not an actual test, just used to include the rsync
 	// version in test output.
 	rsync := exec.Command(rsynctest.AnyRsync(t), "--version")
-	rsync.Stdout = os.Stdout
-	rsync.Stderr = os.Stderr
+	rsync.Stdout = testlogger.New(t)
+	rsync.Stderr = testlogger.New(t)
 	if err := rsync.Run(); err != nil {
 		t.Fatalf("%v: %v", rsync.Args, err)
 	}
@@ -39,8 +40,8 @@ func TestTridgeRsyncVersion(t *testing.T) {
 	// version in test output.
 	rsyncBin := rsynctest.TridgeOrGTFO(t, "--version")
 	tridgeRsync := exec.Command(rsyncBin, "--version")
-	tridgeRsync.Stdout = os.Stdout
-	tridgeRsync.Stderr = os.Stderr
+	tridgeRsync.Stdout = testlogger.New(t)
+	tridgeRsync.Stderr = testlogger.New(t)
 	if err := tridgeRsync.Run(); err != nil {
 		t.Fatalf("%v: %v", tridgeRsync.Args, err)
 	}
@@ -65,7 +66,7 @@ func TestModuleListingServer(t *testing.T) {
 		"--port="+srv.Port,
 		"rsync://localhost")
 	rsync.Stdout = &buf
-	rsync.Stderr = os.Stderr
+	rsync.Stderr = testlogger.New(t)
 	if err := rsync.Run(); err != nil {
 		t.Fatalf("%v: %v", rsync.Args, err)
 	}
@@ -182,8 +183,8 @@ func TestInterop(t *testing.T) {
 		"rsync://localhost/interop/", // copy contents of interop
 		//source+"/", // sync from local directory
 		dest) // directly into dest
-	rsync.Stdout = os.Stdout
-	rsync.Stderr = os.Stderr
+	rsync.Stdout = testlogger.New(t)
+	rsync.Stderr = testlogger.New(t)
 	if err := rsync.Run(); err != nil {
 		t.Fatalf("%v: %v", rsync.Args, err)
 	}
@@ -197,8 +198,8 @@ func TestInterop(t *testing.T) {
 		"rsync://localhost/interop/", // copy contents of interop
 		//source+"/", // sync from local directory
 		dest) // directly into dest
-	rsync.Stdout = os.Stdout
-	rsync.Stderr = os.Stderr
+	rsync.Stdout = testlogger.New(t)
+	rsync.Stderr = testlogger.New(t)
 	if err := rsync.Run(); err != nil {
 		t.Fatalf("%v: %v", rsync.Args, err)
 	}
@@ -239,8 +240,8 @@ func TestInterop(t *testing.T) {
 		"rsync://localhost/interop/", // copy contents of interop
 		//source+"/", // sync from local directory
 		dest) // directly into dest
-	rsync.Stdout = os.Stdout
-	rsync.Stderr = os.Stderr
+	rsync.Stdout = testlogger.New(t)
+	rsync.Stderr = testlogger.New(t)
 	if err := rsync.Run(); err != nil {
 		t.Fatalf("%v: %v", rsync.Args, err)
 	}
@@ -330,8 +331,8 @@ func TestInteropSubdir(t *testing.T) {
 				"--port=" + srv.Port,
 			}, sourcesArgs(t)...),
 			dest)...)
-	rsync.Stdout = os.Stdout
-	rsync.Stderr = os.Stderr
+	rsync.Stdout = testlogger.New(t)
+	rsync.Stderr = testlogger.New(t)
 	if err := rsync.Run(); err != nil {
 		t.Fatalf("%v: %v", rsync.Args, err)
 	}
@@ -365,8 +366,8 @@ func TestInteropSubdirExclude(t *testing.T) {
 				"--port=" + srv.Port,
 			}, "rsync://localhost/interop/"),
 			dest)...)
-	rsync.Stdout = os.Stdout
-	rsync.Stderr = os.Stderr
+	rsync.Stdout = testlogger.New(t)
+	rsync.Stderr = testlogger.New(t)
 	if err := rsync.Run(); err != nil {
 		t.Fatalf("%v: %v", rsync.Args, err)
 	}
@@ -420,8 +421,8 @@ func TestInteropSubdirExcludeMultipleNested(t *testing.T) {
 				"--port=" + srv.Port,
 			}, "rsync://localhost/interop/"),
 			dest)...)
-	rsync.Stdout = os.Stdout
-	rsync.Stderr = os.Stderr
+	rsync.Stdout = testlogger.New(t)
+	rsync.Stderr = testlogger.New(t)
 	if err := rsync.Run(); err != nil {
 		t.Fatalf("%v: %v", rsync.Args, err)
 	}
@@ -459,8 +460,8 @@ func TestInteropRemoteCommand(t *testing.T) {
 				"-e", os.Args[0],
 			}, sourcesArgs...),
 			dest)...)
-	rsync.Stdout = os.Stdout
-	rsync.Stderr = os.Stderr
+	rsync.Stdout = testlogger.New(t)
+	rsync.Stderr = testlogger.New(t)
 	if err := rsync.Run(); err != nil {
 		t.Fatalf("%v: %v", rsync.Args, err)
 	}
@@ -525,8 +526,8 @@ func TestInteropRemoteDaemon(t *testing.T) {
 				"-e", os.Args[0],
 			}, sourcesArgs(t)...),
 			dest)...)
-	rsync.Stdout = os.Stdout
-	rsync.Stderr = os.Stderr
+	rsync.Stdout = testlogger.New(t)
+	rsync.Stderr = testlogger.New(t)
 	// TODO: does os.Environ() reflect changes by os.Setenv()?
 	rsync.Env = append(os.Environ(),
 		"HOME="+homeDir,
@@ -550,8 +551,8 @@ func TestInteropRemoteDaemonSSH(t *testing.T) {
 		"-N", "",
 		"-t", "ed25519",
 		"-f", privKeyPath)
-	genKey.Stdout = os.Stdout
-	genKey.Stderr = os.Stderr
+	genKey.Stdout = testlogger.New(t)
+	genKey.Stderr = testlogger.New(t)
 	if err := genKey.Run(); err != nil {
 		t.Fatalf("%v: %v", genKey.Args, err)
 	}
@@ -580,8 +581,8 @@ func TestInteropRemoteDaemonSSH(t *testing.T) {
 					"-e", "ssh -o IdentityFile=" + privKeyPath + " -o StrictHostKeyChecking=no -o CheckHostIP=no -o UserKnownHostsFile=/dev/null -p " + srv.Port,
 				}, sourcesArgs(t)...),
 				dest)...)
-		rsync.Stdout = os.Stdout
-		rsync.Stderr = os.Stderr
+		rsync.Stdout = testlogger.New(t)
+		rsync.Stderr = testlogger.New(t)
 		if err := rsync.Run(); err != nil {
 			t.Fatalf("%v: %v", rsync.Args, err)
 		}
@@ -625,8 +626,8 @@ func TestInteropRemoteDaemonSSH(t *testing.T) {
 					"-e", "ssh -o IdentityFile=" + privKeyPath + " -o StrictHostKeyChecking=no -o CheckHostIP=no -o UserKnownHostsFile=/dev/null -p " + srv.Port,
 				}, sourcesArgs(t)...),
 				dest)...)
-		rsync.Stdout = os.Stdout
-		rsync.Stderr = os.Stderr
+		rsync.Stdout = testlogger.New(t)
+		rsync.Stderr = testlogger.New(t)
 		if err := rsync.Run(); err == nil {
 			t.Fatalf("rsync unexpectedly succeeded")
 		}
@@ -670,8 +671,8 @@ func TestInteropRemoteDaemonSSH(t *testing.T) {
 					"-e", "ssh -o IdentityFile=" + privKeyPath + " -o StrictHostKeyChecking=no -o CheckHostIP=no -o UserKnownHostsFile=/dev/null -p " + srv.Port,
 				}, sourcesArgs(t)...),
 				dest)...)
-		rsync.Stdout = os.Stdout
-		rsync.Stderr = os.Stderr
+		rsync.Stdout = testlogger.New(t)
+		rsync.Stderr = testlogger.New(t)
 		if err := rsync.Run(); err != nil {
 			t.Fatalf("%v: %v", rsync.Args, err)
 		}

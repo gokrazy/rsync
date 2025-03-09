@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/gokrazy/rsync"
-	"github.com/gokrazy/rsync/internal/log"
 	"github.com/gokrazy/rsync/internal/nofollow"
 	"github.com/gokrazy/rsync/internal/rsyncchecksum"
 	"github.com/gokrazy/rsync/internal/rsynccommon"
@@ -27,19 +26,19 @@ func (rt *Transfer) GenerateFiles(fileList []*File) error {
 		}
 	}
 	phase++
-	log.Printf("generateFiles phase=%d", phase)
+	rt.Logger.Printf("generateFiles phase=%d", phase)
 	if err := rt.Conn.WriteInt32(-1); err != nil {
 		return err
 	}
 
 	// TODO: re-do any files that failed
 	phase++
-	log.Printf("generateFiles phase=%d", phase)
+	rt.Logger.Printf("generateFiles phase=%d", phase)
 	if err := rt.Conn.WriteInt32(-1); err != nil {
 		return err
 	}
 
-	log.Printf("generateFiles finished")
+	rt.Logger.Printf("generateFiles finished")
 	return nil
 }
 
@@ -61,7 +60,6 @@ func (rt *Transfer) skipFile(f *File, st os.FileInfo) (bool, error) {
 func modTimeEqual(a, b time.Time) bool {
 	a = a.Truncate(time.Second)
 	b = b.Truncate(time.Second)
-	log.Printf("comparing mtime: %v vs. %v", a, b)
 	return a.Equal(b)
 }
 
@@ -111,7 +109,7 @@ func (rt *Transfer) recvGenerator(idx int, f *File) error {
 			f.Name)
 		return nil
 	}
-	log.Printf("recv_generator(f=%+v)", f)
+	rt.Logger.Printf("recv_generator(f=%+v)", f)
 
 	local := filepath.Join(rt.Dest, f.Name)
 	st, err := os.Lstat(local)
@@ -131,7 +129,7 @@ func (rt *Transfer) recvGenerator(idx int, f *File) error {
 		}
 		if err != nil {
 			perm := fs.FileMode(f.Mode) & os.ModePerm
-			log.Printf("MkdirAll(%s, %v)", local, perm)
+			rt.Logger.Printf("MkdirAll(%s, %v)", local, perm)
 			if err := os.MkdirAll(local, perm); err != nil {
 				// TODO: EEXIST is okay
 				return err
@@ -149,7 +147,7 @@ func (rt *Transfer) recvGenerator(idx int, f *File) error {
 		if err == nil {
 			// local file exists, verify target matches
 			if target, err := os.Readlink(local); err == nil {
-				log.Printf("existing target: %q", target)
+				rt.Logger.Printf("existing target: %q", target)
 				if target == f.LinkTarget {
 					if err := rt.setPerms(f); err != nil {
 						return err
@@ -160,7 +158,7 @@ func (rt *Transfer) recvGenerator(idx int, f *File) error {
 			}
 			// fallthrough to create or replace the symlink
 		}
-		log.Printf("symlink %s -> %s", local, f.LinkTarget)
+		rt.Logger.Printf("symlink %s -> %s", local, f.LinkTarget)
 		if err := symlink(f.LinkTarget, local); err != nil {
 			return err
 		}
@@ -191,7 +189,7 @@ func (rt *Transfer) recvGenerator(idx int, f *File) error {
 	}
 
 	requestFullFile := func() error {
-		log.Printf("requesting: %s", f.Name)
+		rt.Logger.Printf("requesting: %s", f.Name)
 		if err := rt.Conn.WriteInt32(int32(idx)); err != nil {
 			return err
 		}
@@ -228,7 +226,7 @@ func (rt *Transfer) recvGenerator(idx int, f *File) error {
 		return err
 	}
 	if skip {
-		log.Printf("skipping %s", local)
+		rt.Logger.Printf("skipping %s", local)
 		if err := rt.setPerms(f); err != nil {
 			return err
 		}
@@ -247,12 +245,12 @@ func (rt *Transfer) recvGenerator(idx int, f *File) error {
 
 	in, err := os.OpenFile(local, os.O_RDONLY|nofollow.Maybe, 0)
 	if err != nil {
-		log.Printf("failed to open %s, continuing: %v", local, err)
+		rt.Logger.Printf("failed to open %s, continuing: %v", local, err)
 		return requestFullFile()
 	}
 	defer in.Close()
 
-	log.Printf("sending sums for: %s", f.Name)
+	rt.Logger.Printf("sending sums for: %s", f.Name)
 	if err := rt.Conn.WriteInt32(int32(idx)); err != nil {
 		return err
 	}

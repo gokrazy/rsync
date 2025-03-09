@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/gokrazy/rsync/internal/rsynctest"
+	"github.com/gokrazy/rsync/internal/testlogger"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/renameio/v2"
 )
@@ -485,8 +486,8 @@ func TestReceiverCommandDryRun(t *testing.T) {
 		source+"/",
 		"localhost:"+dest+"/")
 	rsync.Stdout = &buf
-	rsync.Stderr = os.Stderr
-	log.Printf("%v", rsync.Args)
+	rsync.Stderr = testlogger.New(t)
+	t.Logf("%v", rsync.Args)
 	if err := rsync.Run(); err != nil {
 		t.Fatalf("rsync error, output:\n%s", buf.String())
 	}

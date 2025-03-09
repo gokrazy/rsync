@@ -13,6 +13,7 @@ import (
 
 	"github.com/gokrazy/rsync/internal/rsyncdconfig"
 	"github.com/gokrazy/rsync/internal/rsynctest"
+	"github.com/gokrazy/rsync/internal/testlogger"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/renameio/v2"
 )
@@ -297,8 +298,8 @@ func TestReceiverSSH(t *testing.T) {
 		"-N", "",
 		"-t", "ed25519",
 		"-f", privKeyPath)
-	genKey.Stdout = os.Stdout
-	genKey.Stderr = os.Stderr
+	genKey.Stdout = testlogger.New(t)
+	genKey.Stderr = testlogger.New(t)
 	if err := genKey.Run(); err != nil {
 		t.Fatalf("%v: %v", genKey.Args, err)
 	}

@@ -13,6 +13,7 @@ import (
 	"github.com/gokrazy/rsync/internal/log"
 	"github.com/gokrazy/rsync/internal/receiver"
 	"github.com/gokrazy/rsync/internal/rsyncopts"
+	"github.com/gokrazy/rsync/internal/rsyncos"
 	"github.com/gokrazy/rsync/internal/rsyncstats"
 	"github.com/gokrazy/rsync/internal/rsyncwire"
 	"github.com/gokrazy/rsync/internal/sender"
@@ -20,7 +21,7 @@ import (
 )
 
 // rsync/main.c:start_client
-func rsyncMain(osenv receiver.Osenv, opts *rsyncopts.Options, sources []string, dest string) (*rsyncstats.TransferStats, error) {
+func rsyncMain(osenv rsyncos.Std, opts *rsyncopts.Options, sources []string, dest string) (*rsyncstats.TransferStats, error) {
 	log.Printf("dest: %q, sources: %q", dest, sources)
 	log.Printf("opts: %+v", opts)
 	for _, src := range sources {
@@ -87,7 +88,7 @@ func rsyncMain(osenv receiver.Osenv, opts *rsyncopts.Options, sources []string, 
 			user = machine[:idx]
 			machine = machine[idx+1:]
 		}
-		rc, wc, err := doCmd(opts, machine, user, path, daemonConnection)
+		rc, wc, err := doCmd(osenv, opts, machine, user, path, daemonConnection)
 		if err != nil {
 			return nil, err
 		}
@@ -119,7 +120,7 @@ func rsyncMain(osenv receiver.Osenv, opts *rsyncopts.Options, sources []string, 
 }
 
 // rsync/main.c:do_cmd
-func doCmd(opts *rsyncopts.Options, machine, user, path string, daemonConnection int) (io.ReadCloser, io.WriteCloser, error) {
+func doCmd(osenv rsyncos.Std, opts *rsyncopts.Options, machine, user, path string, daemonConnection int) (io.ReadCloser, io.WriteCloser, error) {
 	log.Printf("doCmd(machine=%q, user=%q, path=%q, daemonConnection=%d)",
 		machine, user, path, daemonConnection)
 	var args []string
@@ -176,7 +177,7 @@ func doCmd(opts *rsyncopts.Options, machine, user, path string, daemonConnection
 	if err != nil {
 		return nil, nil, err
 	}
-	ssh.Stderr = os.Stderr
+	ssh.Stderr = osenv.Stderr
 	if err := ssh.Start(); err != nil {
 		return nil, nil, err
 	}
@@ -193,7 +194,7 @@ func doCmd(opts *rsyncopts.Options, machine, user, path string, daemonConnection
 }
 
 // rsync/main.c:client_run
-func clientRun(osenv receiver.Osenv, opts *rsyncopts.Options, conn io.ReadWriter, other string, negotiate bool) (*rsyncstats.TransferStats, error) {
+func clientRun(osenv rsyncos.Std, opts *rsyncopts.Options, conn io.ReadWriter, other string, negotiate bool) (*rsyncstats.TransferStats, error) {
 	crd := &rsyncwire.CountingReader{R: conn}
 	cwr := &rsyncwire.CountingWriter{W: conn}
 	c := &rsyncwire.Conn{
@@ -227,7 +228,7 @@ func clientRun(osenv receiver.Osenv, opts *rsyncopts.Options, conn io.ReadWriter
 
 	if opts.Sender() {
 		st := &sender.Transfer{
-			Logger: log.Default(), // TODO: plumb logging
+			Logger: log.New(osenv.Stderr),
 			Opts:   opts,
 			Conn:   c,
 			Seed:   seed,
@@ -245,6 +246,7 @@ func clientRun(osenv receiver.Osenv, opts *rsyncopts.Options, conn io.ReadWriter
 	}
 
 	rt := &receiver.Transfer{
+		Logger: log.New(osenv.Stderr),
 		Opts: &receiver.TransferOpts{
 			Verbose: opts.Verbose(),
 			DryRun:  opts.DryRun(),
@@ -288,13 +290,8 @@ func clientRun(osenv receiver.Osenv, opts *rsyncopts.Options, conn io.ReadWriter
 	return rt.Do(c, fileList, false)
 }
 
-func clientMain(args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer) (*rsyncstats.TransferStats, error) {
-	osenv := receiver.Osenv{
-		Stdin:  stdin,
-		Stdout: stdout,
-		Stderr: stderr,
-	}
-	pc, err := rsyncopts.ParseArguments(args[1:], false)
+func clientMain(args []string, osenv rsyncos.Std) (*rsyncstats.TransferStats, error) {
+	pc, err := rsyncopts.ParseArguments(osenv, args[1:], false)
 	if err != nil {
 		return nil, err
 	}
@@ -302,7 +299,7 @@ func clientMain(args []string, stdin io.Reader, stdout io.Writer, stderr io.Writ
 	remaining := pc.RemainingArgs
 	if len(remaining) == 0 {
 		// help goes to stderr when no arguments were specified
-		fmt.Fprintln(os.Stderr, opts.Help())
+		fmt.Fprintln(osenv.Stderr, opts.Help())
 		return nil, fmt.Errorf("rsync error: syntax or usage error")
 	}
 	if len(remaining) == 1 {

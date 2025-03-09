@@ -9,7 +9,6 @@ import (
 	"path/filepath"
 
 	"github.com/gokrazy/rsync"
-	"github.com/gokrazy/rsync/internal/log"
 	"github.com/gokrazy/rsync/internal/nofollow"
 	"github.com/mmcloughlin/md4"
 )
@@ -25,32 +24,32 @@ func (rt *Transfer) RecvFiles(fileList []*File) error {
 		if idx == -1 {
 			if phase == 0 {
 				phase++
-				log.Printf("recvFiles phase=%d", phase)
+				rt.Logger.Printf("recvFiles phase=%d", phase)
 				// TODO: send done message
 				continue
 			}
 			break
 		}
-		log.Printf("receiving file idx=%d: %+v", idx, fileList[idx])
+		rt.Logger.Printf("receiving file idx=%d: %+v", idx, fileList[idx])
 		if err := rt.recvFile1(fileList[idx]); err != nil {
 			return err
 		}
 	}
-	log.Printf("recvFiles finished")
+	rt.Logger.Printf("recvFiles finished")
 	return nil
 }
 
 func (rt *Transfer) recvFile1(f *File) error {
 	if rt.Opts.DryRun {
 		if !rt.Opts.Server {
-			fmt.Println(f.Name)
+			fmt.Fprintln(rt.Env.Stdout, f.Name)
 		}
 		return nil
 	}
 
 	localFile, err := rt.openLocalFile(f)
 	if err != nil && !os.IsNotExist(err) {
-		log.Printf("opening local file failed, continuing: %v", err)
+		rt.Logger.Printf("opening local file failed, continuing: %v", err)
 	}
 	defer localFile.Close()
 	if err := rt.receiveData(f, localFile); err != nil {
@@ -98,7 +97,7 @@ func (rt *Transfer) receiveData(f *File, localFile *os.File) error {
 
 	local := filepath.Join(rt.Dest, f.Name)
 
-	log.Printf("creating %s", local)
+	rt.Logger.Printf("creating %s", local)
 	out, err := newPendingFile(local)
 	if err != nil {
 		return err
@@ -150,7 +149,7 @@ func (rt *Transfer) receiveData(f *File, localFile *os.File) error {
 	if !bytes.Equal(localSum, remoteSum) {
 		return fmt.Errorf("file corruption in %s", f.Name)
 	}
-	log.Printf("checksum %x matches!", localSum)
+	rt.Logger.Printf("checksum %x matches!", localSum)
 
 	if err := out.CloseAtomicallyReplace(); err != nil {
 		return err

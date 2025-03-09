@@ -11,13 +11,13 @@ import (
 
 	"github.com/gokrazy/rsync"
 	"github.com/gokrazy/rsync/internal/log"
-	"github.com/gokrazy/rsync/internal/receiver"
 	"github.com/gokrazy/rsync/internal/rsyncopts"
+	"github.com/gokrazy/rsync/internal/rsyncos"
 	"github.com/gokrazy/rsync/internal/rsyncstats"
 )
 
 // rsync/clientserver.c:start_socket_client
-func socketClient(osenv receiver.Osenv, opts *rsyncopts.Options, host string, path string, port int, dest string) (*rsyncstats.TransferStats, error) {
+func socketClient(osenv rsyncos.Std, opts *rsyncopts.Options, host string, path string, port int, dest string) (*rsyncstats.TransferStats, error) {
 	if port < 0 {
 		host += ":873" // rsync daemon port
 	} else {
@@ -54,7 +54,7 @@ func socketClient(osenv receiver.Osenv, opts *rsyncopts.Options, host string, pa
 }
 
 // rsync/clientserver.c:start_inband_exchange
-func startInbandExchange(osenv receiver.Osenv, opts *rsyncopts.Options, conn io.ReadWriter, module, path string) (done bool, _ error) {
+func startInbandExchange(osenv rsyncos.Std, opts *rsyncopts.Options, conn io.ReadWriter, module, path string) (done bool, _ error) {
 	rd := bufio.NewReader(conn)
 
 	// send client greeting

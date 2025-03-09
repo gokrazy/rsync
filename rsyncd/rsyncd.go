@@ -18,6 +18,7 @@ import (
 	"github.com/gokrazy/rsync/internal/log"
 	"github.com/gokrazy/rsync/internal/receiver"
 	"github.com/gokrazy/rsync/internal/rsyncopts"
+	"github.com/gokrazy/rsync/internal/rsyncos"
 	"github.com/gokrazy/rsync/internal/rsyncwire"
 	"github.com/gokrazy/rsync/internal/sender"
 )
@@ -52,6 +53,12 @@ func WithLogger(logger log.Logger) Option {
 	})
 }
 
+func WithStderr(stderr io.Writer) Option {
+	return serverOptionFunc(func(s *Server) {
+		s.stderr = stderr
+	})
+}
+
 func NewServer(modules []Module, opts ...Option) (*Server, error) {
 	for _, mod := range modules {
 		if err := validateModule(mod); err != nil {
@@ -60,7 +67,6 @@ func NewServer(modules []Module, opts ...Option) (*Server, error) {
 	}
 
 	server := &Server{
-		logger:  log.Default(),
 		modules: modules,
 	}
 
@@ -68,10 +74,21 @@ func NewServer(modules []Module, opts ...Option) (*Server, error) {
 		opt.applyServer(server)
 	}
 
+	// Default to os.Stderr if no stderr was specified.
+	// Explicitly use io.Discard if you do not want stderr.
+	if server.stderr == nil {
+		server.stderr = os.Stderr
+	}
+
+	if server.logger == nil {
+		server.logger = log.New(server.stderr)
+	}
+
 	return server, nil
 }
 
 type Server struct {
+	stderr io.Writer
 	logger log.Logger
 
 	modules []Module
@@ -149,7 +166,7 @@ func checkACL(acls []string, remoteAddr net.Addr) error {
 }
 
 // FIXME: context cancellation not yet implemented
-func (s *Server) HandleDaemonConn(ctx context.Context, conn io.ReadWriter, remoteAddr net.Addr) (err error) {
+func (s *Server) HandleDaemonConn(ctx context.Context, osenv rsyncos.Std, conn io.ReadWriter, remoteAddr net.Addr) (err error) {
 	_ = ctx // not implemented. what would be the best thing to do? wrap conn's reader part with cancelable reader?
 
 	const terminationCommand = "@RSYNCD: OK\n"
@@ -212,7 +229,7 @@ func (s *Server) HandleDaemonConn(ctx context.Context, conn io.ReadWriter, remot
 	}
 
 	s.logger.Printf("flags: %+v", flags)
-	pc, err := rsyncopts.ParseArguments(flags, false)
+	pc, err := rsyncopts.ParseArguments(osenv, flags, false)
 	if err != nil {
 		err = fmt.Errorf("parsing server args: %v", err)
 
@@ -248,11 +265,11 @@ func (s *Server) HandleDaemonConn(ctx context.Context, conn io.ReadWriter, remot
 	paths := remaining[1:]
 	s.logger.Printf("paths: %q", paths)
 
-	return s.HandleConn(&module, rd, crd, cwr, paths, opts, false)
+	return s.HandleConn(osenv, &module, rd, crd, cwr, paths, opts, false)
 }
 
 // handleConn is equivalent to rsync/main.c:start_server
-func (s *Server) HandleConn(module *Module, rd io.Reader, crd *rsyncwire.CountingReader, cwr *rsyncwire.CountingWriter, paths []string, opts *rsyncopts.Options, negotiate bool) (err error) {
+func (s *Server) HandleConn(osenv rsyncos.Std, module *Module, rd io.Reader, crd *rsyncwire.CountingReader, cwr *rsyncwire.CountingWriter, paths []string, opts *rsyncopts.Options, negotiate bool) (err error) {
 	// “SHOULD be unique to each connection” as per
 	// https://github.com/JohannesBuchner/Jarsync/blob/master/jarsync/rsync.txt
 	//
@@ -301,11 +318,11 @@ func (s *Server) HandleConn(module *Module, rd io.Reader, crd *rsyncwire.Countin
 			mpx.WriteMsg(rsyncwire.MsgError, fmt.Appendf(nil, "gokr-rsync [receiver]: %v\n", err))
 		}
 	}()
-	return s.handleConnReceiver(module, crd, cwr, paths, opts, false, c, sessionChecksumSeed)
+	return s.handleConnReceiver(osenv, module, crd, cwr, paths, opts, false, c, sessionChecksumSeed)
 }
 
 // handleConnReceiver is equivalent to rsync/main.c:do_server_recv
-func (s *Server) handleConnReceiver(module *Module, crd *rsyncwire.CountingReader, cwr *rsyncwire.CountingWriter, paths []string, opts *rsyncopts.Options, negotiate bool, c *rsyncwire.Conn, sessionChecksumSeed int32) (err error) {
+func (s *Server) handleConnReceiver(osenv rsyncos.Std, module *Module, crd *rsyncwire.CountingReader, cwr *rsyncwire.CountingWriter, paths []string, opts *rsyncopts.Options, negotiate bool, c *rsyncwire.Conn, sessionChecksumSeed int32) (err error) {
 	if module == nil {
 		if len(paths) != 1 {
 			return fmt.Errorf("precisely one destination path required, got %q", paths)
@@ -323,6 +340,7 @@ func (s *Server) handleConnReceiver(module *Module, crd *rsyncwire.CountingReade
 	}
 
 	rt := &receiver.Transfer{
+		Logger: s.logger,
 		Opts: &receiver.TransferOpts{
 			DryRun: opts.DryRun(),
 			Server: opts.Server(),
@@ -338,12 +356,7 @@ func (s *Server) handleConnReceiver(module *Module, crd *rsyncwire.CountingReade
 			// TODO: PreserveHardlinks: opts.PreserveHardlinks,
 		},
 		Dest: module.Path,
-		// TODO: what is Env used for and can we get rid of it?
-		Env: receiver.Osenv{
-			Stdout: os.Stdout,
-			Stderr: os.Stderr,
-			Stdin:  os.Stdin,
-		},
+		Env:  osenv,
 		Conn: c,
 		Seed: sessionChecksumSeed,
 	}
@@ -410,6 +423,12 @@ func (s *Server) handleConnSender(module *Module, crd *rsyncwire.CountingReader,
 }
 
 func (s *Server) Serve(ctx context.Context, ln net.Listener) error {
+	osenv := rsyncos.Std{
+		Stdin:  nil,
+		Stdout: nil,
+		Stderr: s.stderr,
+	}
+
 	go func() {
 		<-ctx.Done()
 		ln.Close() // unblocks Accept()
@@ -429,7 +448,7 @@ func (s *Server) Serve(ctx context.Context, ln net.Listener) error {
 		s.logger.Printf("remote connection from %s", remoteAddr)
 		go func() {
 			defer conn.Close()
-			if err := s.HandleDaemonConn(ctx, conn, remoteAddr); err != nil {
+			if err := s.HandleDaemonConn(ctx, osenv, conn, remoteAddr); err != nil {
 				s.logger.Printf("[%s] handle: %v", remoteAddr, err)
 			}
 		}()

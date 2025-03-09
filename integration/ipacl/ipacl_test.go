@@ -11,6 +11,7 @@ import (
 
 	"github.com/gokrazy/rsync/internal/rsyncdconfig"
 	"github.com/gokrazy/rsync/internal/rsynctest"
+	"github.com/gokrazy/rsync/internal/testlogger"
 )
 
 type connWithRemoteAddrListener struct {
@@ -108,7 +109,7 @@ acl = [
 				"--port="+srv.Port,
 				"rsync://localhost")
 			rsync.Stdout = &buf
-			rsync.Stderr = os.Stderr
+			rsync.Stderr = testlogger.New(t)
 			if err := rsync.Run(); err != nil {
 				t.Fatalf("%v: %v", rsync.Args, err)
 			}
@@ -130,7 +131,7 @@ acl = [
 				"rsync://localhost/interop/", // copy contents of interop
 				//source+"/", // sync from local directory
 				dest) // directly into dest
-			rsync.Stdout = os.Stdout
+			rsync.Stdout = testlogger.New(t)
 			rsync.Stderr = &buf
 			if err := rsync.Run(); err != nil {
 				if !tt.wantError {

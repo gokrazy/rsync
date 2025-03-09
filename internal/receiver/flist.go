@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/gokrazy/rsync"
-	"github.com/gokrazy/rsync/internal/log"
 )
 
 // rsync/flist.c:flist_sort_and_clean
@@ -204,7 +203,7 @@ func (rt *Transfer) ReceiveFileList() ([]*File, error) {
 			break
 		}
 		flags := uint16(b)
-		// log.Printf("flags: %x", flags)
+		// rt.Logger.Printf("flags: %x", flags)
 		// TODO(protocol >= 28): extended flags
 
 		f, err := rt.receiveFileEntry(flags, lastFileEntry)
@@ -213,7 +212,7 @@ func (rt *Transfer) ReceiveFileList() ([]*File, error) {
 		}
 		lastFileEntry = f
 		// TODO: include depth in output?
-		log.Printf("[Receiver] i=%d ? %s mode=%o len=%d uid=%d gid=%d flags=?",
+		rt.Logger.Printf("[Receiver] i=%d ? %s mode=%o len=%d uid=%d gid=%d flags=?",
 			len(fileList),
 			f.Name,
 			f.Mode,
@@ -240,7 +239,7 @@ func (rt *Transfer) ReceiveFileList() ([]*File, error) {
 	if err != nil {
 		return nil, err
 	}
-	log.Printf("ioErrors: %v", ioErrors)
+	rt.Logger.Printf("ioErrors: %v", ioErrors)
 	rt.IOErrors = ioErrors
 
 	return fileList, nil

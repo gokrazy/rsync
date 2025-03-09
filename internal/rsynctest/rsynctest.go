@@ -22,6 +22,7 @@ import (
 	"github.com/gokrazy/rsync/internal/maincmd"
 	"github.com/gokrazy/rsync/internal/rsyncdconfig"
 	"github.com/gokrazy/rsync/internal/rsyncstats"
+	"github.com/gokrazy/rsync/internal/testlogger"
 	"github.com/gokrazy/rsync/rsynccmd"
 	"github.com/gokrazy/rsync/rsyncd"
 	"github.com/google/go-cmp/cmp"
@@ -83,7 +84,7 @@ func New(t *testing.T, modules []rsyncd.Module, opts ...Option) *TestServer {
 			{Rsyncd: "localhost:0"},
 		}
 	}
-	srv, err := rsyncd.NewServer(modules)
+	srv, err := rsyncd.NewServer(modules, rsyncd.WithLogger(log.New(testlogger.New(t))))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -97,7 +98,7 @@ func New(t *testing.T, modules []rsyncd.Module, opts ...Option) *TestServer {
 		ts.listener = ln
 	}
 
-	log.Printf("listening on %s", ts.listener.Addr())
+	t.Logf("listening on %s", ts.listener.Addr())
 	_, port, err := net.SplitHostPort(ts.listener.Addr().String())
 	if err != nil {
 		t.Fatal(err)
@@ -157,8 +158,8 @@ func New(t *testing.T, modules []rsyncd.Module, opts ...Option) *TestServer {
 
 func Run(tb testing.TB, args ...string) *rsyncstats.TransferStats {
 	cmd := rsynccmd.Command(args[0], args[1:]...)
-	cmd.Stdout = os.Stdout // TODO: wire to tb.Logf
-	cmd.Stderr = os.Stderr
+	cmd.Stdout = testlogger.New(tb)
+	cmd.Stderr = testlogger.New(tb)
 	result, err := cmd.Run(tb.Context())
 	if err != nil {
 		tb.Fatal(err)

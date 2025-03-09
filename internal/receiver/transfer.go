@@ -1,16 +1,10 @@
 package receiver
 
 import (
-	"io"
-
+	"github.com/gokrazy/rsync/internal/log"
+	"github.com/gokrazy/rsync/internal/rsyncos"
 	"github.com/gokrazy/rsync/internal/rsyncwire"
 )
-
-type Osenv struct {
-	Stdin  io.Reader
-	Stdout io.Writer
-	Stderr io.Writer
-}
 
 // TransferOpts is a subset of Opts which is required for implementing a receiver.
 type TransferOpts struct {
@@ -31,10 +25,10 @@ type TransferOpts struct {
 
 type Transfer struct {
 	// config
-	// Opts *Opts
-	Opts *TransferOpts
-	Dest string
-	Env  Osenv
+	Logger log.Logger
+	Opts   *TransferOpts
+	Dest   string
+	Env    rsyncos.Std
 
 	// state
 	Conn     *rsyncwire.Conn

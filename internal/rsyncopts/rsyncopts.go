@@ -10,7 +10,6 @@ package rsyncopts
 import (
 	"errors"
 	"fmt"
-	"log"
 	"math"
 	"os"
 	"slices"
@@ -19,6 +18,8 @@ import (
 	"syscall"
 	"unicode"
 
+	"github.com/gokrazy/rsync/internal/log"
+	"github.com/gokrazy/rsync/internal/rsyncos"
 	"github.com/gokrazy/rsync/internal/version"
 )
 
@@ -297,7 +298,7 @@ var infoWords = [...]output{
 	{"SYMSAFE", W_SND | W_REC, "Mention symlinks that are unsafe"},
 }
 
-func parseOutputWords(words []output, levels []uint16, str string, prio priority) {
+func parseOutputWords(words []output, levels []uint16, str string, prio priority) error {
 Level:
 	for s := range strings.SplitSeq(str, ",") {
 		if strings.TrimSpace(s) == "" {
@@ -309,7 +310,7 @@ Level:
 			var err error
 			lev, err = strconv.Atoi(s[len(trimmed):])
 			if err != nil {
-				log.Fatal(err) // TODO: plumb error
+				return err
 			}
 		}
 		trimmed = strings.ToLower(trimmed)
@@ -333,12 +334,13 @@ Level:
 			}
 		}
 		if !all {
-			log.Fatalf("unknown --info/--debug item: %q", trimmed) // TODO: plumb: error
+			return fmt.Errorf("unknown --info/--debug item: %q", trimmed)
 		}
 	}
+	return nil
 }
 
-func (o *Options) setOutputVerbosity(prio priority) {
+func (o *Options) setOutputVerbosity(prio priority) error {
 	debugVerbosity := [...]string{
 		"",
 		"",
@@ -355,12 +357,15 @@ func (o *Options) setOutputVerbosity(prio priority) {
 	}
 	for j := 0; j <= o.verbose; j++ {
 		if j < len(infoVerbosity) {
-			parseOutputWords(infoWords[:], o.info[:], infoVerbosity[j], prio)
+			if err := parseOutputWords(infoWords[:], o.info[:], infoVerbosity[j], prio); err != nil {
+				return err
+			}
 		}
 		if j < len(debugVerbosity) {
 			// parseOutputWords(debugWords[:], o.debug[:], debugVerbosity[j], prio)
 		}
 	}
+	return nil
 }
 
 func (o *Options) Help() string {
@@ -862,7 +867,7 @@ func (o *Options) table() []poptOption {
 var errNotYetImplemented = errors.New("option not yet implemented in gokrazy/rsync")
 
 // rsync/options.c:parse_arguments
-func ParseArguments(args []string, gokrazyTable bool) (*Context, error) {
+func ParseArguments(osenv rsyncos.Std, args []string, gokrazyTable bool) (*Context, error) {
 	// NOTE: We do not implement support for refusing options per rsyncd.conf
 	// here, as we have our own configuration file.
 
@@ -1094,7 +1099,11 @@ func ParseArguments(args []string, gokrazyTable bool) (*Context, error) {
 		os.Exit(0)               // exit with code 0 for compatibility with tridge rsync
 	}
 
-	opts.setOutputVerbosity(DEFAULT_PRIORITY)
+	if err := opts.setOutputVerbosity(DEFAULT_PRIORITY); err != nil {
+		// TODO: plumb error
+		fmt.Println(err.Error())
+		os.Exit(1)
+	}
 
 	if opts.recurse != 0 {
 		opts.xfer_dirs = 1
