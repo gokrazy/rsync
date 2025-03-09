@@ -27,43 +27,35 @@ func rsyncMain(ctx context.Context, osenv rsyncos.Std, opts *rsyncopts.Options, 
 		log.Printf("dest: %q, sources: %q", dest, sources)
 		log.Printf("opts: %+v", opts)
 	}
-	for _, src := range sources {
-		if opts.Verbose() {
-			log.Printf("processing src=%s", src)
-		}
-		daemonConnection := 0 // no daemon
-		host, path, port, err := checkForHostspec(src)
+	// Guaranteed to be non-empty by caller of rsyncMain().
+	src := sources[0]
+
+	if opts.Verbose() {
+		log.Printf("processing src=%s", src)
+	}
+	daemonConnection := 0 // no daemon
+	host, path, port, err := checkForHostspec(src)
+	if opts.Verbose() {
+		log.Printf("host=%q, path=%q, port=%d, err=%v", host, path, port, err)
+	}
+	if err != nil {
+		// source is local, check dest arg
+		opts.SetSender()
+		// TODO: remote_argv == "."?
+		host, path, port, err = checkForHostspec(dest)
 		if opts.Verbose() {
 			log.Printf("host=%q, path=%q, port=%d, err=%v", host, path, port, err)
 		}
-		if err != nil {
-			// source is local, check dest arg
-			opts.SetSender()
-			// TODO: remote_argv == "."?
-			host, path, port, err = checkForHostspec(dest)
+		if path == "" {
 			if opts.Verbose() {
-				log.Printf("host=%q, path=%q, port=%d, err=%v", host, path, port, err)
+				log.Printf("source and dest are both local!")
 			}
-			if path == "" {
-				if opts.Verbose() {
-					log.Printf("source and dest are both local!")
-				}
-				host = ""
-				port = 0
-				path = dest
-				opts.SetLocalServer()
-			} else {
-				// dest is remote
-				if port != 0 {
-					if opts.ShellCommand() != "" {
-						daemonConnection = 1 // daemon via remote shell
-					} else {
-						daemonConnection = -1 // daemon via socket
-					}
-				}
-			}
+			host = ""
+			port = 0
+			path = dest
+			opts.SetLocalServer()
 		} else {
-			// source is remote
+			// dest is remote
 			if port != 0 {
 				if opts.ShellCommand() != "" {
 					daemonConnection = 1 // daemon via remote shell
@@ -72,64 +64,71 @@ func rsyncMain(ctx context.Context, osenv rsyncos.Std, opts *rsyncopts.Options, 
 				}
 			}
 		}
-
-		// TODO: if opts.AmSender(), verify extra source args have no hostspec
-		other := dest
-		if opts.Sender() {
-			other = src
-		}
-
-		module := path
-		if idx := strings.IndexByte(module, '/'); idx > -1 {
-			module = module[:idx]
-		}
-		if opts.Verbose() {
-			log.Printf("module=%q, path=%q, other=%q", module, path, other)
-		}
-
-		if daemonConnection < 0 {
-			stats, err := socketClient(ctx, osenv, opts, host, path, port, other)
-			if err != nil {
-				return nil, err
+	} else {
+		// source is remote
+		if port != 0 {
+			if opts.ShellCommand() != "" {
+				daemonConnection = 1 // daemon via remote shell
+			} else {
+				daemonConnection = -1 // daemon via socket
 			}
-			return stats, nil
 		}
+	}
 
-		machine := host
-		user := ""
-		if idx := strings.IndexByte(machine, '@'); idx > -1 {
-			user = machine[:idx]
-			machine = machine[idx+1:]
-		}
-		rc, wc, err := doCmd(osenv, opts, machine, user, path, daemonConnection)
+	// TODO: if opts.AmSender(), verify extra source args have no hostspec
+	other := dest
+	if opts.Sender() {
+		other = src
+	}
+
+	module := path
+	if idx := strings.IndexByte(module, '/'); idx > -1 {
+		module = module[:idx]
+	}
+	if opts.Verbose() {
+		log.Printf("module=%q, path=%q, other=%q", module, path, other)
+	}
+
+	if daemonConnection < 0 {
+		stats, err := socketClient(ctx, osenv, opts, host, path, port, other)
 		if err != nil {
 			return nil, err
 		}
-		defer rc.Close()
-		defer wc.Close()
-		conn := &readWriter{
-			r: rc,
-			w: wc,
-		}
-		negotiate := true
-		if daemonConnection != 0 {
-			done, err := startInbandExchange(osenv, opts, conn, module, path)
-			if err != nil {
-				return nil, err
-			}
-			if done {
-				return nil, nil
-			}
-			negotiate = false // already done
-		}
-		stats, err := clientRun(osenv, opts, conn, other, negotiate)
-		if err != nil {
-			return nil, err
-		}
-		//lint:ignore SA4004 TODO: refactor to match how rsync handles multiple sources
 		return stats, nil
 	}
-	return nil, nil
+
+	machine := host
+	user := ""
+	if idx := strings.IndexByte(machine, '@'); idx > -1 {
+		user = machine[:idx]
+		machine = machine[idx+1:]
+	}
+	rc, wc, err := doCmd(osenv, opts, machine, user, path, daemonConnection)
+	if err != nil {
+		return nil, err
+	}
+	defer rc.Close()
+	defer wc.Close()
+	conn := &readWriter{
+		r: rc,
+		w: wc,
+	}
+	negotiate := true
+	if daemonConnection != 0 {
+		done, err := startInbandExchange(osenv, opts, conn, module, path)
+		if err != nil {
+			return nil, err
+		}
+		if done {
+			return nil, nil
+		}
+		negotiate = false // already done
+	}
+	stats, err := clientRun(osenv, opts, conn, []string{other}, negotiate)
+	if err != nil {
+		return nil, err
+	}
+	return stats, nil
 }
 
 // rsync/main.c:do_cmd
@@ -211,7 +210,7 @@ func doCmd(osenv rsyncos.Std, opts *rsyncopts.Options, machine, user, path strin
 }
 
 // rsync/main.c:client_run
-func clientRun(osenv rsyncos.Std, opts *rsyncopts.Options, conn io.ReadWriter, other string, negotiate bool) (*rsyncstats.TransferStats, error) {
+func clientRun(osenv rsyncos.Std, opts *rsyncopts.Options, conn io.ReadWriter, paths []string, negotiate bool) (*rsyncstats.TransferStats, error) {
 	crd := &rsyncwire.CountingReader{R: conn}
 	cwr := &rsyncwire.CountingWriter{W: conn}
 	c := &rsyncwire.Conn{
@@ -253,8 +252,15 @@ func clientRun(osenv rsyncos.Std, opts *rsyncopts.Options, conn io.ReadWriter, o
 			Seed:   seed,
 		}
 		if opts.Verbose() {
-			log.Printf("sender(other=%q)", other)
+			log.Printf("sender(paths=%q)", paths)
 		}
+
+		if len(paths) != 1 {
+			// TODO: support more than one source
+			return nil, fmt.Errorf("BUG: expected exactly one path, got %q", paths)
+		}
+
+		other := paths[0]
 		trimPrefix := filepath.Base(filepath.Clean(other))
 		if strings.HasSuffix(other, "/") {
 			trimPrefix += "/"
@@ -264,6 +270,10 @@ func clientRun(osenv rsyncos.Std, opts *rsyncopts.Options, conn io.ReadWriter, o
 			return nil, err
 		}
 		return stats, nil
+	}
+
+	if len(paths) != 1 {
+		return nil, fmt.Errorf("BUG: expected exactly one path, got %q", paths)
 	}
 
 	rt := &receiver.Transfer{
@@ -282,7 +292,7 @@ func clientRun(osenv rsyncos.Std, opts *rsyncopts.Options, conn io.ReadWriter, o
 			PreserveTimes:     opts.PreserveMTimes(),
 			PreserveHardlinks: opts.PreserveHardLinks(),
 		},
-		Dest: other,
+		Dest: paths[0],
 		Env:  osenv,
 		Conn: c,
 		Seed: seed,
