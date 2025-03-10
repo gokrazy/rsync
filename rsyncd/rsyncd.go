@@ -276,11 +276,31 @@ func (s *Server) HandleDaemonConn(ctx context.Context, osenv rsyncos.Std, conn i
 
 	s.logger.Printf("trimmed paths: %q", paths)
 
-	return s.HandleConn(osenv, &module, rd, crd, cwr, paths, opts, false)
+	return s.HandleConn(osenv, &module, &Conn{crd, cwr, rd}, paths, opts, false)
+}
+
+type Conn struct {
+	crd *rsyncwire.CountingReader
+	cwr *rsyncwire.CountingWriter
+	rd  *bufio.Reader
+}
+
+func (s *Server) NewConnection(r io.Reader, w io.Writer) *Conn {
+	crd, cwr := rsyncwire.CounterPair(r, w)
+	rd := bufio.NewReader(crd)
+	return &Conn{
+		crd: crd,
+		cwr: cwr,
+		rd:  rd,
+	}
 }
 
 // handleConn is equivalent to rsync/main.c:start_server
-func (s *Server) HandleConn(osenv rsyncos.Std, module *Module, rd io.Reader, crd *rsyncwire.CountingReader, cwr *rsyncwire.CountingWriter, paths []string, opts *rsyncopts.Options, negotiate bool) (err error) {
+func (s *Server) HandleConn(osenv rsyncos.Std, module *Module, conn *Conn, paths []string, opts *rsyncopts.Options, negotiate bool) (err error) {
+	rd := conn.rd
+	crd := conn.crd
+	cwr := conn.cwr
+
 	// “SHOULD be unique to each connection” as per
 	// https://github.com/JohannesBuchner/Jarsync/blob/master/jarsync/rsync.txt
 	//

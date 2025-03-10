@@ -1,7 +1,6 @@
 package rsyncclient_test
 
 import (
-	"bufio"
 	"bytes"
 	"context"
 	"io"
@@ -15,7 +14,6 @@ import (
 	"github.com/gokrazy/rsync/internal/rsyncopts"
 	"github.com/gokrazy/rsync/internal/rsyncos"
 	"github.com/gokrazy/rsync/internal/rsynctest"
-	"github.com/gokrazy/rsync/internal/rsyncwire"
 	"github.com/gokrazy/rsync/internal/testlogger"
 	"github.com/gokrazy/rsync/rsyncclient"
 	"github.com/gokrazy/rsync/rsyncd"
@@ -82,8 +80,7 @@ func ExampleClient_Run_sendToGoroutine() {
 	// stdin from the view of the rsync server
 	stdinrd, stdinwr := io.Pipe()
 	stdoutrd, stdoutwr := io.Pipe()
-	crd, cwr := rsyncwire.CounterPair(stdinrd, stdoutwr)
-	rd := bufio.NewReader(crd)
+	conn := rsync.NewConnection(stdinrd, stdoutwr)
 	serverArgs := append([]string{"--server"}, args...)
 	serverArgs = append(serverArgs, ".", dest)
 	pc, err := rsyncopts.ParseArguments(osenv, serverArgs)
@@ -91,7 +88,7 @@ func ExampleClient_Run_sendToGoroutine() {
 		log.Fatalf("parsing server args: %v", err)
 	}
 	go func() {
-		err := rsync.HandleConn(osenv, nil, rd, crd, cwr, pc.RemainingArgs[1:], pc.Options, negotiate)
+		err := rsync.HandleConn(osenv, nil, conn, pc.RemainingArgs[1:], pc.Options, negotiate)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -187,8 +184,7 @@ func TestClientServerModule(t *testing.T) {
 	// stdin from the view of the rsync server
 	stdinrd, stdinwr := io.Pipe()
 	stdoutrd, stdoutwr := io.Pipe()
-	crd, cwr := rsyncwire.CounterPair(stdinrd, stdoutwr)
-	rd := bufio.NewReader(crd)
+	conn := rsync.NewConnection(stdinrd, stdoutwr)
 	args := []string{"-av"}
 	serverArgs := append([]string{"--server", "--sender"}, args...)
 	serverArgs = append(serverArgs, ".", "./")
@@ -201,7 +197,7 @@ func TestClientServerModule(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		err := rsync.HandleConn(osenv, &mod, rd, crd, cwr, pc.RemainingArgs[1:], pc.Options, negotiate)
+		err := rsync.HandleConn(osenv, &mod, conn, pc.RemainingArgs[1:], pc.Options, negotiate)
 		if err != nil {
 			t.Error(err)
 		}
@@ -260,8 +256,7 @@ func TestClientServerCommand(t *testing.T) {
 	// stdin from the view of the rsync server
 	stdinrd, stdinwr := io.Pipe()
 	stdoutrd, stdoutwr := io.Pipe()
-	crd, cwr := rsyncwire.CounterPair(stdinrd, stdoutwr)
-	rd := bufio.NewReader(crd)
+	conn := rsync.NewConnection(stdinrd, stdoutwr)
 	args := []string{"-av"}
 	serverArgs := append([]string{"--server", "--sender"}, args...)
 	serverArgs = append(serverArgs, ".", src)
@@ -274,7 +269,7 @@ func TestClientServerCommand(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		err := rsync.HandleConn(osenv, nil, rd, crd, cwr, pc.RemainingArgs[1:], pc.Options, negotiate)
+		err := rsync.HandleConn(osenv, nil, conn, pc.RemainingArgs[1:], pc.Options, negotiate)
 		if err != nil {
 			t.Error(err)
 		}
@@ -332,8 +327,7 @@ func TestClientServerCommandSender(t *testing.T) {
 	// stdin from the view of the rsync server
 	stdinrd, stdinwr := io.Pipe()
 	stdoutrd, stdoutwr := io.Pipe()
-	crd, cwr := rsyncwire.CounterPair(stdinrd, stdoutwr)
-	rd := bufio.NewReader(crd)
+	conn := rsync.NewConnection(stdinrd, stdoutwr)
 	args := []string{"-av"}
 	serverArgs := append([]string{"--server"}, args...)
 	serverArgs = append(serverArgs, ".", dest)
@@ -346,7 +340,7 @@ func TestClientServerCommandSender(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		err := rsync.HandleConn(osenv, nil, rd, crd, cwr, pc.RemainingArgs[1:], pc.Options, negotiate)
+		err := rsync.HandleConn(osenv, nil, conn, pc.RemainingArgs[1:], pc.Options, negotiate)
 		if err != nil {
 			t.Error(err)
 		}

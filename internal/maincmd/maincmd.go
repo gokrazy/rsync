@@ -5,7 +5,6 @@
 package maincmd
 
 import (
-	"bufio"
 	"context"
 	"fmt"
 	"io"
@@ -20,7 +19,6 @@ import (
 	"github.com/gokrazy/rsync/internal/rsyncopts"
 	"github.com/gokrazy/rsync/internal/rsyncos"
 	"github.com/gokrazy/rsync/internal/rsyncstats"
-	"github.com/gokrazy/rsync/internal/rsyncwire"
 	"github.com/gokrazy/rsync/rsyncd"
 
 	// For profiling and debugging
@@ -101,9 +99,8 @@ func Main(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer,
 		if opts.Verbose() {
 			log.Printf("paths: %q", paths)
 		}
-		crd, cwr := rsyncwire.CounterPair(stdin, stdout)
-		rd := bufio.NewReader(crd)
-		return nil, srv.HandleConn(osenv, nil, rd, crd, cwr, paths, opts, true)
+		conn := srv.NewConnection(stdin, stdout)
+		return nil, srv.HandleConn(osenv, nil, conn, paths, opts, true)
 	}
 
 	if !opts.Daemon() {
