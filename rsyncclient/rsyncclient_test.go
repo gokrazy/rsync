@@ -54,6 +54,8 @@ func ExampleClient_Run_receiveFromSubprocess() {
 }
 
 func ExampleClient_Run_sendToGoroutine() {
+	ctx := context.Background()
+
 	args, src, dest := []string{"-av"}, "/usr/share/man", "/tmp/man"
 	client, err := rsyncclient.New(args, rsyncclient.WithSender())
 	if err != nil {
@@ -75,7 +77,7 @@ func ExampleClient_Run_sendToGoroutine() {
 		if err != nil {
 			log.Fatalf("parsing server args: %v", err)
 		}
-		if err := rsync.HandleConn(nil, conn, pc); err != nil {
+		if err := rsync.HandleConn(ctx, nil, conn, pc); err != nil {
 			log.Fatal(err)
 		}
 	}()
@@ -89,7 +91,7 @@ func ExampleClient_Run_sendToGoroutine() {
 		Writer: stdinwr,  // The client writes to the server's stdin.
 	}
 
-	if _, err := client.Run(context.Background(), rw, []string{src}); err != nil {
+	if _, err := client.Run(ctx, rw, []string{src}); err != nil {
 		log.Fatal(err)
 	}
 }
@@ -174,7 +176,7 @@ func TestClientServerModule(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		err := rsync.HandleConn(&mod, conn, pc)
+		err := rsync.HandleConn(t.Context(), &mod, conn, pc)
 		if err != nil {
 			t.Error(err)
 		}
@@ -241,7 +243,7 @@ func TestClientServerCommand(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		err := rsync.HandleConn(nil, conn, pc)
+		err := rsync.HandleConn(t.Context(), nil, conn, pc)
 		if err != nil {
 			t.Error(err)
 		}
@@ -307,7 +309,7 @@ func TestClientServerCommandSender(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		err := rsync.HandleConn(nil, conn, pc)
+		err := rsync.HandleConn(t.Context(), nil, conn, pc)
 		if err != nil {
 			t.Error(err)
 		}
