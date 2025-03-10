@@ -191,6 +191,11 @@ func TestParseArgumentsError(t *testing.T) {
 			want:        POPT_ERROR_BADOPT,
 			wantMessage: "--does-not-exist: unknown option",
 		},
+		{
+			args:        []string{"-Q"},
+			want:        POPT_ERROR_BADOPT,
+			wantMessage: "-Q: unknown option",
+		},
 	} {
 		t.Run(strings.Join(tt.args, " "), func(t *testing.T) {
 			_, err := ParseArguments(osenv, tt.args, false)

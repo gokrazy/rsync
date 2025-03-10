@@ -195,7 +195,7 @@ func (pc *Context) poptGetNextOpt() (int32, error) {
 			if opt == nil {
 				return -1, &PoptError{
 					Errno: POPT_ERROR_BADOPT,
-					Err:   fmt.Errorf("option %q not found", pc.nextCharArg[:1]),
+					Err:   fmt.Errorf("-%s: unknown option", pc.nextCharArg[:1]),
 				}
 			}
 			pc.nextCharArg = pc.nextCharArg[1:]
