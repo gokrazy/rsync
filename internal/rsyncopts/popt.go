@@ -170,8 +170,19 @@ func (pc *Context) poptGetNextOpt() (int32, error) {
 			// remove the one dash we ensured is present
 			before = strings.TrimPrefix(before, "-")
 			// a second dash is permitted
-			before = strings.TrimPrefix(before, "-")
+			oneDash := false
+			if strings.HasPrefix(before, "-") {
+				before = strings.TrimPrefix(before, "-")
+			} else {
+				oneDash = true
+			}
 			opt = pc.findOption(before, "")
+			if opt == nil && !oneDash {
+				return -1, &PoptError{
+					Errno: POPT_ERROR_BADOPT,
+					Err:   fmt.Errorf("%s: unknown option", origOptString),
+				}
+			}
 			if opt == nil {
 				// try and parse it as a short option
 				pc.nextCharArg = origOptString[1:]

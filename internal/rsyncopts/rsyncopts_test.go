@@ -178,12 +178,18 @@ func TestParseArgumentsError(t *testing.T) {
 		Stderr: testlogger.New(t),
 	}
 	for _, tt := range []struct {
-		args []string
-		want int32
+		args        []string
+		want        int32
+		wantMessage string
 	}{
 		{
 			args: []string{"--delete=thoroughly"},
 			want: POPT_ERROR_UNWANTEDARG,
+		},
+		{
+			args:        []string{"--does-not-exist"},
+			want:        POPT_ERROR_BADOPT,
+			wantMessage: "--does-not-exist: unknown option",
 		},
 	} {
 		t.Run(strings.Join(tt.args, " "), func(t *testing.T) {
@@ -194,6 +200,9 @@ func TestParseArgumentsError(t *testing.T) {
 			got := err.(*PoptError).Errno
 			if got != tt.want {
 				t.Errorf("unexpected error: got %q, want %q", got, tt.want)
+			}
+			if tt.wantMessage != "" && !strings.Contains(err.Error(), tt.wantMessage) {
+				t.Errorf("unexpected error: got %q, want something containing %q", err.Error(), tt.wantMessage)
 			}
 		})
 	}
