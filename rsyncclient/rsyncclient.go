@@ -60,7 +60,7 @@ func New(args []string, opts ...Option) (*Client, error) {
 		opt.applyServer(c)
 	}
 
-	pc, err := rsyncopts.ParseArguments(c.osenv, args)
+	pc, err := rsyncopts.ParseArguments(args)
 	if err != nil {
 		return nil, err
 	}

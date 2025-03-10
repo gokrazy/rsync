@@ -7,8 +7,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gokrazy/rsync/internal/rsyncos"
-	"github.com/gokrazy/rsync/internal/testlogger"
 	"github.com/google/go-cmp/cmp"
 )
 
@@ -74,10 +72,6 @@ func discardKnownDifferences(lines []string) []string {
 }
 
 func TestParseArguments(t *testing.T) {
-	osenv := rsyncos.Std{
-		Stdout: testlogger.New(t),
-		Stderr: testlogger.New(t),
-	}
 	for _, tt := range []struct {
 		args        []string
 		goldenTable string
@@ -156,7 +150,7 @@ func TestParseArguments(t *testing.T) {
 			}
 			wantLines := discardKnownDifferences(strings.Split(strings.TrimSpace(string(want)), "\n"))
 
-			pc, err := ParseArguments(osenv, tt.args)
+			pc, err := ParseArguments(tt.args)
 			if err != nil {
 				t.Fatalf("ParseArguments: %v", err)
 			}
@@ -173,10 +167,6 @@ func TestParseArguments(t *testing.T) {
 }
 
 func TestParseArgumentsError(t *testing.T) {
-	osenv := rsyncos.Std{
-		Stdout: testlogger.New(t),
-		Stderr: testlogger.New(t),
-	}
 	for _, tt := range []struct {
 		args        []string
 		want        int32
@@ -198,7 +188,7 @@ func TestParseArgumentsError(t *testing.T) {
 		},
 	} {
 		t.Run(strings.Join(tt.args, " "), func(t *testing.T) {
-			_, err := ParseArguments(osenv, tt.args)
+			_, err := ParseArguments(tt.args)
 			if err == nil {
 				t.Fatalf("ParseArguments unexpectedly did not fail!")
 			}
@@ -214,10 +204,6 @@ func TestParseArgumentsError(t *testing.T) {
 }
 
 func TestParseArgumentsRemaining(t *testing.T) {
-	osenv := rsyncos.Std{
-		Stdout: testlogger.New(t),
-		Stderr: testlogger.New(t),
-	}
 	for _, tt := range []struct {
 		args []string
 		want []string
@@ -228,7 +214,7 @@ func TestParseArgumentsRemaining(t *testing.T) {
 		},
 	} {
 		t.Run(strings.Join(tt.args, " "), func(t *testing.T) {
-			pc, err := ParseArguments(osenv, tt.args)
+			pc, err := ParseArguments(tt.args)
 			if err != nil {
 				t.Fatalf("ParseArguments: %v", err)
 			}

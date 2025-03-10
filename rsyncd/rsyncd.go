@@ -228,7 +228,7 @@ func (s *Server) HandleDaemonConn(ctx context.Context, osenv rsyncos.Std, conn i
 	}
 
 	s.logger.Printf("flags: %+v", flags)
-	pc, err := rsyncopts.ParseArguments(osenv, flags)
+	pc, err := rsyncopts.ParseArguments(flags)
 	if err != nil {
 		err = fmt.Errorf("parsing server args: %v", err)
 
@@ -276,7 +276,7 @@ func (s *Server) HandleDaemonConn(ctx context.Context, osenv rsyncos.Std, conn i
 
 	s.logger.Printf("trimmed paths: %q", paths)
 
-	return s.HandleConn(osenv, &module, &Conn{crd, cwr, rd}, paths, opts, false)
+	return s.HandleConn(&module, &Conn{crd, cwr, rd}, paths, opts, false)
 }
 
 type Conn struct {
@@ -296,7 +296,7 @@ func (s *Server) NewConnection(r io.Reader, w io.Writer) *Conn {
 }
 
 // handleConn is equivalent to rsync/main.c:start_server
-func (s *Server) HandleConn(osenv rsyncos.Std, module *Module, conn *Conn, paths []string, opts *rsyncopts.Options, negotiate bool) (err error) {
+func (s *Server) HandleConn(module *Module, conn *Conn, paths []string, opts *rsyncopts.Options, negotiate bool) (err error) {
 	rd := conn.rd
 	crd := conn.crd
 	cwr := conn.cwr
@@ -351,11 +351,11 @@ func (s *Server) HandleConn(osenv rsyncos.Std, module *Module, conn *Conn, paths
 			mpx.WriteMsg(rsyncwire.MsgError, fmt.Appendf(nil, "gokr-rsync [receiver]: %v\n", err))
 		}
 	}()
-	return s.handleConnReceiver(osenv, module, crd, cwr, paths, opts, false, c, sessionChecksumSeed)
+	return s.handleConnReceiver(module, crd, cwr, paths, opts, false, c, sessionChecksumSeed)
 }
 
 // handleConnReceiver is equivalent to rsync/main.c:do_server_recv
-func (s *Server) handleConnReceiver(osenv rsyncos.Std, module *Module, crd *rsyncwire.CountingReader, cwr *rsyncwire.CountingWriter, paths []string, opts *rsyncopts.Options, negotiate bool, c *rsyncwire.Conn, sessionChecksumSeed int32) (err error) {
+func (s *Server) handleConnReceiver(module *Module, crd *rsyncwire.CountingReader, cwr *rsyncwire.CountingWriter, paths []string, opts *rsyncopts.Options, negotiate bool, c *rsyncwire.Conn, sessionChecksumSeed int32) (err error) {
 	if module == nil {
 		if len(paths) != 1 {
 			return fmt.Errorf("precisely one destination path required, got %q", paths)
@@ -391,7 +391,9 @@ func (s *Server) handleConnReceiver(osenv rsyncos.Std, module *Module, crd *rsyn
 			// TODO: PreserveHardlinks: opts.PreserveHardlinks,
 		},
 		Dest: module.Path,
-		Env:  osenv,
+		Env: rsyncos.Std{
+			Stderr: s.stderr,
+		},
 		Conn: c,
 		Seed: sessionChecksumSeed,
 	}

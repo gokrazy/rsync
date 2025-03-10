@@ -19,7 +19,6 @@ import (
 	"unicode"
 
 	"github.com/gokrazy/rsync/internal/log"
-	"github.com/gokrazy/rsync/internal/rsyncos"
 	"github.com/gokrazy/rsync/internal/version"
 )
 
@@ -894,7 +893,7 @@ func (o *Options) table() []poptOption {
 var errNotYetImplemented = errors.New("option not yet implemented in gokrazy/rsync")
 
 // rsync/options.c:parse_arguments
-func ParseArguments(osenv rsyncos.Std, args []string) (*Context, error) {
+func ParseArguments(args []string) (*Context, error) {
 	// NOTE: We do not implement support for refusing options per rsyncd.conf
 	// here, as we have our own configuration file.
 

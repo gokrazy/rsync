@@ -44,7 +44,7 @@ func Main(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer,
 		Stderr: stderr,
 	}
 	log.Printf("Main(args=%q)", args)
-	pc, err := rsyncopts.ParseArguments(osenv, args[1:])
+	pc, err := rsyncopts.ParseArguments(args[1:])
 	if err != nil {
 		if pe, ok := err.(*rsyncopts.PoptError); ok &&
 			pe.Errno == rsyncopts.POPT_ERROR_BADOPT &&
@@ -100,7 +100,7 @@ func Main(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer,
 			log.Printf("paths: %q", paths)
 		}
 		conn := srv.NewConnection(stdin, stdout)
-		return nil, srv.HandleConn(osenv, nil, conn, paths, opts, true)
+		return nil, srv.HandleConn(nil, conn, paths, opts, true)
 	}
 
 	if !opts.Daemon() {

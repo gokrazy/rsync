@@ -12,7 +12,6 @@ import (
 	"testing"
 
 	"github.com/gokrazy/rsync/internal/rsyncopts"
-	"github.com/gokrazy/rsync/internal/rsyncos"
 	"github.com/gokrazy/rsync/internal/rsynctest"
 	"github.com/gokrazy/rsync/internal/testlogger"
 	"github.com/gokrazy/rsync/rsyncclient"
@@ -69,9 +68,6 @@ func ExampleClient_Run_sendToGoroutine() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	osenv := rsyncos.Std{
-		Stderr: os.Stderr,
-	}
 	// stdin from the view of the rsync server
 	stdinrd, stdinwr := io.Pipe()
 	stdoutrd, stdoutwr := io.Pipe()
@@ -79,13 +75,13 @@ func ExampleClient_Run_sendToGoroutine() {
 		conn := rsync.NewConnection(stdinrd, stdoutwr)
 		serverArgs := append([]string{"--server"}, args...)
 		serverArgs = append(serverArgs, ".", dest)
-		pc, err := rsyncopts.ParseArguments(osenv, serverArgs)
+		pc, err := rsyncopts.ParseArguments(serverArgs)
 		if err != nil {
 			log.Fatalf("parsing server args: %v", err)
 		}
 		opts := pc.Options
 		paths := pc.RemainingArgs[1:]
-		err = rsync.HandleConn(osenv, nil, conn, paths, opts, true /* negotiate */)
+		err = rsync.HandleConn(nil, conn, paths, opts, true /* negotiate */)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -175,9 +171,6 @@ func TestClientServerModule(t *testing.T) {
 		t.Fatal(err)
 	}
 	const negotiate = true
-	osenv := rsyncos.Std{
-		Stderr: stderr,
-	}
 	// stdin from the view of the rsync server
 	stdinrd, stdinwr := io.Pipe()
 	stdoutrd, stdoutwr := io.Pipe()
@@ -185,7 +178,7 @@ func TestClientServerModule(t *testing.T) {
 	args := []string{"-av"}
 	serverArgs := append([]string{"--server", "--sender"}, args...)
 	serverArgs = append(serverArgs, ".", "./")
-	pc, err := rsyncopts.ParseArguments(osenv, serverArgs)
+	pc, err := rsyncopts.ParseArguments(serverArgs)
 	if err != nil {
 		t.Fatalf("parsing server args: %v", err)
 	}
@@ -194,7 +187,7 @@ func TestClientServerModule(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		err := rsync.HandleConn(osenv, &mod, conn, pc.RemainingArgs[1:], pc.Options, negotiate)
+		err := rsync.HandleConn(&mod, conn, pc.RemainingArgs[1:], pc.Options, negotiate)
 		if err != nil {
 			t.Error(err)
 		}
@@ -247,9 +240,6 @@ func TestClientServerCommand(t *testing.T) {
 		t.Fatal(err)
 	}
 	const negotiate = true
-	osenv := rsyncos.Std{
-		Stderr: stderr,
-	}
 	// stdin from the view of the rsync server
 	stdinrd, stdinwr := io.Pipe()
 	stdoutrd, stdoutwr := io.Pipe()
@@ -257,7 +247,7 @@ func TestClientServerCommand(t *testing.T) {
 	args := []string{"-av"}
 	serverArgs := append([]string{"--server", "--sender"}, args...)
 	serverArgs = append(serverArgs, ".", src)
-	pc, err := rsyncopts.ParseArguments(osenv, serverArgs)
+	pc, err := rsyncopts.ParseArguments(serverArgs)
 	if err != nil {
 		t.Fatalf("parsing server args: %v", err)
 	}
@@ -266,7 +256,7 @@ func TestClientServerCommand(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		err := rsync.HandleConn(osenv, nil, conn, pc.RemainingArgs[1:], pc.Options, negotiate)
+		err := rsync.HandleConn(nil, conn, pc.RemainingArgs[1:], pc.Options, negotiate)
 		if err != nil {
 			t.Error(err)
 		}
@@ -318,9 +308,6 @@ func TestClientServerCommandSender(t *testing.T) {
 		t.Fatal(err)
 	}
 	const negotiate = true
-	osenv := rsyncos.Std{
-		Stderr: stderr,
-	}
 	// stdin from the view of the rsync server
 	stdinrd, stdinwr := io.Pipe()
 	stdoutrd, stdoutwr := io.Pipe()
@@ -328,7 +315,7 @@ func TestClientServerCommandSender(t *testing.T) {
 	args := []string{"-av"}
 	serverArgs := append([]string{"--server"}, args...)
 	serverArgs = append(serverArgs, ".", dest)
-	pc, err := rsyncopts.ParseArguments(osenv, serverArgs)
+	pc, err := rsyncopts.ParseArguments(serverArgs)
 	if err != nil {
 		t.Fatalf("parsing server args: %v", err)
 	}
@@ -337,7 +324,7 @@ func TestClientServerCommandSender(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		err := rsync.HandleConn(osenv, nil, conn, pc.RemainingArgs[1:], pc.Options, negotiate)
+		err := rsync.HandleConn(nil, conn, pc.RemainingArgs[1:], pc.Options, negotiate)
 		if err != nil {
 			t.Error(err)
 		}
