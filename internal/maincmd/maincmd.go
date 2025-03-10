@@ -45,8 +45,13 @@ func Main(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer,
 		Stderr: stderr,
 	}
 	log.Printf("Main(args=%q)", args)
-	pc, err := rsyncopts.ParseArguments(osenv, args[1:], true)
+	pc, err := rsyncopts.ParseArguments(osenv, args[1:])
 	if err != nil {
+		if pe, ok := err.(*rsyncopts.PoptError); ok &&
+			pe.Errno == rsyncopts.POPT_ERROR_BADOPT &&
+			strings.HasPrefix(pe.Error(), "--gokr.") {
+			return nil, fmt.Errorf("%v (you need to specify --daemon before flags starting with --gokr are available)", pe)
+		}
 		return nil, err
 	}
 	opts := pc.Options

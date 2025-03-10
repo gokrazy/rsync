@@ -321,7 +321,7 @@ func clientRun(osenv rsyncos.Std, opts *rsyncopts.Options, conn io.ReadWriter, p
 }
 
 func clientMain(ctx context.Context, args []string, osenv rsyncos.Std) (*rsyncstats.TransferStats, error) {
-	pc, err := rsyncopts.ParseArguments(osenv, args[1:], false)
+	pc, err := rsyncopts.ParseArguments(osenv, args[1:])
 	if err != nil {
 		return nil, err
 	}

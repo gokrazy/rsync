@@ -229,7 +229,7 @@ func (s *Server) HandleDaemonConn(ctx context.Context, osenv rsyncos.Std, conn i
 	}
 
 	s.logger.Printf("flags: %+v", flags)
-	pc, err := rsyncopts.ParseArguments(osenv, flags, false)
+	pc, err := rsyncopts.ParseArguments(osenv, flags)
 	if err != nil {
 		err = fmt.Errorf("parsing server args: %v", err)
 

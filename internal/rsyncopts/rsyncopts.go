@@ -894,7 +894,7 @@ func (o *Options) table() []poptOption {
 var errNotYetImplemented = errors.New("option not yet implemented in gokrazy/rsync")
 
 // rsync/options.c:parse_arguments
-func ParseArguments(osenv rsyncos.Std, args []string, gokrazyTable bool) (*Context, error) {
+func ParseArguments(osenv rsyncos.Std, args []string) (*Context, error) {
 	// NOTE: We do not implement support for refusing options per rsyncd.conf
 	// here, as we have our own configuration file.
 
@@ -902,11 +902,6 @@ func ParseArguments(osenv rsyncos.Std, args []string, gokrazyTable bool) (*Conte
 
 	opts := NewOptions()
 	table := opts.table()
-	if gokrazyTable {
-		// We need to make the --gokr.* flags known, otherwise the first parsing
-		// attempt fails and the daemon mode parsing is never run.
-		table = slices.Concat(opts.Gokrazy.table(), table)
-	}
 	pc := Context{
 		Options: opts,
 		table:   table,
@@ -939,9 +934,7 @@ func ParseArguments(osenv rsyncos.Std, args []string, gokrazyTable bool) (*Conte
 		case OPT_DAEMON:
 			// Parse the whole command-line using the daemon options table.
 			table := opts.daemonTable()
-			if gokrazyTable {
-				table = slices.Concat(opts.Gokrazy.table(), table)
-			}
+			table = slices.Concat(opts.Gokrazy.table(), table)
 			pc := Context{
 				Options: opts,
 				table:   table,
