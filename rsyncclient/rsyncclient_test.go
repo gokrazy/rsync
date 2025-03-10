@@ -21,10 +21,7 @@ import (
 )
 
 func ExampleClient_Run_receiveFromSubprocess() {
-	// rsync SRC DEST
-	args := []string{"-av"}
-	src := "/usr/share/man"
-	dest := "/tmp/man"
+	args, src, dest := []string{"-av"}, "/usr/share/man", "/tmp/man"
 
 	// Start an rsync server and run an rsync client on its stdin/stdout.
 	rsync := exec.Command("rsync",
@@ -64,7 +61,6 @@ func ExampleClient_Run_receiveFromSubprocess() {
 }
 
 func ExampleClient_Run_sendToGoroutine() {
-	// rsync SRC DEST
 	args, src, dest := []string{"-av"}, "/usr/share/man", "/tmp/man"
 
 	// Start an rsync server and run an rsync client on
@@ -73,22 +69,23 @@ func ExampleClient_Run_sendToGoroutine() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	const negotiate = true
 	osenv := rsyncos.Std{
 		Stderr: os.Stderr,
 	}
 	// stdin from the view of the rsync server
 	stdinrd, stdinwr := io.Pipe()
 	stdoutrd, stdoutwr := io.Pipe()
-	conn := rsync.NewConnection(stdinrd, stdoutwr)
-	serverArgs := append([]string{"--server"}, args...)
-	serverArgs = append(serverArgs, ".", dest)
-	pc, err := rsyncopts.ParseArguments(osenv, serverArgs)
-	if err != nil {
-		log.Fatalf("parsing server args: %v", err)
-	}
 	go func() {
-		err := rsync.HandleConn(osenv, nil, conn, pc.RemainingArgs[1:], pc.Options, negotiate)
+		conn := rsync.NewConnection(stdinrd, stdoutwr)
+		serverArgs := append([]string{"--server"}, args...)
+		serverArgs = append(serverArgs, ".", dest)
+		pc, err := rsyncopts.ParseArguments(osenv, serverArgs)
+		if err != nil {
+			log.Fatalf("parsing server args: %v", err)
+		}
+		opts := pc.Options
+		paths := pc.RemainingArgs[1:]
+		err = rsync.HandleConn(osenv, nil, conn, paths, opts, true /* negotiate */)
 		if err != nil {
 			log.Fatal(err)
 		}
