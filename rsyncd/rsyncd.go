@@ -288,7 +288,7 @@ type Conn struct {
 	rd  *bufio.Reader
 }
 
-func (s *Server) NewConnection(r io.Reader, w io.Writer) *Conn {
+func NewConnection(r io.Reader, w io.Writer) *Conn {
 	crd, cwr := rsyncwire.CounterPair(r, w)
 	rd := bufio.NewReader(crd)
 	return &Conn{

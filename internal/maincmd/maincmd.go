@@ -98,7 +98,7 @@ func Main(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer,
 		if opts.Verbose() {
 			log.Printf("paths: %q", remaining[1:])
 		}
-		conn := srv.NewConnection(stdin, stdout)
+		conn := rsyncd.NewConnection(stdin, stdout)
 		return nil, srv.HandleConn(nil, conn, pc)
 	}
 
