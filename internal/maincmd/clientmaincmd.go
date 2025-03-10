@@ -125,7 +125,7 @@ func rsyncMain(ctx context.Context, osenv rsyncos.Std, opts *rsyncopts.Options, 
 		}
 		negotiate = false // already done
 	}
-	stats, err := clientRun(osenv, opts, conn, paths, negotiate)
+	stats, err := ClientRun(osenv, opts, conn, paths, negotiate)
 	if err != nil {
 		return nil, err
 	}
@@ -211,7 +211,7 @@ func doCmd(osenv rsyncos.Std, opts *rsyncopts.Options, machine, user, path strin
 }
 
 // rsync/main.c:client_run
-func clientRun(osenv rsyncos.Std, opts *rsyncopts.Options, conn io.ReadWriter, paths []string, negotiate bool) (*rsyncstats.TransferStats, error) {
+func ClientRun(osenv rsyncos.Std, opts *rsyncopts.Options, conn io.ReadWriter, paths []string, negotiate bool) (*rsyncstats.TransferStats, error) {
 	crd := &rsyncwire.CountingReader{R: conn}
 	cwr := &rsyncwire.CountingWriter{W: conn}
 	c := &rsyncwire.Conn{
