@@ -173,7 +173,7 @@ func doCmd(osenv rsyncos.Std, opts *rsyncopts.Options, machine, user, path strin
 	if daemonConnection > 0 {
 		args = append(args, "--server", "--daemon")
 	} else {
-		args = append(args, serverOptions(opts)...)
+		args = append(args, opts.ServerOptions()...)
 	}
 	args = append(args, ".")
 

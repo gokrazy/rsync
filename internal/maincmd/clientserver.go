@@ -122,7 +122,7 @@ func startInbandExchange(osenv rsyncos.Std, opts *rsyncopts.Options, conn io.Rea
 		fmt.Fprintf(osenv.Stdout, "%s\n", line)
 	}
 
-	sargv := serverOptions(opts)
+	sargv := opts.ServerOptions()
 	sargv = append(sargv, ".")
 	if path != "" {
 		sargv = append(sargv, path)
