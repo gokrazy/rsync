@@ -48,7 +48,7 @@ func ExampleClient_Run_receiveFromSubprocess() {
 		Writer: stdin,  // The client writes to the server's stdin.
 	}
 
-	if err := client.Run(context.Background(), rw, []string{dest}); err != nil {
+	if _, err := client.Run(context.Background(), rw, []string{dest}); err != nil {
 		log.Fatal(err)
 	}
 }
@@ -89,7 +89,7 @@ func ExampleClient_Run_sendToGoroutine() {
 		Writer: stdinwr,  // The client writes to the server's stdin.
 	}
 
-	if err := client.Run(context.Background(), rw, []string{src}); err != nil {
+	if _, err := client.Run(context.Background(), rw, []string{src}); err != nil {
 		log.Fatal(err)
 	}
 }
@@ -126,7 +126,7 @@ func TestClientCommand(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := client.Run(t.Context(), rw, []string{"."}); err != nil {
+	if _, err := client.Run(t.Context(), rw, []string{"."}); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -184,7 +184,7 @@ func TestClientServerModule(t *testing.T) {
 		Reader: stdoutrd,
 		Writer: stdinwr,
 	}
-	if err := client.Run(t.Context(), rw, []string{dest}); err != nil {
+	if _, err := client.Run(t.Context(), rw, []string{dest}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -251,7 +251,7 @@ func TestClientServerCommand(t *testing.T) {
 		Reader: stdoutrd,
 		Writer: stdinwr,
 	}
-	if err := client.Run(t.Context(), rw, []string{dest}); err != nil {
+	if _, err := client.Run(t.Context(), rw, []string{dest}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -317,7 +317,7 @@ func TestClientServerCommandSender(t *testing.T) {
 		Reader: stdoutrd,
 		Writer: stdinwr,
 	}
-	if err := client.Run(t.Context(), rw, []string{src}); err != nil {
+	if _, err := client.Run(t.Context(), rw, []string{src}); err != nil {
 		t.Fatal(err)
 	}
 
