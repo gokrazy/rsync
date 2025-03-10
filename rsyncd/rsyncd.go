@@ -279,7 +279,7 @@ func (s *Server) HandleDaemonConn(ctx context.Context, conn *Conn) (err error) {
 
 	s.logger.Printf("trimmed paths: %q", pc.RemainingArgs[1:])
 
-	return s.handleConn(ctx, &module, conn, pc, false)
+	return s.handleConn(ctx, conn, &module, pc, false)
 }
 
 type Conn struct {
@@ -300,12 +300,12 @@ func NewConnection(r io.Reader, w io.Writer, name string) *Conn {
 	}
 }
 
-func (s *Server) HandleConn(ctx context.Context, module *Module, conn *Conn, pc *rsyncopts.Context) error {
-	return s.handleConn(ctx, module, conn, pc, true /* negotiate */)
+func (s *Server) HandleConn(ctx context.Context, conn *Conn, module *Module, pc *rsyncopts.Context) error {
+	return s.handleConn(ctx, conn, module, pc, true /* negotiate */)
 }
 
 // handleConn is equivalent to rsync/main.c:start_server
-func (s *Server) handleConn(ctx context.Context, module *Module, conn *Conn, pc *rsyncopts.Context, negotiate bool) (err error) {
+func (s *Server) handleConn(ctx context.Context, conn *Conn, module *Module, pc *rsyncopts.Context, negotiate bool) (err error) {
 	rd := conn.rd
 	crd := conn.crd
 	cwr := conn.cwr

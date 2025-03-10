@@ -96,7 +96,7 @@ func Main(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer,
 			log.Printf("paths: %q", remaining[1:])
 		}
 		conn := rsyncd.NewConnection(stdin, stdout, "<remote-shell>")
-		return nil, srv.HandleConn(ctx, nil, conn, pc)
+		return nil, srv.HandleConn(ctx, conn, nil, pc)
 	}
 
 	if !opts.Daemon() {
