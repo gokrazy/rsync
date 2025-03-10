@@ -951,6 +951,7 @@ func ParseArguments(osenv rsyncos.Std, args []string, gokrazyTable bool) (*Conte
 			for {
 				opt, err := pc.poptGetNextOpt()
 				if err != nil {
+					err.(*PoptError).DaemonMode = true
 					return nil, err
 				}
 				if opt == -1 {

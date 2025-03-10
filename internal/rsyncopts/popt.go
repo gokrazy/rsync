@@ -54,13 +54,19 @@ const (
 )
 
 type PoptError struct {
-	Errno int32
-	Err   error
+	Errno      int32
+	Err        error
+	DaemonMode bool
 }
 
 func (pe *PoptError) Unwrap() error { return pe.Err }
 
-func (pe *PoptError) Error() string { return pe.Err.Error() }
+func (pe *PoptError) Error() string {
+	if pe.DaemonMode {
+		return pe.Err.Error() + " (in daemon mode)"
+	}
+	return pe.Err.Error()
+}
 
 // TODO(later): turn these into sentinel error values
 // which stringify like poptStrerror()
