@@ -106,7 +106,7 @@ func Main(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer,
 	}
 
 	if !opts.Daemon() {
-		return clientMain(ctx, args, osenv)
+		return clientMain(ctx, osenv, opts, remaining)
 	}
 
 	// daemon_main()

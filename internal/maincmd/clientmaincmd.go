@@ -320,13 +320,7 @@ func clientRun(osenv rsyncos.Std, opts *rsyncopts.Options, conn io.ReadWriter, p
 	return rt.Do(c, fileList, false)
 }
 
-func clientMain(ctx context.Context, args []string, osenv rsyncos.Std) (*rsyncstats.TransferStats, error) {
-	pc, err := rsyncopts.ParseArguments(osenv, args[1:])
-	if err != nil {
-		return nil, err
-	}
-	opts := pc.Options
-	remaining := pc.RemainingArgs
+func clientMain(ctx context.Context, osenv rsyncos.Std, opts *rsyncopts.Options, remaining []string) (*rsyncstats.TransferStats, error) {
 	if len(remaining) == 0 {
 		// help goes to stderr when no arguments were specified
 		fmt.Fprintln(osenv.Stderr, opts.Help())
