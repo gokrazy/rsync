@@ -610,7 +610,6 @@ func (o *Options) AlwaysChecksum() bool       { return o.always_checksum != 0 }
 func (o *Options) daemonTable() []poptOption {
 	return []poptOption{
 		/* longName, shortName, argInfo, arg, val */
-		{"help", "", POPT_ARG_NONE, nil, 'h'},
 		{"address", "", POPT_ARG_STRING, &o.bind_address, 0},
 		{"bwlimit", "", POPT_ARG_INT, &o.daemon_bwlimit, 0},
 		{"config", "", POPT_ARG_STRING, &o.config_file, 0},
@@ -627,10 +626,10 @@ func (o *Options) daemonTable() []poptOption {
 		{"protocol", "", POPT_ARG_INT, &o.protocol_version, 0},
 		{"server", "", POPT_ARG_NONE, &o.am_server, 0},
 		{"temp-dir", "T", POPT_ARG_STRING, &o.tmpdir, 0},
-		{"verbose", "v", POPT_ARG_NONE, 0, 'v'},
+		{"verbose", "v", POPT_ARG_NONE, nil, 'v'},
 		{"no-verbose", "", POPT_ARG_VAL, &o.verbose, 0},
 		{"no-v", "", POPT_ARG_VAL, &o.verbose, 0},
-		{"help", "h", POPT_ARG_NONE, 0, 'h'},
+		{"help", "h", POPT_ARG_NONE, nil, 'h'},
 	}
 }
 
