@@ -368,6 +368,34 @@ func (o *Options) setOutputVerbosity(prio priority) error {
 	return nil
 }
 
+func (o *Options) DaemonHelp() string {
+	return version.Read() + `
+gokrazy/rsync is a native Go rsync implementation.
+It recognizes all command-line flags that the original rsync supports,
+but might not implement all functionality (and instead error out).
+
+See the rsync(1) man page for more details on rsync.
+For your convenience, here is the rsync --daemon --help output:
+
+  --daemon                 run as an rsync daemon
+  --address=ADDRESS        bind to the specified address
+  --bwlimit=RATE           limit socket I/O bandwidth
+  --config=FILE            specify alternate rsyncd.conf file
+  --dparam=OVERRIDE, -M    override global daemon config parameter
+  --no-detach              do not detach from the parent
+  --port=PORT              listen on alternate port number
+  --log-file=FILE          override the "log file" setting
+  --log-file-format=FMT    override the "log format" setting
+  --sockopts=OPTIONS       specify custom TCP options
+  --verbose, -v            increase verbosity
+  --ipv4, -4               prefer IPv4
+  --ipv6, -6               prefer IPv6
+  --help, -h               show this help (when used with --daemon)
+
+See https://github.com/gokrazy/rsync for updates, bug reports, and answers
+`
+}
+
 func (o *Options) Help() string {
 	return version.Read() + `
 
@@ -582,7 +610,7 @@ func (o *Options) AlwaysChecksum() bool       { return o.always_checksum != 0 }
 func (o *Options) daemonTable() []poptOption {
 	return []poptOption{
 		/* longName, shortName, argInfo, arg, val */
-		{"help", "", POPT_ARG_NONE, nil, OPT_HELP},
+		{"help", "", POPT_ARG_NONE, nil, 'h'},
 		{"address", "", POPT_ARG_STRING, &o.bind_address, 0},
 		{"bwlimit", "", POPT_ARG_INT, &o.daemon_bwlimit, 0},
 		{"config", "", POPT_ARG_STRING, &o.config_file, 0},
@@ -933,8 +961,8 @@ func ParseArguments(osenv rsyncos.Std, args []string, gokrazyTable bool) (*Conte
 				// are returned and handled here.
 				switch opt {
 				case 'h':
-					fmt.Println(opts.Help()) // tridge rsync prints help to stdout
-					os.Exit(0)               // exit with code 0 for compatibility with tridge rsync
+					fmt.Println(opts.DaemonHelp()) // tridge rsync prints help to stdout
+					os.Exit(0)                     // exit with code 0 for compatibility with tridge rsync
 				case 'M':
 					return nil, errNotYetImplemented
 
