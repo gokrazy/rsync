@@ -170,8 +170,7 @@ func (s *Server) HandleDaemonConn(ctx context.Context, osenv rsyncos.Std, conn i
 	_ = ctx // not implemented. what would be the best thing to do? wrap conn's reader part with cancelable reader?
 
 	const terminationCommand = "@RSYNCD: OK\n"
-	crd := &rsyncwire.CountingReader{R: conn}
-	cwr := &rsyncwire.CountingWriter{W: conn}
+	crd, cwr := rsyncwire.CounterPair(conn, conn)
 	rd := bufio.NewReader(crd)
 	// send server greeting
 

@@ -5,6 +5,7 @@
 package maincmd
 
 import (
+	"bufio"
 	"context"
 	"fmt"
 	"io"
@@ -101,7 +102,7 @@ func Main(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer,
 			log.Printf("paths: %q", paths)
 		}
 		crd, cwr := rsyncwire.CounterPair(stdin, stdout)
-		rd := crd
+		rd := bufio.NewReader(crd)
 		return nil, srv.HandleConn(osenv, nil, rd, crd, cwr, paths, opts, true)
 	}
 
