@@ -250,7 +250,6 @@ func (s *Server) HandleDaemonConn(ctx context.Context, osenv rsyncos.Std, conn i
 
 		return err
 	}
-	opts := pc.Options
 	remaining := pc.RemainingArgs
 	s.logger.Printf("remaining: %q", remaining)
 	// remaining[0] is always "."
@@ -266,17 +265,21 @@ func (s *Server) HandleDaemonConn(ctx context.Context, osenv rsyncos.Std, conn i
 
 	// Strip the module_name/ prefix out of the paths,
 	// see rsync/io.c:read_args, glob_expand_module().
-	for idx, path := range paths {
+	for idx, path := range pc.RemainingArgs {
+		if idx == 0 {
+			// skip pc.RemainingArgs[0], only strip RemainingArgs[1:]
+			continue
+		}
 		trimmed := strings.TrimPrefix(path, module.Name)
 		if trimmed == "" {
 			trimmed = "."
 		}
-		paths[idx] = trimmed
+		pc.RemainingArgs[idx] = trimmed
 	}
 
-	s.logger.Printf("trimmed paths: %q", paths)
+	s.logger.Printf("trimmed paths: %q", pc.RemainingArgs[1:])
 
-	return s.handleConn(&module, &Conn{crd, cwr, rd}, paths, opts, false)
+	return s.handleConn(&module, &Conn{crd, cwr, rd}, pc, false)
 }
 
 type Conn struct {
@@ -295,15 +298,17 @@ func (s *Server) NewConnection(r io.Reader, w io.Writer) *Conn {
 	}
 }
 
-func (s *Server) HandleConn(module *Module, conn *Conn, paths []string, opts *rsyncopts.Options) error {
-	return s.handleConn(module, conn, paths, opts, true /* negotiate */)
+func (s *Server) HandleConn(module *Module, conn *Conn, pc *rsyncopts.Context) error {
+	return s.handleConn(module, conn, pc, true /* negotiate */)
 }
 
 // handleConn is equivalent to rsync/main.c:start_server
-func (s *Server) handleConn(module *Module, conn *Conn, paths []string, opts *rsyncopts.Options, negotiate bool) (err error) {
+func (s *Server) handleConn(module *Module, conn *Conn, pc *rsyncopts.Context, negotiate bool) (err error) {
 	rd := conn.rd
 	crd := conn.crd
 	cwr := conn.cwr
+	opts := pc.Options
+	paths := pc.RemainingArgs[1:]
 
 	// “SHOULD be unique to each connection” as per
 	// https://github.com/JohannesBuchner/Jarsync/blob/master/jarsync/rsync.txt

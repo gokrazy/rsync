@@ -95,12 +95,11 @@ func Main(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer,
 		if got, want := remaining[0], "."; got != want {
 			return nil, fmt.Errorf("protocol error: got %q, expected %q", got, want)
 		}
-		paths := remaining[1:]
 		if opts.Verbose() {
-			log.Printf("paths: %q", paths)
+			log.Printf("paths: %q", remaining[1:])
 		}
 		conn := srv.NewConnection(stdin, stdout)
-		return nil, srv.HandleConn(nil, conn, paths, opts)
+		return nil, srv.HandleConn(nil, conn, pc)
 	}
 
 	if !opts.Daemon() {

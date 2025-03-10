@@ -75,10 +75,7 @@ func ExampleClient_Run_sendToGoroutine() {
 		if err != nil {
 			log.Fatalf("parsing server args: %v", err)
 		}
-		opts := pc.Options
-		paths := pc.RemainingArgs[1:]
-		err = rsync.HandleConn(nil, conn, paths, opts)
-		if err != nil {
+		if err := rsync.HandleConn(nil, conn, pc); err != nil {
 			log.Fatal(err)
 		}
 	}()
@@ -177,7 +174,7 @@ func TestClientServerModule(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		err := rsync.HandleConn(&mod, conn, pc.RemainingArgs[1:], pc.Options)
+		err := rsync.HandleConn(&mod, conn, pc)
 		if err != nil {
 			t.Error(err)
 		}
@@ -244,7 +241,7 @@ func TestClientServerCommand(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		err := rsync.HandleConn(nil, conn, pc.RemainingArgs[1:], pc.Options)
+		err := rsync.HandleConn(nil, conn, pc)
 		if err != nil {
 			t.Error(err)
 		}
@@ -310,7 +307,7 @@ func TestClientServerCommandSender(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		err := rsync.HandleConn(nil, conn, pc.RemainingArgs[1:], pc.Options)
+		err := rsync.HandleConn(nil, conn, pc)
 		if err != nil {
 			t.Error(err)
 		}
