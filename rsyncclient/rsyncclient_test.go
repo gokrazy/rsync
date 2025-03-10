@@ -70,7 +70,7 @@ func ExampleClient_Run_sendToGoroutine() {
 	stdinrd, stdinwr := io.Pipe()
 	stdoutrd, stdoutwr := io.Pipe()
 	go func() {
-		conn := rsyncd.NewConnection(stdinrd, stdoutwr)
+		conn := rsyncd.NewConnection(stdinrd, stdoutwr, "<io.Pipe>")
 		pc, err := rsyncopts.ParseArguments(client.ServerCommandOptions(dest))
 		if err != nil {
 			log.Fatalf("parsing server args: %v", err)
@@ -164,7 +164,7 @@ func TestClientServerModule(t *testing.T) {
 	// stdin from the view of the rsync server
 	stdinrd, stdinwr := io.Pipe()
 	stdoutrd, stdoutwr := io.Pipe()
-	conn := rsyncd.NewConnection(stdinrd, stdoutwr)
+	conn := rsyncd.NewConnection(stdinrd, stdoutwr, "<io.Pipe>")
 	pc, err := rsyncopts.ParseArguments(client.ServerCommandOptions("./"))
 	if err != nil {
 		t.Fatalf("parsing server args: %v", err)
@@ -231,7 +231,7 @@ func TestClientServerCommand(t *testing.T) {
 	// stdin from the view of the rsync server
 	stdinrd, stdinwr := io.Pipe()
 	stdoutrd, stdoutwr := io.Pipe()
-	conn := rsyncd.NewConnection(stdinrd, stdoutwr)
+	conn := rsyncd.NewConnection(stdinrd, stdoutwr, "<io.Pipe>")
 	pc, err := rsyncopts.ParseArguments(client.ServerCommandOptions(src))
 	if err != nil {
 		t.Fatalf("parsing server args: %v", err)
@@ -297,7 +297,7 @@ func TestClientServerCommandSender(t *testing.T) {
 	// stdin from the view of the rsync server
 	stdinrd, stdinwr := io.Pipe()
 	stdoutrd, stdoutwr := io.Pipe()
-	conn := rsyncd.NewConnection(stdinrd, stdoutwr)
+	conn := rsyncd.NewConnection(stdinrd, stdoutwr, "<io.Pipe>")
 	pc, err := rsyncopts.ParseArguments(client.ServerCommandOptions(dest))
 	if err != nil {
 		t.Fatalf("parsing server args: %v", err)

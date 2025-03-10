@@ -118,13 +118,13 @@ func (s *Server) formatModuleList() string {
 	return list.String()
 }
 
-func checkACL(acls []string, remoteAddr net.Addr) error {
+func checkACL(acls []string, remoteAddr string) error {
 	if len(acls) == 0 {
 		return nil
 	}
-	host, _, err := net.SplitHostPort(remoteAddr.String())
+	host, _, err := net.SplitHostPort(remoteAddr)
 	if err != nil {
-		return fmt.Errorf("BUG: invalid remote address %q", remoteAddr.String())
+		return fmt.Errorf("BUG: invalid remote address %q", remoteAddr)
 	}
 	remoteIP := net.ParseIP(host)
 	if remoteIP == nil {
@@ -166,12 +166,12 @@ func checkACL(acls []string, remoteAddr net.Addr) error {
 }
 
 // FIXME: context cancellation not yet implemented
-func (s *Server) HandleDaemonConn(ctx context.Context, osenv rsyncos.Std, conn io.ReadWriter, remoteAddr net.Addr) (err error) {
+func (s *Server) HandleDaemonConn(ctx context.Context, conn *Conn) (err error) {
 	_ = ctx // not implemented. what would be the best thing to do? wrap conn's reader part with cancelable reader?
 
 	const terminationCommand = "@RSYNCD: OK\n"
-	crd, cwr := rsyncwire.CounterPair(conn, conn)
-	rd := bufio.NewReader(crd)
+	cwr := conn.cwr
+	rd := conn.rd
 	// send server greeting
 
 	fmt.Fprintf(cwr, "@RSYNCD: %d\n", rsync.ProtocolVersion)
@@ -193,19 +193,19 @@ func (s *Server) HandleDaemonConn(ctx context.Context, osenv rsyncos.Std, conn i
 	}
 	requestedModule = strings.TrimSpace(requestedModule)
 	if requestedModule == "" || requestedModule == "#list" {
-		s.logger.Printf("client %v requested rsync module listing", remoteAddr)
+		s.logger.Printf("client %v requested rsync module listing", conn.name)
 		io.WriteString(cwr, s.formatModuleList())
 		io.WriteString(cwr, "@RSYNCD: EXIT\n")
 		return nil
 	}
-	s.logger.Printf("client %v requested rsync module %q", remoteAddr, requestedModule)
+	s.logger.Printf("client %v requested rsync module %q", conn.name, requestedModule)
 	module, err := s.getModule(requestedModule)
 	if err != nil {
 		fmt.Fprintf(cwr, "@ERROR: Unknown module %q\n", requestedModule)
 		return err
 	}
 
-	if err := checkACL(module.ACL, remoteAddr); err != nil {
+	if err := checkACL(module.ACL, conn.name); err != nil {
 		fmt.Fprintf(cwr, "@ERROR: %v\n", err)
 		return err
 	}
@@ -279,22 +279,24 @@ func (s *Server) HandleDaemonConn(ctx context.Context, osenv rsyncos.Std, conn i
 
 	s.logger.Printf("trimmed paths: %q", pc.RemainingArgs[1:])
 
-	return s.handleConn(&module, &Conn{crd, cwr, rd}, pc, false)
+	return s.handleConn(&module, conn, pc, false)
 }
 
 type Conn struct {
-	crd *rsyncwire.CountingReader
-	cwr *rsyncwire.CountingWriter
-	rd  *bufio.Reader
+	name string
+	crd  *rsyncwire.CountingReader
+	cwr  *rsyncwire.CountingWriter
+	rd   *bufio.Reader
 }
 
-func NewConnection(r io.Reader, w io.Writer) *Conn {
+func NewConnection(r io.Reader, w io.Writer, name string) *Conn {
 	crd, cwr := rsyncwire.CounterPair(r, w)
 	rd := bufio.NewReader(crd)
 	return &Conn{
-		crd: crd,
-		cwr: cwr,
-		rd:  rd,
+		name: name,
+		crd:  crd,
+		cwr:  cwr,
+		rd:   rd,
 	}
 }
 
@@ -474,12 +476,6 @@ func (s *Server) handleConnSender(module *Module, crd *rsyncwire.CountingReader,
 }
 
 func (s *Server) Serve(ctx context.Context, ln net.Listener) error {
-	osenv := rsyncos.Std{
-		Stdin:  nil,
-		Stdout: nil,
-		Stderr: s.stderr,
-	}
-
 	go func() {
 		<-ctx.Done()
 		ln.Close() // unblocks Accept()
@@ -499,7 +495,8 @@ func (s *Server) Serve(ctx context.Context, ln net.Listener) error {
 		s.logger.Printf("remote connection from %s", remoteAddr)
 		go func() {
 			defer conn.Close()
-			if err := s.HandleDaemonConn(ctx, osenv, conn, remoteAddr); err != nil {
+			c := NewConnection(conn, conn, remoteAddr.String())
+			if err := s.HandleDaemonConn(ctx, c); err != nil {
 				s.logger.Printf("[%s] handle: %v", remoteAddr, err)
 			}
 		}()

@@ -72,11 +72,8 @@ func Main(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer,
 		if err != nil {
 			return nil, err
 		}
-		rw := readWriter{
-			r: stdin,
-			w: stdout,
-		}
-		return nil, srv.HandleDaemonConn(ctx, osenv, &rw, nil)
+		conn := rsyncd.NewConnection(stdin, stdout, "<remoteshell>")
+		return nil, srv.HandleDaemonConn(ctx, conn)
 	}
 
 	// calling convention: command mode (over remote shell or locally)
@@ -98,7 +95,7 @@ func Main(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer,
 		if opts.Verbose() {
 			log.Printf("paths: %q", remaining[1:])
 		}
-		conn := rsyncd.NewConnection(stdin, stdout)
+		conn := rsyncd.NewConnection(stdin, stdout, "<remote-shell>")
 		return nil, srv.HandleConn(nil, conn, pc)
 	}
 
