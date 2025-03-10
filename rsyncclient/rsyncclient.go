@@ -75,6 +75,14 @@ func New(args []string, opts ...Option) (*Client, error) {
 	return c, nil
 }
 
+func (c *Client) ServerOptions() []string {
+	return c.opts.ServerOptions()
+}
+
+func (c *Client) ServerCommandOptions(path string, paths ...string) []string {
+	return c.opts.CommandOptions(path, paths...)
+}
+
 func (c *Client) Run(ctx context.Context, conn io.ReadWriter, paths []string) error {
 	stats, err := maincmd.ClientRun(c.osenv, c.opts, conn, paths, c.negotiate)
 	if err != nil {

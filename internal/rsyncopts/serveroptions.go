@@ -1,5 +1,9 @@
 package rsyncopts
 
+func (o *Options) CommandOptions(path string, paths ...string) []string {
+	return append(o.ServerOptions(), append([]string{".", path}, paths...)...)
+}
+
 // rsync/options.c:server_options
 func (o *Options) ServerOptions() []string {
 	var sargv []string

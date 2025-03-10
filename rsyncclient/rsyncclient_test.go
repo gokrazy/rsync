@@ -21,15 +21,13 @@ import (
 
 func ExampleClient_Run_receiveFromSubprocess() {
 	args, src, dest := []string{"-av"}, "/usr/share/man", "/tmp/man"
+	client, err := rsyncclient.New(args)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	// Start an rsync server and run an rsync client on its stdin/stdout.
-	rsync := exec.Command("rsync",
-		// TODO: derive serverOptions from args
-		"--server",
-		"--sender",
-		"-nlogDtpr",
-		".",
-		src)
+	rsync := exec.Command("rsync", client.ServerCommandOptions(src)...)
 	stdin, err := rsync.StdinPipe()
 	if err != nil {
 		log.Fatal(err)
@@ -50,10 +48,6 @@ func ExampleClient_Run_receiveFromSubprocess() {
 		Writer: stdin,  // The client writes to the server's stdin.
 	}
 
-	client, err := rsyncclient.New(args)
-	if err != nil {
-		log.Fatal(err)
-	}
 	if err := client.Run(context.Background(), rw, []string{dest}); err != nil {
 		log.Fatal(err)
 	}
@@ -61,6 +55,10 @@ func ExampleClient_Run_receiveFromSubprocess() {
 
 func ExampleClient_Run_sendToGoroutine() {
 	args, src, dest := []string{"-av"}, "/usr/share/man", "/tmp/man"
+	client, err := rsyncclient.New(args, rsyncclient.WithSender())
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	// Start an rsync server and run an rsync client on
 	// an io.Pipe()-backend stdin/stdout.
@@ -73,9 +71,7 @@ func ExampleClient_Run_sendToGoroutine() {
 	stdoutrd, stdoutwr := io.Pipe()
 	go func() {
 		conn := rsync.NewConnection(stdinrd, stdoutwr)
-		serverArgs := append([]string{"--server"}, args...)
-		serverArgs = append(serverArgs, ".", dest)
-		pc, err := rsyncopts.ParseArguments(serverArgs)
+		pc, err := rsyncopts.ParseArguments(client.ServerCommandOptions(dest))
 		if err != nil {
 			log.Fatalf("parsing server args: %v", err)
 		}
@@ -96,10 +92,6 @@ func ExampleClient_Run_sendToGoroutine() {
 		Writer: stdinwr,  // The client writes to the server's stdin.
 	}
 
-	client, err := rsyncclient.New(args, rsyncclient.WithSender())
-	if err != nil {
-		log.Fatal(err)
-	}
 	if err := client.Run(context.Background(), rw, []string{src}); err != nil {
 		log.Fatal(err)
 	}
@@ -113,14 +105,14 @@ type readWriter struct {
 func TestClientCommand(t *testing.T) {
 	t.Parallel()
 
+	client, err := rsyncclient.New([]string{"-av"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	tmp := t.TempDir()
 	// Start an rsync process directly for the server part of the test.
-	rsync := exec.Command(rsynctest.AnyRsync(t),
-		"--server",
-		"--sender",
-		"-nlogDtpr",
-		".",
-		tmp)
+	rsync := exec.Command(rsynctest.AnyRsync(t), client.ServerCommandOptions(tmp)...)
 	wc, err := rsync.StdinPipe()
 	if err != nil {
 		t.Fatal(err)
@@ -137,10 +129,6 @@ func TestClientCommand(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	client, err := rsyncclient.New([]string{"-av"})
-	if err != nil {
-		t.Fatal(err)
-	}
 	if err := client.Run(t.Context(), rw, []string{"."}); err != nil {
 		t.Fatal(err)
 	}
@@ -162,6 +150,12 @@ func TestClientServerModule(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	args := []string{"-av"}
+	client, err := rsyncclient.New(args)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	mod := rsyncd.Module{
 		Name: "tmp",
 		Path: src,
@@ -175,10 +169,7 @@ func TestClientServerModule(t *testing.T) {
 	stdinrd, stdinwr := io.Pipe()
 	stdoutrd, stdoutwr := io.Pipe()
 	conn := rsync.NewConnection(stdinrd, stdoutwr)
-	args := []string{"-av"}
-	serverArgs := append([]string{"--server", "--sender"}, args...)
-	serverArgs = append(serverArgs, ".", "./")
-	pc, err := rsyncopts.ParseArguments(serverArgs)
+	pc, err := rsyncopts.ParseArguments(client.ServerCommandOptions("./"))
 	if err != nil {
 		t.Fatalf("parsing server args: %v", err)
 	}
@@ -196,10 +187,6 @@ func TestClientServerModule(t *testing.T) {
 	rw := &readWriter{
 		Reader: stdoutrd,
 		Writer: stdinwr,
-	}
-	client, err := rsyncclient.New(args)
-	if err != nil {
-		t.Fatal(err)
 	}
 	if err := client.Run(t.Context(), rw, []string{dest}); err != nil {
 		t.Fatal(err)
@@ -235,6 +222,12 @@ func TestClientServerCommand(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	args := []string{"-av"}
+	client, err := rsyncclient.New(args)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	rsync, err := rsyncd.NewServer(nil, rsyncd.WithStderr(stderr))
 	if err != nil {
 		t.Fatal(err)
@@ -244,10 +237,7 @@ func TestClientServerCommand(t *testing.T) {
 	stdinrd, stdinwr := io.Pipe()
 	stdoutrd, stdoutwr := io.Pipe()
 	conn := rsync.NewConnection(stdinrd, stdoutwr)
-	args := []string{"-av"}
-	serverArgs := append([]string{"--server", "--sender"}, args...)
-	serverArgs = append(serverArgs, ".", src)
-	pc, err := rsyncopts.ParseArguments(serverArgs)
+	pc, err := rsyncopts.ParseArguments(client.ServerCommandOptions(src))
 	if err != nil {
 		t.Fatalf("parsing server args: %v", err)
 	}
@@ -265,10 +255,6 @@ func TestClientServerCommand(t *testing.T) {
 	rw := &readWriter{
 		Reader: stdoutrd,
 		Writer: stdinwr,
-	}
-	client, err := rsyncclient.New(args)
-	if err != nil {
-		t.Fatal(err)
 	}
 	if err := client.Run(t.Context(), rw, []string{dest}); err != nil {
 		t.Fatal(err)
@@ -303,6 +289,12 @@ func TestClientServerCommandSender(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	args := []string{"-av"}
+	client, err := rsyncclient.New(args, rsyncclient.WithSender())
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	rsync, err := rsyncd.NewServer(nil, rsyncd.WithStderr(stderr))
 	if err != nil {
 		t.Fatal(err)
@@ -312,10 +304,7 @@ func TestClientServerCommandSender(t *testing.T) {
 	stdinrd, stdinwr := io.Pipe()
 	stdoutrd, stdoutwr := io.Pipe()
 	conn := rsync.NewConnection(stdinrd, stdoutwr)
-	args := []string{"-av"}
-	serverArgs := append([]string{"--server"}, args...)
-	serverArgs = append(serverArgs, ".", dest)
-	pc, err := rsyncopts.ParseArguments(serverArgs)
+	pc, err := rsyncopts.ParseArguments(client.ServerCommandOptions(dest))
 	if err != nil {
 		t.Fatalf("parsing server args: %v", err)
 	}
@@ -333,10 +322,6 @@ func TestClientServerCommandSender(t *testing.T) {
 	rw := &readWriter{
 		Reader: stdoutrd,
 		Writer: stdinwr,
-	}
-	client, err := rsyncclient.New(args, rsyncclient.WithSender())
-	if err != nil {
-		t.Fatal(err)
 	}
 	if err := client.Run(t.Context(), rw, []string{src}); err != nil {
 		t.Fatal(err)
