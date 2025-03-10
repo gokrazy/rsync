@@ -77,7 +77,7 @@ func ExampleClient_Run_sendToGoroutine() {
 		}
 		opts := pc.Options
 		paths := pc.RemainingArgs[1:]
-		err = rsync.HandleConn(nil, conn, paths, opts, true /* negotiate */)
+		err = rsync.HandleConn(nil, conn, paths, opts)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -164,7 +164,6 @@ func TestClientServerModule(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	const negotiate = true
 	// stdin from the view of the rsync server
 	stdinrd, stdinwr := io.Pipe()
 	stdoutrd, stdoutwr := io.Pipe()
@@ -178,7 +177,7 @@ func TestClientServerModule(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		err := rsync.HandleConn(&mod, conn, pc.RemainingArgs[1:], pc.Options, negotiate)
+		err := rsync.HandleConn(&mod, conn, pc.RemainingArgs[1:], pc.Options)
 		if err != nil {
 			t.Error(err)
 		}
@@ -232,7 +231,6 @@ func TestClientServerCommand(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	const negotiate = true
 	// stdin from the view of the rsync server
 	stdinrd, stdinwr := io.Pipe()
 	stdoutrd, stdoutwr := io.Pipe()
@@ -246,7 +244,7 @@ func TestClientServerCommand(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		err := rsync.HandleConn(nil, conn, pc.RemainingArgs[1:], pc.Options, negotiate)
+		err := rsync.HandleConn(nil, conn, pc.RemainingArgs[1:], pc.Options)
 		if err != nil {
 			t.Error(err)
 		}
@@ -299,7 +297,6 @@ func TestClientServerCommandSender(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	const negotiate = true
 	// stdin from the view of the rsync server
 	stdinrd, stdinwr := io.Pipe()
 	stdoutrd, stdoutwr := io.Pipe()
@@ -313,7 +310,7 @@ func TestClientServerCommandSender(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		err := rsync.HandleConn(nil, conn, pc.RemainingArgs[1:], pc.Options, negotiate)
+		err := rsync.HandleConn(nil, conn, pc.RemainingArgs[1:], pc.Options)
 		if err != nil {
 			t.Error(err)
 		}

@@ -276,7 +276,7 @@ func (s *Server) HandleDaemonConn(ctx context.Context, osenv rsyncos.Std, conn i
 
 	s.logger.Printf("trimmed paths: %q", paths)
 
-	return s.HandleConn(&module, &Conn{crd, cwr, rd}, paths, opts, false)
+	return s.handleConn(&module, &Conn{crd, cwr, rd}, paths, opts, false)
 }
 
 type Conn struct {
@@ -295,8 +295,12 @@ func (s *Server) NewConnection(r io.Reader, w io.Writer) *Conn {
 	}
 }
 
+func (s *Server) HandleConn(module *Module, conn *Conn, paths []string, opts *rsyncopts.Options) error {
+	return s.handleConn(module, conn, paths, opts, true /* negotiate */)
+}
+
 // handleConn is equivalent to rsync/main.c:start_server
-func (s *Server) HandleConn(module *Module, conn *Conn, paths []string, opts *rsyncopts.Options, negotiate bool) (err error) {
+func (s *Server) handleConn(module *Module, conn *Conn, paths []string, opts *rsyncopts.Options, negotiate bool) (err error) {
 	rd := conn.rd
 	crd := conn.crd
 	cwr := conn.cwr

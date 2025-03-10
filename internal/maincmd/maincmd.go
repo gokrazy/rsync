@@ -100,7 +100,7 @@ func Main(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer,
 			log.Printf("paths: %q", paths)
 		}
 		conn := srv.NewConnection(stdin, stdout)
-		return nil, srv.HandleConn(nil, conn, paths, opts, true)
+		return nil, srv.HandleConn(nil, conn, paths, opts)
 	}
 
 	if !opts.Daemon() {
