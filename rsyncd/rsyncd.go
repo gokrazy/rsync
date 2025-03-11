@@ -300,7 +300,16 @@ func NewConnection(r io.Reader, w io.Writer, name string) *Conn {
 	}
 }
 
-func (s *Server) HandleConn(ctx context.Context, conn *Conn, module *Module, pc *rsyncopts.Context) error {
+// This method is only exported until we refactor; use HandleConnArgs() instead
+func (s *Server) InternalHandleConn(ctx context.Context, conn *Conn, module *Module, pc *rsyncopts.Context) error {
+	return s.handleConn(ctx, conn, module, pc, true /* negotiate */)
+}
+
+func (s *Server) HandleConnArgs(ctx context.Context, conn *Conn, module *Module, args []string) error {
+	pc, err := rsyncopts.ParseArguments(args)
+	if err != nil {
+		return fmt.Errorf("parsing server args: %v", err)
+	}
 	return s.handleConn(ctx, conn, module, pc, true /* negotiate */)
 }
 
