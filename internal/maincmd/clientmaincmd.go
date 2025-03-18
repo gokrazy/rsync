@@ -165,8 +165,8 @@ func doCmd(osenv rsyncos.Std, opts *rsyncopts.Options, machine, user, path strin
 
 		args = append(args, "rsync") // TODO: flag
 	} else {
-		// NOTE: tridge rsync will fork and run child_main(), but we create a
-		// new process because that is much simpler/cleaner in Go.
+		// NOTE: tridge rsync will fork and run child_main(), we call Main() in
+		// a separate goroutine below.
 		args = append(args, os.Args[0])
 	}
 
@@ -183,6 +183,20 @@ func doCmd(osenv rsyncos.Std, opts *rsyncopts.Options, machine, user, path strin
 
 	if opts.Verbose() {
 		log.Printf("args: %q", args)
+	}
+
+	if opts.LocalServer() {
+		stdinrd, stdinwr := io.Pipe()
+		stdoutrd, stdoutwr := io.Pipe()
+		go func() {
+			defer stdinrd.Close()
+			defer stdoutwr.Close()
+			_, err := Main(context.Background(), args, stdinrd, stdoutwr, os.Stderr, nil)
+			if err != nil {
+				log.Printf("Main(): %v", err)
+			}
+		}()
+		return stdoutrd, stdinwr, nil
 	}
 
 	ssh := exec.Command(args[0], args[1:]...)
