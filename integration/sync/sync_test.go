@@ -5,16 +5,20 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
+	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/gokrazy/rsync/internal/rsynctest"
 	"github.com/gokrazy/rsync/internal/testlogger"
-	"github.com/stapelberg/rsyncparse"
 )
 
 func TestMain(m *testing.M) {
 	rsynctest.CommandMain(m)
 }
+
+var statsTransferRe = regexp.MustCompile(`^sent ([0-9,]+) bytes  received ([0-9,]+) bytes  ([0-9,.]+) bytes/sec$`)
 
 func TestSyncExtended(t *testing.T) {
 	t.Parallel()
@@ -34,7 +38,7 @@ func TestSyncExtended(t *testing.T) {
 	// start a server to sync from
 	srv := rsynctest.New(t, rsynctest.InteropModule(source))
 
-	sync := func() *rsyncparse.Stats {
+	sync := func() int64 {
 		rsync := exec.Command(rsyncBin,
 			//		"--debug=all4",
 			"--archive",
@@ -60,25 +64,40 @@ func TestSyncExtended(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		stats, err := rsyncparse.Parse(&buf)
-		if err != nil {
-			t.Fatal(err)
+		totalRead := int64(-1)
+		for _, line := range strings.Split(buf.String(), "\n") {
+			// log.Printf("rsync output line: %q", line)
+			if strings.HasPrefix(line, "sent ") {
+				// e.g.:
+				// sent 1,590 bytes  received 18 bytes  3,216.00 bytes/sec
+				// total size is 1,188,046  speedup is 738.83
+				matches := statsTransferRe.FindStringSubmatch(line)
+				if len(matches) == 0 {
+					t.Fatalf("could not parse rsync 'sent' line")
+				}
+
+				var err error
+				totalRead, err = strconv.ParseInt(strings.ReplaceAll(matches[2], ",", ""), 0, 64)
+				if err != nil {
+					t.Fatal(err)
+				}
+			}
 		}
-		return stats
+		return totalRead
 	}
 
 	{
 		// initial sync into dest dir
-		stats := sync()
-		if got, want := stats.TotalRead, int64(3*1024); got < want {
+		totalRead := sync()
+		if got, want := totalRead, int64(3*1024); got < want {
 			t.Fatalf("rsync unexpectedly did not read the whole file over the network: got %d, want >= %d", got, want)
 		}
 	}
 
 	{
 		// second sync (unmodified) into dest dir
-		stats := sync()
-		if got, want := stats.TotalRead, int64(512*1024); got >= want {
+		totalRead := sync()
+		if got, want := totalRead, int64(512*1024); got >= want {
 			t.Fatalf("rsync unexpectedly transferred more data than needed: got %d, want < %d", got, want)
 		}
 	}
@@ -90,11 +109,11 @@ func TestSyncExtended(t *testing.T) {
 		rsynctest.WriteLargeDataFile(t, source, headPattern, bodyPattern, endPattern)
 
 		// sync modifications into dest dir
-		stats := sync()
+		totalRead := sync()
 
 		// TODO: verify speedup value, compare to rsync and openrsync
 
-		if got, want := stats.TotalRead, int64(2*1024*1024); got >= want {
+		if got, want := totalRead, int64(2*1024*1024); got >= want {
 			t.Fatalf("rsync unexpectedly transferred more data than needed: got %d, want < %d", got, want)
 		}
 	}
