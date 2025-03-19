@@ -55,10 +55,11 @@ func (rt *Transfer) deleteFiles(fileList []*File) error {
 			if rt.Opts.DryRun {
 				return nil
 			}
-			if err := os.Remove(path); err != nil {
-				return err
+			if err := os.RemoveAll(path); err != nil {
+				rt.Logger.Printf("  deleting %s failed: %v", name, err)
+				// keep going
 			}
-			return nil
+			return filepath.SkipDir // skip the just-deleted directory
 		})
 		if err != nil {
 			if os.IsNotExist(err) {

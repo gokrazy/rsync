@@ -264,9 +264,20 @@ func TestReceiverSyncDelete(t *testing.T) {
 	if err := os.WriteFile(extra, []byte("deleteme"), 0644); err != nil {
 		t.Fatal(err)
 	}
+	extraDir := filepath.Join(dest, "extradir")
+	if err := os.MkdirAll(extraDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	extra2 := filepath.Join(extraDir, "blocker")
+	if err := os.WriteFile(extra2, []byte("deleteme"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
 	rsynctest.Run(t, args...)
-	if _, err := os.Stat(extra); !os.IsNotExist(err) {
-		t.Errorf("expected %s to be deleted, but it still exists", extra)
+	for _, gone := range []string{extra, extraDir, extra2} {
+		if _, err := os.Stat(gone); !os.IsNotExist(err) {
+			t.Errorf("expected %s to be deleted, but it still exists", gone)
+		}
 	}
 }
 
