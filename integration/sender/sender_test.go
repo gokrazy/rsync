@@ -478,10 +478,14 @@ func TestReceiverCommandDryRun(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	exe, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
 	var buf bytes.Buffer
 	rsync := exec.Command(rsynctest.AnyRsync(t),
 		"--dry-run",
-		"-e", os.Args[0],
+		"-e", exe,
 		"-a",
 		source+"/",
 		"localhost:"+dest+"/")
