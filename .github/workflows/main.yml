@@ -21,12 +21,12 @@ jobs:
     runs-on: ${{ matrix.os }}
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v4
 
-    - uses: actions/setup-go@v2
+    - uses: actions/setup-go@v5
       with:
-        # Latest minor release of Go 1.24:
-        go-version: ^1.24
+        # Latest stable version of Go, e.g. 1.20.2
+        go-version: 'stable'
 
     - name: Ensure all files were formatted as per gofmt
       if: matrix.os == 'ubuntu-latest'
