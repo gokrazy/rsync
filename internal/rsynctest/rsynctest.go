@@ -168,6 +168,7 @@ func Run(tb testing.TB, args ...string) *rsyncstats.TransferStats {
 }
 
 func Output(tb testing.TB, args ...string) (stdout []byte, stderr []byte) {
+	tb.Helper()
 	var stdoutb, stderrb bytes.Buffer
 	cmd := rsynccmd.Command(args[0], args[1:]...)
 	cmd.Stdout = &stdoutb
