@@ -28,7 +28,7 @@ type Transfer struct {
 	Logger log.Logger
 	Opts   *TransferOpts
 	Dest   string
-	Env    rsyncos.Std
+	Env    rsyncos.Env
 
 	// state
 	Conn     *rsyncwire.Conn

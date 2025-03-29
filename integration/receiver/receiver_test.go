@@ -12,6 +12,7 @@ import (
 
 	"github.com/gokrazy/rsync/internal/rsyncdconfig"
 	"github.com/gokrazy/rsync/internal/rsynctest"
+	"github.com/gokrazy/rsync/rsyncd"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/renameio/v2"
 )
@@ -92,15 +93,12 @@ func TestReceiver(t *testing.T) {
 	}
 
 	// start a server to sync from
-	srv := rsynctest.New(t, rsynctest.InteropModule(source))
-
-	args := []string{
-		"gokr-rsync",
-		"-aH",
-		"rsync://localhost:" + srv.Port + "/interop/",
-		dest,
-	}
-	firstStats := rsynctest.Run(t, args...)
+	srv := rsynctest.NewInMemory(t, rsyncd.Module{
+		Name: "interop",
+		Path: source,
+	})
+	args := []string{"-aH"}
+	firstStats := srv.RunClient(t, args, []string{dest})
 
 	{
 		want := []byte("world")
@@ -139,7 +137,7 @@ func TestReceiver(t *testing.T) {
 		rsynctest.VerifyDummyDeviceFiles(t, devices, filepath.Join(dest, "devices"))
 	}
 
-	incrementalStats := rsynctest.Run(t, args...)
+	incrementalStats := srv.RunClient(t, args, []string{dest})
 	if incrementalStats.Written >= firstStats.Written {
 		t.Fatalf("incremental run unexpectedly not more efficient than first run: incremental wrote %d bytes, first wrote %d bytes", incrementalStats.Written, firstStats.Written)
 	}
@@ -160,7 +158,7 @@ func TestReceiver(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	rsynctest.Run(t, args...)
+	srv.RunClient(t, args, []string{dest})
 
 	{
 		want := []byte("world")
@@ -198,15 +196,12 @@ func TestReceiverSync(t *testing.T) {
 	rsynctest.WriteLargeDataFile(t, source, headPattern, bodyPattern, endPattern)
 
 	// start a server to sync from
-	srv := rsynctest.New(t, rsynctest.InteropModule(source))
-
-	args := []string{
-		"gokr-rsync",
-		"-aH",
-		"rsync://localhost:" + srv.Port + "/interop/",
-		dest,
-	}
-	firstStats := rsynctest.Run(t, args...)
+	srv := rsynctest.NewInMemory(t, rsyncd.Module{
+		Name: "interop",
+		Path: source,
+	})
+	args := []string{"-aH"}
+	firstStats := srv.RunClient(t, args, []string{dest})
 	t.Logf("firstStats: %+v", firstStats)
 	//     receiver_test.go:211: firstStats: &{Read:91 Written:3146087 Size:3149824}
 
@@ -219,7 +214,7 @@ func TestReceiverSync(t *testing.T) {
 	// modify the large data file
 	rsynctest.WriteLargeDataFile(t, source, headPattern, bodyPattern, endPattern)
 
-	incrementalStats := rsynctest.Run(t, args...)
+	incrementalStats := srv.RunClient(t, args, []string{dest})
 	t.Logf("incrementalStats: %+v", incrementalStats)
 	if got, want := incrementalStats.Written, int64(2*1024*1024); got >= want {
 		t.Fatalf("rsync unexpectedly transferred more data than needed: got %d, want < %d", got, want)
@@ -240,16 +235,12 @@ func TestReceiverSyncDelete(t *testing.T) {
 	rsynctest.WriteLargeDataFile(t, source, headPattern, bodyPattern, endPattern)
 
 	// start a server to sync from
-	srv := rsynctest.New(t, rsynctest.InteropModule(source))
-
-	args := []string{
-		"gokr-rsync",
-		"-aH",
-		"--delete",
-		"rsync://localhost:" + srv.Port + "/interop/",
-		dest,
-	}
-	firstStats := rsynctest.Run(t, args...)
+	srv := rsynctest.NewInMemory(t, rsyncd.Module{
+		Name: "interop",
+		Path: source,
+	})
+	args := []string{"-aH", "--delete"}
+	firstStats := srv.RunClient(t, args, []string{dest})
 	t.Logf("firstStats: %+v", firstStats)
 	//     receiver_test.go:211: firstStats: &{Read:91 Written:3146087 Size:3149824}
 
@@ -271,7 +262,7 @@ func TestReceiverSyncDelete(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	rsynctest.Run(t, args...)
+	srv.RunClient(t, args, []string{dest})
 	for _, gone := range []string{extra, extraDir, extra2} {
 		if _, err := os.Stat(gone); !os.IsNotExist(err) {
 			t.Errorf("expected %s to be deleted, but it still exists", gone)

@@ -13,3 +13,8 @@ require (
 	golang.org/x/sync v0.11.0
 	golang.org/x/sys v0.30.0
 )
+
+require (
+	github.com/landlock-lsm/go-landlock v0.0.0-20250303204525-1544bccde3a3
+	kernel.org/pub/linux/libs/security/libcap/psx v1.2.70 // indirect
+)

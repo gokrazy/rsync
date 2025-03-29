@@ -49,8 +49,14 @@ func WithoutNegotiate() Option {
 	})
 }
 
+func DontRestrict() Option {
+	return clientOptionFunc(func(c *Client) {
+		c.osenv.DontRestrict = true
+	})
+}
+
 type Client struct {
-	osenv     rsyncos.Std
+	osenv     rsyncos.Env
 	opts      *rsyncopts.Options
 	negotiate bool
 	sender    bool
@@ -60,7 +66,7 @@ type Client struct {
 // the same [Client].
 func New(args []string, opts ...Option) (*Client, error) {
 	c := &Client{
-		osenv: rsyncos.Std{
+		osenv: rsyncos.Env{
 			Stderr: os.Stderr,
 		},
 		negotiate: true,

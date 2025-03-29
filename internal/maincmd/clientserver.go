@@ -18,7 +18,7 @@ import (
 )
 
 // rsync/clientserver.c:start_socket_client
-func socketClient(ctx context.Context, osenv rsyncos.Std, opts *rsyncopts.Options, host string, path string, port int, paths []string) (*rsyncstats.TransferStats, error) {
+func socketClient(ctx context.Context, osenv rsyncos.Env, opts *rsyncopts.Options, host string, path string, port int, paths []string) (*rsyncstats.TransferStats, error) {
 	if port < 0 {
 		host += ":873" // rsync daemon port
 	} else {
@@ -62,7 +62,7 @@ func socketClient(ctx context.Context, osenv rsyncos.Std, opts *rsyncopts.Option
 }
 
 // rsync/clientserver.c:start_inband_exchange
-func startInbandExchange(osenv rsyncos.Std, opts *rsyncopts.Options, conn io.ReadWriter, module, path string) (done bool, _ error) {
+func startInbandExchange(osenv rsyncos.Env, opts *rsyncopts.Options, conn io.ReadWriter, module, path string) (done bool, _ error) {
 	rd := bufio.NewReader(conn)
 
 	// send client greeting

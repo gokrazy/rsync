@@ -12,6 +12,7 @@ import (
 	"github.com/gokrazy/rsync"
 	"github.com/gokrazy/rsync/internal/log"
 	"github.com/gokrazy/rsync/internal/receiver"
+	"github.com/gokrazy/rsync/internal/restrict"
 	"github.com/gokrazy/rsync/internal/rsyncopts"
 	"github.com/gokrazy/rsync/internal/rsyncos"
 	"github.com/gokrazy/rsync/internal/rsyncstats"
@@ -21,7 +22,7 @@ import (
 )
 
 // rsync/main.c:start_client
-func rsyncMain(ctx context.Context, osenv rsyncos.Std, opts *rsyncopts.Options, sources []string, dest string) (*rsyncstats.TransferStats, error) {
+func rsyncMain(ctx context.Context, osenv rsyncos.Env, opts *rsyncopts.Options, sources []string, dest string) (*rsyncstats.TransferStats, error) {
 	if opts.Verbose() {
 		log.Printf("dest: %q, sources: %q", dest, sources)
 		log.Printf("opts: %+v", opts)
@@ -75,11 +76,25 @@ func rsyncMain(ctx context.Context, osenv rsyncos.Std, opts *rsyncopts.Options, 
 	}
 
 	// TODO: if opts.AmSender(), verify extra source args have no hostspec
+	var roDirs, rwDirs []string
 	other := dest
 	paths := []string{other}
 	if opts.Sender() {
 		other = src
 		paths = sources
+		roDirs = sources
+	} else {
+		if other != "" {
+			if err := os.MkdirAll(other, 0755); err != nil {
+				return nil, err
+			}
+			rwDirs = paths
+		}
+	}
+	if opts.GokrazyClient.DontRestrict == 0 {
+		if err := restrict.MaybeFileSystem(roDirs, rwDirs); err != nil {
+			return nil, err
+		}
 	}
 
 	module := path
@@ -133,7 +148,7 @@ func rsyncMain(ctx context.Context, osenv rsyncos.Std, opts *rsyncopts.Options, 
 }
 
 // rsync/main.c:do_cmd
-func doCmd(osenv rsyncos.Std, opts *rsyncopts.Options, machine, user, path string, daemonConnection int) (io.ReadCloser, io.WriteCloser, error) {
+func doCmd(osenv rsyncos.Env, opts *rsyncopts.Options, machine, user, path string, daemonConnection int) (io.ReadCloser, io.WriteCloser, error) {
 	if opts.Verbose() {
 		log.Printf("doCmd(machine=%q, user=%q, path=%q, daemonConnection=%d)",
 			machine, user, path, daemonConnection)
@@ -225,7 +240,7 @@ func doCmd(osenv rsyncos.Std, opts *rsyncopts.Options, machine, user, path strin
 }
 
 // rsync/main.c:client_run
-func ClientRun(osenv rsyncos.Std, opts *rsyncopts.Options, conn io.ReadWriter, paths []string, negotiate bool) (*rsyncstats.TransferStats, error) {
+func ClientRun(osenv rsyncos.Env, opts *rsyncopts.Options, conn io.ReadWriter, paths []string, negotiate bool) (*rsyncstats.TransferStats, error) {
 	crd := &rsyncwire.CountingReader{R: conn}
 	cwr := &rsyncwire.CountingWriter{W: conn}
 	c := &rsyncwire.Conn{
@@ -305,6 +320,16 @@ func ClientRun(osenv rsyncos.Std, opts *rsyncopts.Options, conn io.ReadWriter, p
 	if opts.Verbose() {
 		log.Printf("receiving to dest=%s", rt.Dest)
 	}
+	if rt.Dest == "" {
+		// just listing modules, not transferring anything
+	} else if osenv.Restrict() {
+		if err := os.MkdirAll(rt.Dest, 0755); err != nil {
+			return nil, fmt.Errorf("MkdirAll(dest=%s): %v", rt.Dest, err)
+		}
+		if err := restrict.MaybeFileSystem(nil, []string{rt.Dest}); err != nil {
+			return nil, fmt.Errorf("landlock: %v", err)
+		}
+	}
 
 	// TODO: this is different for client/server
 	// client always sends exclusion list, server always receives
@@ -334,7 +359,7 @@ func ClientRun(osenv rsyncos.Std, opts *rsyncopts.Options, conn io.ReadWriter, p
 	return rt.Do(c, fileList, false)
 }
 
-func clientMain(ctx context.Context, osenv rsyncos.Std, opts *rsyncopts.Options, remaining []string) (*rsyncstats.TransferStats, error) {
+func clientMain(ctx context.Context, osenv rsyncos.Env, opts *rsyncopts.Options, remaining []string) (*rsyncstats.TransferStats, error) {
 	if len(remaining) == 0 {
 		// help goes to stderr when no arguments were specified
 		fmt.Fprintln(osenv.Stderr, opts.Help())

@@ -151,7 +151,7 @@ func TestClientServerModule(t *testing.T) {
 	}
 
 	args := []string{"-av"}
-	client, err := rsyncclient.New(args)
+	client, err := rsyncclient.New(args, rsyncclient.WithStderr(stderr))
 	if err != nil {
 		t.Fatal(err)
 	}

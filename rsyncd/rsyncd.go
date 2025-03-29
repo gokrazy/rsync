@@ -60,6 +60,12 @@ func WithStderr(stderr io.Writer) Option {
 	})
 }
 
+func DontRestrict() Option {
+	return serverOptionFunc(func(s *Server) {
+		s.dontRestrict = true
+	})
+}
+
 func NewServer(modules []Module, opts ...Option) (*Server, error) {
 	for _, mod := range modules {
 		if err := validateModule(mod); err != nil {
@@ -85,12 +91,19 @@ func NewServer(modules []Module, opts ...Option) (*Server, error) {
 		server.logger = log.New(server.stderr)
 	}
 
+	if !server.dontRestrict {
+		if err := restrictToModules(server.modules); err != nil {
+			return nil, err
+		}
+	}
+
 	return server, nil
 }
 
 type Server struct {
-	stderr io.Writer
-	logger log.Logger
+	stderr       io.Writer
+	logger       log.Logger
+	dontRestrict bool
 
 	modules []Module
 }
@@ -413,7 +426,7 @@ func (s *Server) handleConnReceiver(module *Module, crd *rsyncwire.CountingReade
 			// TODO: PreserveHardlinks: opts.PreserveHardlinks,
 		},
 		Dest: module.Path,
-		Env: rsyncos.Std{
+		Env: rsyncos.Env{
 			Stderr: s.stderr,
 		},
 		Conn: c,

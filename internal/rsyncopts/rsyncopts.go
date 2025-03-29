@@ -103,9 +103,22 @@ func NewOptions() *Options {
 	}
 }
 
-// GokrazyOptions contains additional command-line flags, prefixed with
+// GokrazyClientOptions contains additional command-line flags, prefixed with
+// gokr. (like --gokr.dont_restrict) to not clash with rsync flag names.
+type GokrazyClientOptions struct {
+	DontRestrict int
+}
+
+func (o *GokrazyClientOptions) table() []poptOption {
+	return []poptOption{
+		/* longName, shortName, argInfo, arg, val */
+		{"gokr.dont_restrict", "", POPT_ARG_NONE, &o.DontRestrict, 0},
+	}
+}
+
+// GokrazyDaemonOptions contains additional command-line flags, prefixed with
 // gokr. (like --gokr.modulemap) to not clash with rsync flag names.
-type GokrazyOptions struct {
+type GokrazyDaemonOptions struct {
 	Config           string
 	Listen           string
 	MonitoringListen string
@@ -113,7 +126,7 @@ type GokrazyOptions struct {
 	ModuleMap        string
 }
 
-func (o *GokrazyOptions) table() []poptOption {
+func (o *GokrazyDaemonOptions) table() []poptOption {
 	return []poptOption{
 		/* longName, shortName, argInfo, arg, val */
 		{"gokr.config", "", POPT_ARG_STRING, &o.Config, 0},
@@ -125,7 +138,8 @@ func (o *GokrazyOptions) table() []poptOption {
 }
 
 type Options struct {
-	Gokrazy GokrazyOptions
+	GokrazyClient GokrazyClientOptions
+	GokrazyDaemon GokrazyDaemonOptions
 
 	// not directly referenced in the table, but used in the special case code.
 	do_compression int
@@ -391,6 +405,17 @@ For your convenience, here is the rsync --daemon --help output:
   --ipv6, -6               prefer IPv6
   --help, -h               show this help (when used with --daemon)
 
+In addition, the following gokrazy-specific flags are supported:
+
+  --gokr.config            path to a config file (if unspecified,
+                           os.UserConfigDir()/gokr-rsyncd.toml is used)
+  --gokr.listen            [host]:port listen address for the rsync daemon protocol
+  --gokr.monitoring_listen optional [host]:port listen address for a HTTP debug interface
+  --gokr.anonssh_listen    optional [host]:port listen address for
+                           the rsync daemon protocol via anonymous SSH
+  --gokr.modulemap         <modulename>=<path> pairs for quick setup of the server,
+                           without a config file
+
 See https://github.com/gokrazy/rsync for updates, bug reports, and answers
 `
 }
@@ -570,14 +595,8 @@ For your convenience, here is the rsync --help output:
 
 In addition, the following gokrazy-specific flags are supported:
 
-  --gokr.config            path to a config file (if unspecified,
-                           os.UserConfigDir()/gokr-rsyncd.toml is used)
-  --gokr.listen            [host]:port listen address for the rsync daemon protocol
-  --gokr.monitoring_listen optional [host]:port listen address for a HTTP debug interface
-  --gokr.anonssh_listen    optional [host]:port listen address for
-                           the rsync daemon protocol via anonymous SSH
-  --gokr.modulemap         <modulename>=<path> pairs for quick setup of the server,
-                           without a config file
+  --gokr.dont_restrict     do not restrict file system access to source/dest
+                           where available (e.g. with Landlock on Linux)
 
 See https://github.com/gokrazy/rsync for updates, bug reports, and answers
 `
@@ -901,6 +920,7 @@ func ParseArguments(args []string) (*Context, error) {
 
 	opts := NewOptions()
 	table := opts.table()
+	table = slices.Concat(opts.GokrazyClient.table(), table)
 	pc := Context{
 		Options: opts,
 		table:   table,
@@ -933,7 +953,7 @@ func ParseArguments(args []string) (*Context, error) {
 		case OPT_DAEMON:
 			// Parse the whole command-line using the daemon options table.
 			table := opts.daemonTable()
-			table = slices.Concat(opts.Gokrazy.table(), table)
+			table = slices.Concat(opts.GokrazyDaemon.table(), table)
 			pc := Context{
 				Options: opts,
 				table:   table,

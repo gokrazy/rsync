@@ -21,8 +21,10 @@ import (
 	"github.com/gokrazy/rsync/internal/log"
 	"github.com/gokrazy/rsync/internal/maincmd"
 	"github.com/gokrazy/rsync/internal/rsyncdconfig"
+	"github.com/gokrazy/rsync/internal/rsyncopts"
 	"github.com/gokrazy/rsync/internal/rsyncstats"
 	"github.com/gokrazy/rsync/internal/testlogger"
+	"github.com/gokrazy/rsync/rsyncclient"
 	"github.com/gokrazy/rsync/rsynccmd"
 	"github.com/gokrazy/rsync/rsyncd"
 	"github.com/google/go-cmp/cmp"
@@ -31,8 +33,13 @@ import (
 
 type TestServer struct {
 	// config
-	listener  net.Listener
-	listeners []rsyncdconfig.Listener
+	module       rsyncd.Module
+	listener     net.Listener
+	listeners    []rsyncdconfig.Listener
+	dontRestrict bool
+
+	// state
+	srv *rsyncd.Server
 
 	// Port is the port on which the test server is listening on. Useful to pass
 	// to rsync’s --port option.
@@ -72,6 +79,12 @@ func Listener(ln net.Listener) Option {
 	}
 }
 
+func DontRestrict() Option {
+	return func(ts *TestServer) {
+		ts.dontRestrict = true
+	}
+}
+
 func New(t *testing.T, modules []rsyncd.Module, opts ...Option) *TestServer {
 	ctx := t.Context()
 
@@ -84,7 +97,7 @@ func New(t *testing.T, modules []rsyncd.Module, opts ...Option) *TestServer {
 			{Rsyncd: "localhost:0"},
 		}
 	}
-	srv, err := rsyncd.NewServer(modules, rsyncd.WithLogger(log.New(testlogger.New(t))))
+	srv, err := rsyncd.NewServer(modules, rsyncd.WithStderr(testlogger.New(t)), rsyncd.DontRestrict())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -187,6 +200,77 @@ func CombinedOutput(args ...string) ([]byte, error) {
 	cmd.Stderr = &buf
 	_, err := cmd.Run(context.Background())
 	return buf.Bytes(), err
+}
+
+func NewInMemory(t *testing.T, module rsyncd.Module, opts ...Option) *TestServer {
+	ts := &TestServer{
+		module: module,
+	}
+	for _, opt := range opts {
+		opt(ts)
+	}
+
+	stderr := testlogger.New(t)
+	rsyncdOpts := []rsyncd.Option{
+		rsyncd.WithStderr(stderr),
+	}
+	if ts.dontRestrict {
+		rsyncdOpts = append(rsyncdOpts, rsyncd.DontRestrict())
+	}
+	srv, err := rsyncd.NewServer([]rsyncd.Module{module}, rsyncdOpts...)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ts.srv = srv
+	return ts
+}
+
+type readWriter struct {
+	io.Reader
+	io.Writer
+}
+
+func (ts *TestServer) pipe(t *testing.T, args []string) (*sync.WaitGroup, io.ReadWriter) {
+	// stdin from the view of the rsync server
+	stdinrd, stdinwr := io.Pipe()
+	stdoutrd, stdoutwr := io.Pipe()
+	conn := rsyncd.NewConnection(stdinrd, stdoutwr, "<io.Pipe>")
+	pc, err := rsyncopts.ParseArguments(args)
+	if err != nil {
+		t.Fatalf("parsing server args: %v", err)
+	}
+	t.Logf("pc.RemainingArgs=%q", pc.RemainingArgs)
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		err := ts.srv.InternalHandleConn(t.Context(), conn, &ts.module, pc)
+		if err != nil {
+			t.Error(err)
+		}
+	}()
+
+	rw := &readWriter{
+		Reader: stdoutrd,
+		Writer: stdinwr,
+	}
+	return &wg, rw
+}
+
+func (ts *TestServer) RunClient(t *testing.T, args []string, remaining []string) *rsyncstats.TransferStats {
+	stderr := testlogger.New(t)
+	cl, err := rsyncclient.New(args, rsyncclient.WithStderr(stderr), rsyncclient.DontRestrict())
+	if err != nil {
+		t.Fatal(err)
+	}
+	wg, rw := ts.pipe(t, cl.ServerCommandOptions("./"))
+	res, err := cl.Run(t.Context(), rw, remaining)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Ensure an error would be displayed, if any.
+	wg.Wait()
+	return res.Stats
 }
 
 func CommandMain(m *testing.M) error {

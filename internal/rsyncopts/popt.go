@@ -255,7 +255,7 @@ func (pc *Context) poptGetNextOpt() (int32, error) {
 				if errno := pc.poptSaveArg(opt, nextArg); errno != 0 {
 					return -1, &PoptError{
 						Errno: errno,
-						Err:   fmt.Errorf("poptSaveArg"),
+						Err:   fmt.Errorf("poptSaveArg errno %d", errno),
 					}
 				}
 			}

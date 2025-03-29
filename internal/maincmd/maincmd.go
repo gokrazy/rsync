@@ -15,6 +15,7 @@ import (
 
 	"github.com/gokrazy/rsync/internal/anonssh"
 	"github.com/gokrazy/rsync/internal/log"
+	"github.com/gokrazy/rsync/internal/restrict"
 	"github.com/gokrazy/rsync/internal/rsyncdconfig"
 	"github.com/gokrazy/rsync/internal/rsyncopts"
 	"github.com/gokrazy/rsync/internal/rsyncos"
@@ -38,7 +39,7 @@ func (r *readWriter) Read(p []byte) (n int, err error)  { return r.r.Read(p) }
 func (r *readWriter) Write(p []byte) (n int, err error) { return r.w.Write(p) }
 
 func Main(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer, cfg *rsyncdconfig.Config) (*rsyncstats.TransferStats, error) {
-	osenv := rsyncos.Std{
+	osenv := rsyncos.Env{
 		Stdin:  stdin,
 		Stdout: stdout,
 		Stderr: stderr,
@@ -72,6 +73,9 @@ func Main(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer,
 		if err != nil {
 			return nil, err
 		}
+		if err := restrictToModules(cfg.Modules); err != nil {
+			return nil, err
+		}
 		conn := rsyncd.NewConnection(stdin, stdout, "<remote-shell-daemon>")
 		return nil, srv.HandleDaemonConn(ctx, conn)
 	}
@@ -92,14 +96,30 @@ func Main(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer,
 		if got, want := remaining[0], "."; got != want {
 			return nil, fmt.Errorf("protocol error: got %q, expected %q", got, want)
 		}
+		paths := remaining[1:]
 		if opts.Verbose() {
-			log.Printf("paths: %q", remaining[1:])
+			log.Printf("paths: %q", paths)
+		}
+		var roDirs, rwDirs []string
+		if opts.Sender() {
+			roDirs = append(roDirs, paths...)
+		} else {
+			for _, path := range paths {
+				if err := os.MkdirAll(path, 0755); err != nil {
+					return nil, err
+				}
+			}
+			rwDirs = append(rwDirs, paths...)
+		}
+		if err := restrict.MaybeFileSystem(roDirs, rwDirs); err != nil {
+			return nil, err
 		}
 		conn := rsyncd.NewConnection(stdin, stdout, "<remote-shell>")
 		return nil, srv.InternalHandleConn(ctx, conn, nil, pc)
 	}
 
 	if !opts.Daemon() {
+		osenv.DontRestrict = opts.GokrazyClient.DontRestrict == 1
 		return clientMain(ctx, osenv, opts, remaining)
 	}
 
@@ -111,8 +131,8 @@ func Main(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer,
 	var cfgfn string
 	var cfgErr error
 	if cfg == nil {
-		if opts.Gokrazy.Config != "" {
-			cfgfn = opts.Gokrazy.Config
+		if opts.GokrazyDaemon.Config != "" {
+			cfgfn = opts.GokrazyDaemon.Config
 			cfg, cfgErr = rsyncdconfig.FromFile(cfgfn)
 		} else {
 			cfg, cfgfn, cfgErr = rsyncdconfig.FromDefaultFiles()
@@ -125,8 +145,8 @@ func Main(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer,
 				cfg = &rsyncdconfig.Config{
 					Listeners: []rsyncdconfig.Listener{
 						{
-							Rsyncd:  opts.Gokrazy.Listen,
-							AnonSSH: opts.Gokrazy.AnonSSHListen,
+							Rsyncd:  opts.GokrazyDaemon.Listen,
+							AnonSSH: opts.GokrazyDaemon.AnonSSHListen,
 						},
 					},
 					Modules: []rsyncd.Module{},
@@ -140,15 +160,15 @@ func Main(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer,
 	}
 
 	if os.IsNotExist(cfgErr) {
-		if opts.Gokrazy.Listen == "" &&
-			opts.Gokrazy.AnonSSHListen == "" {
+		if opts.GokrazyDaemon.Listen == "" &&
+			opts.GokrazyDaemon.AnonSSHListen == "" {
 			return nil, fmt.Errorf("neither -gokr.listen nor -gokr.anonssh_listen specified, and config file not found: %v", cfgErr)
 		}
 		// If no config file was found, and the user did not specify a
 		// -gokr.modulemap flag, use a default value to force the user to
 		// configure a module map.
-		if opts.Gokrazy.ModuleMap == "" {
-			opts.Gokrazy.ModuleMap = "nonex=/nonexistant/path"
+		if opts.GokrazyDaemon.ModuleMap == "" {
+			opts.GokrazyDaemon.ModuleMap = "nonex=/nonexistant/path"
 		}
 	} else {
 		if len(cfg.Listeners) == 0 ||
@@ -187,7 +207,7 @@ func Main(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer,
 		}
 	}
 
-	if moduleMap := opts.Gokrazy.ModuleMap; moduleMap != "" {
+	if moduleMap := opts.GokrazyDaemon.ModuleMap; moduleMap != "" {
 		parts := strings.Split(moduleMap, "=")
 		if len(parts) != 2 {
 			return nil, fmt.Errorf("malformed -gokr.modulemap parameter %q, expected <modulename>=<path>", moduleMap)
@@ -223,7 +243,7 @@ func Main(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer,
 		log.Printf("rsync module %q with path %s configured", mod.Name, mod.Path)
 	}
 
-	if monitoringListen := opts.Gokrazy.MonitoringListen; monitoringListen != "" {
+	if monitoringListen := opts.GokrazyDaemon.MonitoringListen; monitoringListen != "" {
 		go func() {
 			log.Printf("HTTP server for monitoring listening on http://%s/debug/pprof", monitoringListen)
 			if err := http.ListenAndServe(monitoringListen, nil); err != nil {

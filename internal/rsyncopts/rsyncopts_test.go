@@ -63,7 +63,9 @@ func discardKnownDifferences(lines []string) []string {
 			strings.HasPrefix(line, "long=ipv6 ") ||
 			// We implement protocol version 27 currently,
 			// tridge rsync implements newer versions.
-			strings.HasPrefix(line, "long=protocol ")
+			strings.HasPrefix(line, "long=protocol ") ||
+			// gokrazy-specific flags
+			strings.HasPrefix(line, "long=gokr.")
 		if !ignore {
 			filtered = append(filtered, line)
 		}
