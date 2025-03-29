@@ -221,7 +221,15 @@ type Listener struct {
 }
 
 func ListenerFromConfig(cfg rsyncdconfig.Listener) (*Listener, error) {
-	hostKey, err := loadHostKey()
+	hostKeyPath := cfg.HostKeyPath
+	if hostKeyPath == "" {
+		dir, err := os.UserConfigDir()
+		if err != nil {
+			return nil, err
+		}
+		hostKeyPath = filepath.Join(dir, "gokr-rsyncd", "ssh_host_ed25519_key")
+	}
+	hostKey, err := loadHostKey(hostKeyPath)
 	if err != nil {
 		return nil, err
 	}
@@ -246,12 +254,7 @@ func ListenerFromConfig(cfg rsyncdconfig.Listener) (*Listener, error) {
 	}, nil
 }
 
-func loadHostKey() (ssh.Signer, error) {
-	dir, err := os.UserConfigDir()
-	if err != nil {
-		return nil, err
-	}
-	path := filepath.Join(dir, "gokr-rsyncd", "ssh_host_ed25519_key")
+func loadHostKey(path string) (ssh.Signer, error) {
 	b, err := os.ReadFile(path)
 	if err != nil {
 		if os.IsNotExist(err) {

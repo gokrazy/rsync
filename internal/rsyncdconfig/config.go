@@ -14,6 +14,7 @@ type SSHListener struct {
 }
 
 type Listener struct {
+	HostKeyPath    string      `toml:"host_key_path"`
 	Rsyncd         string      `toml:"rsyncd"`
 	HTTPMonitoring string      `toml:"http_monitoring"`
 	AnonSSH        string      `toml:"anon_ssh"`

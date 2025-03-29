@@ -299,7 +299,10 @@ func TestReceiverSSH(t *testing.T) {
 	srv := rsynctest.New(t,
 		rsynctest.InteropModule(source),
 		rsynctest.Listeners([]rsyncdconfig.Listener{
-			{AnonSSH: "localhost:0"},
+			{
+				AnonSSH:     "localhost:0",
+				HostKeyPath: filepath.Join(tmp, "ssh_host_ed25519_key"),
+			},
 		}))
 
 	// ensure the user running the tests (root when doing the privileged run!)
