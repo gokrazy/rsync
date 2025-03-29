@@ -24,7 +24,14 @@ func socketClient(ctx context.Context, osenv rsyncos.Std, opts *rsyncopts.Option
 	} else {
 		host += ":" + strconv.Itoa(port)
 	}
-	dialer := net.Dialer{}
+	dialer := net.Dialer{
+		// Prefer the Go resolver: We know which files it uses (which makes life
+		// easier for the restrict package), whereas the C resolver can be
+		// extended by host-specific plugins.
+		Resolver: &net.Resolver{
+			PreferGo: true,
+		},
+	}
 	timeoutStr := ""
 	if timeout := opts.ConnectTimeoutSeconds(); timeout > 0 {
 		dialer.Timeout = time.Duration(timeout) * time.Second
