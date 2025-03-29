@@ -72,7 +72,7 @@ func Main(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer,
 		if err != nil {
 			return nil, err
 		}
-		conn := rsyncd.NewConnection(stdin, stdout, "<remoteshell>")
+		conn := rsyncd.NewConnection(stdin, stdout, "<remote-shell-daemon>")
 		return nil, srv.HandleDaemonConn(ctx, conn)
 	}
 
