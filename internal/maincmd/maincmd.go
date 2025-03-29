@@ -214,7 +214,7 @@ func Main(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer,
 	}
 	log.Printf("%d rsync modules configured in total", len(cfg.Modules))
 	for _, mod := range cfg.Modules {
-		if !cfg.DontNamespace {
+		if !cfg.DontNamespace && !mod.Writable {
 			if err := canUnexpectedlyWriteTo(mod.Path); err != nil {
 				return nil, err
 			}
