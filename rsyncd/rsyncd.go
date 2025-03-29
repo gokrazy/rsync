@@ -13,6 +13,7 @@ import (
 	"net"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/gokrazy/rsync"
 	"github.com/gokrazy/rsync/internal/log"
@@ -324,8 +325,9 @@ func (s *Server) handleConn(ctx context.Context, conn *Conn, module *Module, pc 
 	// “SHOULD be unique to each connection” as per
 	// https://github.com/JohannesBuchner/Jarsync/blob/master/jarsync/rsync.txt
 	//
-	// TODO: random seed. tridge rsync uses time(NULL) ^ (getpid() << 6)
-	const sessionChecksumSeed = 666
+	// Computed the same way that tridge rsync does it, but the details do not
+	// matter. The goal is to have a checksum seed each time.
+	sessionChecksumSeed := int32(time.Now().Unix()) ^ (int32(os.Getpid()) << 6)
 
 	c := &rsyncwire.Conn{
 		Reader: rd,
