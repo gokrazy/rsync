@@ -3,7 +3,6 @@ package receiver_test
 import (
 	"log"
 	"os"
-	"os/exec"
 	"os/user"
 	"path/filepath"
 	"strconv"
@@ -13,7 +12,6 @@ import (
 
 	"github.com/gokrazy/rsync/internal/rsyncdconfig"
 	"github.com/gokrazy/rsync/internal/rsynctest"
-	"github.com/gokrazy/rsync/internal/testlogger"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/renameio/v2"
 )
@@ -308,14 +306,8 @@ func TestReceiverSSH(t *testing.T) {
 	// ensure the user running the tests (root when doing the privileged run!)
 	// has an SSH private key:
 	privKeyPath := filepath.Join(tmp, "ssh_private_key")
-	genKey := exec.Command("ssh-keygen",
-		"-N", "",
-		"-t", "ed25519",
-		"-f", privKeyPath)
-	genKey.Stdout = testlogger.New(t)
-	genKey.Stderr = testlogger.New(t)
-	if err := genKey.Run(); err != nil {
-		t.Fatalf("%v: %v", genKey.Args, err)
+	if err := genKey(privKeyPath); err != nil {
+		t.Fatal(err)
 	}
 
 	// sync into dest dir
