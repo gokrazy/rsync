@@ -61,5 +61,19 @@ func MaybeFileSystem(roDirs []string, rwDirs []string) error {
 	if err != nil {
 		return fmt.Errorf("landlock: %v", err)
 	}
+
+	// Check whether landlock worked and print the result to the log.
+	//
+	// We use /sys because that path should never be required
+	// for regular functioning, yet is standard enough to be present
+	// on all supported Linux versions (including gokrazy).
+	const verifyPath = "/sys"
+	_, err = os.ReadDir(verifyPath)
+	if err == nil {
+		log.Printf("landlock seems ineffective: readdir(%s) unexpectedly worked!", verifyPath)
+	} else {
+		log.Printf("landlock verified: readdir(%s) = %v", verifyPath, err)
+	}
+
 	return nil
 }
