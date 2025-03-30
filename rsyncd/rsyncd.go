@@ -91,7 +91,11 @@ func NewServer(modules []Module, opts ...Option) (*Server, error) {
 		server.logger = log.New(server.stderr)
 	}
 
-	if !server.dontRestrict {
+	// An empty module list means this server is a sender
+	// (e.g. started in command mode with --server --sender),
+	// in which case restrict.MaybeFileSystem() will be called
+	// by the caller of NewServer().
+	if !server.dontRestrict && len(server.modules) > 0 {
 		if err := restrictToModules(server.modules); err != nil {
 			return nil, err
 		}
