@@ -52,50 +52,42 @@ any issues you run into!
 
 ## Getting started
 
-To serve the current directory via rsync on `localhost:8730`, use:
+To serve the `/usr/share/man` directory via rsync on `localhost:8730`, use:
 
 ```
 go install github.com/gokrazy/rsync/cmd/gokr-rsync@latest
-gokr-rsync --daemon --gokr.listen=localhost:8730 --gokr.modulemap=pwd=$PWD
+gokr-rsync --daemon --gokr.listen=localhost:8730 --gokr.modulemap=man=/usr/share/man
 ```
 
 You can then copy the contents of the current directory with clients such as
 `rsync(1)`:
 
 ```
-% rsync -v --archive --port 8730 rsync://localhost/pwd/ quine
+% rsync -v --archive --port 8730 rsync://localhost/man/ man
 receiving file list ... done
-created directory quine
+created directory man
 ./
-.git/
+ar/
+ar/man1/
 […]
-.github/workflows/main.yml
-LICENSE
-Makefile
-README.md
-cmd/gokr-rsyncd/rsyncd.go
-doc.go
-go.mod
-go.sum
-internal/rsyncd/connection.go
-internal/rsyncd/rsyncd.go
-interop_test.go
+zh_TW/man8/userdel.8.gz
+zh_TW/man8/usermod.8.gz
 
-sent 1,234 bytes  received 5,678 bytes  13,824.00 bytes/sec
-total size is 666  speedup is 0.10
-
+sent 658.973 bytes  received 88.012.067 bytes  3.940.935,11 bytes/sec
+total size is 84.504.170  speedup is 0,95
 ```
 
 …or [`openrsync(1)`](https://github.com/kristapsdz/openrsync), shown doing a
 differential update:
 
 ```
-% openrsync -v --archive --port 8730 rsync://localhost/pwd/ quine
-socket.c:109: warning: connect refused: ::1, localhost
-Transfer starting: 369 files
-.git/index (1.1 KB, 100.0% downloaded)
-Transfer complete: 5.5 KB sent, 1.2 KB read, 666 B file size
-
+% openrsync -v --archive --port 8730 rsync://localhost/man/ man
+openrsync: warning: connect refused: ::1, localhost
+Transfer starting: 40202 files
+[…]
+zh_TW/man8/userdel.8.gz (732 B, 100.0% downloaded)
+zh_TW/man8/usermod.8.gz (1.8 KB, 100.0% downloaded)
+Transfer complete: 83.93 MB sent, 643.5 KB read, 80.59 MB file size
 ```
 
 ## Usage / Setup
