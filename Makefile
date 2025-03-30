@@ -1,7 +1,10 @@
-.PHONY: all run systemd test privileged-test docker raspi mac
+.PHONY: all run systemd test privileged-test docker raspi mac staticcheck
 
 all:
 	CGO_ENABLED=0 go install github.com/gokrazy/rsync/cmd/...
+
+staticcheck:
+	staticcheck ./...
 
 run: all
 	sudo ~/go/bin/gokr-rsyncd -modulemap=default=/etc/default
