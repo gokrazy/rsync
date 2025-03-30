@@ -64,7 +64,13 @@ func Main(ctx context.Context, osenv rsyncos.Env, args []string, cfg *rsyncdconf
 				return nil, err
 			}
 		}
-		srv, err := rsyncd.NewServer(cfg.Modules, rsyncd.WithStderr(osenv.Stderr))
+		rsyncdOpts := []rsyncd.Option{
+			rsyncd.WithStderr(osenv.Stderr),
+		}
+		if osenv.DontRestrict {
+			rsyncdOpts = append(rsyncdOpts, rsyncd.DontRestrict())
+		}
+		srv, err := rsyncd.NewServer(cfg.Modules, rsyncdOpts...)
 		if err != nil {
 			return nil, err
 		}
@@ -273,6 +279,10 @@ func Main(ctx context.Context, osenv rsyncos.Env, args []string, cfg *rsyncdconf
 				Stdin:  stdin,
 				Stdout: stdout,
 				Stderr: stderr,
+				// This process is already restricted since to the
+				// rsyncd.NewServer call above. Do not add more rulesets to stay
+				// under the limit of policy layers per process.
+				DontRestrict: true,
 			}
 			_, err := Main(ctx, osenv, args, cfg)
 			return err
@@ -286,6 +296,10 @@ func Main(ctx context.Context, osenv rsyncos.Env, args []string, cfg *rsyncdconf
 				Stdin:  stdin,
 				Stdout: stdout,
 				Stderr: stderr,
+				// This process is already restricted since to the
+				// rsyncd.NewServer call above. Do not add more rulesets to stay
+				// under the limit of policy layers per process.
+				DontRestrict: true,
 			}
 			_, err := Main(ctx, osenv, args, cfg)
 			return err
