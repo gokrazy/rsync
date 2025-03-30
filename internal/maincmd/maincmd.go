@@ -58,7 +58,7 @@ func Main(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer,
 	remaining := pc.RemainingArgs
 	// log.Printf("remaining: %v", remaining)
 
-	// calling convention: daemon mode over remote shell
+	// calling convention: daemon mode over remote shell (also builtin SSH)
 	// Example: --server --daemon .
 	if opts.Daemon() && opts.Server() {
 		// start_daemon()
@@ -71,9 +71,6 @@ func Main(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer,
 		}
 		srv, err := rsyncd.NewServer(cfg.Modules, rsyncd.WithStderr(stderr))
 		if err != nil {
-			return nil, err
-		}
-		if err := restrictToModules(cfg.Modules); err != nil {
 			return nil, err
 		}
 		conn := rsyncd.NewConnection(stdin, stdout, "<remote-shell-daemon>")

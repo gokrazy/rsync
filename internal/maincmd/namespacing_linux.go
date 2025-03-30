@@ -141,7 +141,7 @@ func namespace(modules []rsyncd.Module, listen string) error {
 	if os.Getuid() != 0 {
 		version()
 		log.Printf("environment: unprivileged")
-		return restrictToModules(modules)
+		return nil
 	}
 
 	version()
