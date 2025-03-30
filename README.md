@@ -9,12 +9,6 @@ command implements an rsync client and server, which can send or receive files
 `gokr-rsync` behind SSH (anonymous or authorized), as command or daemon, or
 listening directly on the network (on port 873/tcp by default).
 
-The following known improvements are not yet implemented:
-
-* Making `gokr-rsync` chroot (and/or Linux mount namespaces when available?)
-  into the destination directory to reduce chances of accidental file system
-  manipulation in case of bugs.
-
 This project accepts contributions as time permits to merge them (best effort).
 
 ## How do I know this project won’t eat my data?
@@ -192,6 +186,10 @@ In all environments, the default instructions will take care that:
 * (On Linux only) Only configured rsync modules from the host file system are
   mounted **read-only** into a Linux mount namespace for `gokr-rsync`, to guard
   against data modification and data exfiltration.
+* (On Linux only) File system access is restricted using the
+  [Landlock](https://docs.kernel.org/userspace-api/landlock.html) Linux kernel
+  security module, which works similar to OpenBSD’s
+  [`unveil(2)`](https://man.openbsd.org/unveil.2) API.
 * `gokr-rsync` is running without privileges, as user `nobody`, to limit the
   scope of what an attacker can do when exploiting a vulnerability.
 
