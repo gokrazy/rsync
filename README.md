@@ -13,8 +13,9 @@ This project accepts contributions as time permits to merge them (best effort).
 
 ## How do I know this project won’t eat my data?
 
-This rsync implementation is very fresh. It was started in 2021 and doesn’t have
-many users yet.
+This rsync implementation is not as well-tested as the original “tridge”
+implementation from the Samba project. gokrazy/rsync was started in 2021 and
+doesn’t have many users yet.
 
 With that warning out of the way, the rsync protocol uses MD4 checksums over
 file contents, so at least your file contents should never be able to be
