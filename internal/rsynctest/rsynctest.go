@@ -22,6 +22,7 @@ import (
 	"github.com/gokrazy/rsync/internal/maincmd"
 	"github.com/gokrazy/rsync/internal/rsyncdconfig"
 	"github.com/gokrazy/rsync/internal/rsyncopts"
+	"github.com/gokrazy/rsync/internal/rsyncos"
 	"github.com/gokrazy/rsync/internal/rsyncstats"
 	"github.com/gokrazy/rsync/internal/testlogger"
 	"github.com/gokrazy/rsync/rsyncclient"
@@ -128,7 +129,12 @@ func New(t *testing.T, modules []rsyncd.Module, opts ...Option) *TestServer {
 		}
 		go func() {
 			err := anonssh.Serve(ctx, ts.listener, sshListener, cfg, func(args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer) error {
-				_, err := maincmd.Main(context.Background(), args, stdin, stdout, stderr, cfg)
+				osenv := rsyncos.Env{
+					Stdin:  stdin,
+					Stdout: stdout,
+					Stderr: stderr,
+				}
+				_, err := maincmd.Main(context.Background(), osenv, args, cfg)
 				return err
 			})
 
@@ -150,7 +156,12 @@ func New(t *testing.T, modules []rsyncd.Module, opts ...Option) *TestServer {
 		}
 		go func() {
 			err := anonssh.Serve(ctx, ts.listener, sshListener, cfg, func(args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer) error {
-				_, err := maincmd.Main(context.Background(), args, stdin, stdout, stderr, cfg)
+				osenv := rsyncos.Env{
+					Stdin:  stdin,
+					Stdout: stdout,
+					Stderr: stderr,
+				}
+				_, err := maincmd.Main(context.Background(), osenv, args, cfg)
 				return err
 			})
 
@@ -274,16 +285,21 @@ func (ts *TestServer) RunClient(t *testing.T, args []string, remaining []string)
 }
 
 func CommandMain(m *testing.M) error {
+	osenv := rsyncos.Env{
+		Stdin:  os.Stdin,
+		Stdout: os.Stdout,
+		Stderr: os.Stderr,
+	}
 	if len(os.Args) > 1 && os.Args[1] == "localhost" {
 		// Strip first 2 args (./rsync.test localhost) from command line:
 		// rsync(1) is calling this process as a remote shell.
 		os.Args = os.Args[2:]
-		if _, err := maincmd.Main(context.Background(), os.Args, os.Stdin, os.Stdout, os.Stderr, nil); err != nil {
+		if _, err := maincmd.Main(context.Background(), osenv, os.Args, nil); err != nil {
 			return err
 		}
 	} else if len(os.Args) > 1 && os.Args[1] == "--server" {
 		// gokr-rsync is calling this process as a local daemon.
-		if _, err := maincmd.Main(context.Background(), os.Args, os.Stdin, os.Stdout, os.Stderr, nil); err != nil {
+		if _, err := maincmd.Main(context.Background(), osenv, os.Args, nil); err != nil {
 			return err
 		}
 	} else {

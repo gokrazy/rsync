@@ -206,7 +206,12 @@ func doCmd(osenv rsyncos.Env, opts *rsyncopts.Options, machine, user, path strin
 		go func() {
 			defer stdinrd.Close()
 			defer stdoutwr.Close()
-			_, err := Main(context.Background(), args, stdinrd, stdoutwr, os.Stderr, nil)
+			osenv := rsyncos.Env{
+				Stdin:  stdinrd,
+				Stdout: stdoutwr,
+				Stderr: os.Stderr,
+			}
+			_, err := Main(context.Background(), osenv, args, nil)
 			if err != nil {
 				log.Printf("Main(): %v", err)
 			}

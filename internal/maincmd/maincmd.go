@@ -38,12 +38,7 @@ type readWriter struct {
 func (r *readWriter) Read(p []byte) (n int, err error)  { return r.r.Read(p) }
 func (r *readWriter) Write(p []byte) (n int, err error) { return r.w.Write(p) }
 
-func Main(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer, cfg *rsyncdconfig.Config) (*rsyncstats.TransferStats, error) {
-	osenv := rsyncos.Env{
-		Stdin:  stdin,
-		Stdout: stdout,
-		Stderr: stderr,
-	}
+func Main(ctx context.Context, osenv rsyncos.Env, args []string, cfg *rsyncdconfig.Config) (*rsyncstats.TransferStats, error) {
 	log.Printf("Main(args=%q)", args)
 	pc, err := rsyncopts.ParseArguments(args[1:])
 	if err != nil {
@@ -69,11 +64,11 @@ func Main(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer,
 				return nil, err
 			}
 		}
-		srv, err := rsyncd.NewServer(cfg.Modules, rsyncd.WithStderr(stderr))
+		srv, err := rsyncd.NewServer(cfg.Modules, rsyncd.WithStderr(osenv.Stderr))
 		if err != nil {
 			return nil, err
 		}
-		conn := rsyncd.NewConnection(stdin, stdout, "<remote-shell-daemon>")
+		conn := rsyncd.NewConnection(osenv.Stdin, osenv.Stdout, "<remote-shell-daemon>")
 		return nil, srv.HandleDaemonConn(ctx, conn)
 	}
 
@@ -81,7 +76,7 @@ func Main(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer,
 	// Example: --server --sender -vvvvlogDtpre.iLsfxCIvu . .
 	if opts.Server() {
 		// start_server()
-		srv, err := rsyncd.NewServer(nil, rsyncd.WithStderr(stderr))
+		srv, err := rsyncd.NewServer(nil, rsyncd.WithStderr(osenv.Stderr))
 		if err != nil {
 			return nil, err
 		}
@@ -111,7 +106,7 @@ func Main(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer,
 		if err := restrict.MaybeFileSystem(roDirs, rwDirs); err != nil {
 			return nil, err
 		}
-		conn := rsyncd.NewConnection(stdin, stdout, "<remote-shell>")
+		conn := rsyncd.NewConnection(osenv.Stdin, osenv.Stdout, "<remote-shell>")
 		return nil, srv.InternalHandleConn(ctx, conn, nil, pc)
 	}
 
@@ -249,7 +244,7 @@ func Main(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer,
 		}()
 	}
 
-	srv, err := rsyncd.NewServer(cfg.Modules, rsyncd.WithStderr(stderr))
+	srv, err := rsyncd.NewServer(cfg.Modules, rsyncd.WithStderr(osenv.Stderr))
 	if err != nil {
 		return nil, err
 	}
@@ -274,7 +269,12 @@ func Main(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer,
 		}
 		log.Printf("rsync daemon listening (authorized SSH) on %s", ln.Addr())
 		return nil, anonssh.Serve(ctx, ln, sshListener, cfg, func(args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer) error {
-			_, err := Main(ctx, args, stdin, stdout, stderr, cfg)
+			osenv := rsyncos.Env{
+				Stdin:  stdin,
+				Stdout: stdout,
+				Stderr: stderr,
+			}
+			_, err := Main(ctx, osenv, args, cfg)
 			return err
 		})
 	}
@@ -282,7 +282,12 @@ func Main(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer,
 	if cfg.Listeners[0].AnonSSH != "" {
 		log.Printf("rsync daemon listening (anon SSH) on %s", ln.Addr())
 		return nil, anonssh.Serve(ctx, ln, sshListener, cfg, func(args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer) error {
-			_, err := Main(ctx, args, stdin, stdout, stderr, cfg)
+			osenv := rsyncos.Env{
+				Stdin:  stdin,
+				Stdout: stdout,
+				Stderr: stderr,
+			}
+			_, err := Main(ctx, osenv, args, cfg)
 			return err
 		})
 	}

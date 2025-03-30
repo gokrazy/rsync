@@ -23,6 +23,7 @@ import (
 	"io"
 
 	"github.com/gokrazy/rsync/internal/maincmd"
+	"github.com/gokrazy/rsync/internal/rsyncos"
 	"github.com/gokrazy/rsync/internal/rsyncstats"
 )
 
@@ -51,7 +52,12 @@ type Result struct {
 
 // Run starts the specified rsync invocation.
 func (c *Cmd) Run(ctx context.Context) (*Result, error) {
-	stats, err := maincmd.Main(ctx, c.Args, c.Stdin, c.Stdout, c.Stderr, nil)
+	osenv := rsyncos.Env{
+		Stdin:  c.Stdin,
+		Stdout: c.Stdout,
+		Stderr: c.Stderr,
+	}
+	stats, err := maincmd.Main(ctx, osenv, c.Args, nil)
 	if err != nil {
 		return nil, err
 	}
