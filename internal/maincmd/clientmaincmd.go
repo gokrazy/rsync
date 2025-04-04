@@ -78,20 +78,30 @@ func rsyncMain(ctx context.Context, osenv rsyncos.Env, opts *rsyncopts.Options, 
 	// TODO: if opts.AmSender(), verify extra source args have no hostspec
 	var roDirs, rwDirs []string
 	other := dest
-	paths := []string{other}
-	if opts.Sender() {
-		other = src
-		paths = sources
-		roDirs = sources
-	} else {
-		if other != "" {
+	if other != "" {
+		if !opts.Sender() || opts.LocalServer() {
+			// dest is local
 			if err := os.MkdirAll(other, 0755); err != nil {
 				return nil, err
 			}
+		}
+	}
+	paths := []string{other}
+	if opts.Sender() {
+		// source is local
+		other = src
+		paths = sources
+		roDirs = sources
+		if opts.LocalServer() {
+			// source and dest are both local
+			rwDirs = []string{dest}
+		}
+	} else {
+		if other != "" {
 			rwDirs = paths
 		}
 	}
-	if opts.GokrazyClient.DontRestrict == 0 {
+	if osenv.Restrict() {
 		if err := restrict.MaybeFileSystem(roDirs, rwDirs); err != nil {
 			return nil, err
 		}
@@ -210,6 +220,9 @@ func doCmd(osenv rsyncos.Env, opts *rsyncopts.Options, machine, user, path strin
 				Stdin:  stdinrd,
 				Stdout: stdoutwr,
 				Stderr: os.Stderr,
+				// If this transfer restricts file system access, all goroutines
+				// (including the other end of the connection) are affected.
+				DontRestrict: true,
 			}
 			_, err := Main(context.Background(), osenv, args, nil)
 			if err != nil {

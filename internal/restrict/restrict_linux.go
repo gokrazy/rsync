@@ -47,7 +47,7 @@ func MaybeFileSystem(roDirs []string, rwDirs []string) error {
 			return nil
 		}
 	}
-	log.Printf("setting up landlock ACL (paths ro: %d, paths rw: %d)", len(roDirs), len(rwDirs))
+	log.Printf("setting up landlock ACL (paths ro: %q, paths rw: %q)", roDirs, rwDirs)
 	err := landlock.V3.BestEffort().RestrictPaths(
 		append(re(), []landlock.Rule{
 			landlock.ROFiles(dnsLookup...).IgnoreIfMissing(),

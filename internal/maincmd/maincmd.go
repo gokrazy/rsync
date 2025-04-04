@@ -39,7 +39,7 @@ func (r *readWriter) Read(p []byte) (n int, err error)  { return r.r.Read(p) }
 func (r *readWriter) Write(p []byte) (n int, err error) { return r.w.Write(p) }
 
 func Main(ctx context.Context, osenv rsyncos.Env, args []string, cfg *rsyncdconfig.Config) (*rsyncstats.TransferStats, error) {
-	log.Printf("Main(args=%q)", args)
+	log.Printf("Main(osenv=%v, args=%q)", osenv, args)
 	pc, err := rsyncopts.ParseArguments(args[1:])
 	if err != nil {
 		if pe, ok := err.(*rsyncopts.PoptError); ok &&
@@ -109,15 +109,19 @@ func Main(ctx context.Context, osenv rsyncos.Env, args []string, cfg *rsyncdconf
 			}
 			rwDirs = append(rwDirs, paths...)
 		}
-		if err := restrict.MaybeFileSystem(roDirs, rwDirs); err != nil {
-			return nil, err
+		if osenv.Restrict() {
+			if err := restrict.MaybeFileSystem(roDirs, rwDirs); err != nil {
+				return nil, err
+			}
 		}
 		conn := rsyncd.NewConnection(osenv.Stdin, osenv.Stdout, "<remote-shell>")
 		return nil, srv.InternalHandleConn(ctx, conn, nil, pc)
 	}
 
 	if !opts.Daemon() {
-		osenv.DontRestrict = opts.GokrazyClient.DontRestrict == 1
+		if !osenv.DontRestrict {
+			osenv.DontRestrict = opts.GokrazyClient.DontRestrict == 1
+		}
 		return clientMain(ctx, osenv, opts, remaining)
 	}
 
