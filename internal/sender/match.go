@@ -5,10 +5,8 @@ import (
 	"encoding/binary"
 	"fmt"
 	"hash"
-	"os"
 
 	"github.com/gokrazy/rsync"
-	"github.com/gokrazy/rsync/internal/nofollow"
 	"github.com/gokrazy/rsync/internal/rsyncchecksum"
 	"github.com/mmcloughlin/md4"
 )
@@ -21,7 +19,7 @@ type target struct {
 // rsync/match.c:hash_search
 func (st *Transfer) hashSearch(targets []target, tagTable map[uint16]int, head rsync.SumHead, fileIndex int32, fl file) error {
 	st.Logger.Printf("hashSearch(path=%s, len(sums)=%d)", fl.path, len(head.Sums))
-	f, err := os.OpenFile(fl.path, os.O_RDONLY|nofollow.Maybe, 0)
+	f, err := fl.root.Open(fl.path)
 	if err != nil {
 		return err
 	}

@@ -57,8 +57,8 @@ func Checksum2(seed int32, buf []byte) []byte {
 	return h.Sum(nil)
 }
 
-func FileChecksum(fn string) ([]byte, error) {
-	f, err := os.Open(fn)
+func FileChecksum(root *os.Root, fn string) ([]byte, error) {
+	f, err := root.Open(fn)
 	if err != nil {
 		return nil, err
 	}

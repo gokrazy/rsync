@@ -1,6 +1,7 @@
 package sender
 
 import (
+	"io/fs"
 	"os"
 	"os/user"
 	"path/filepath"
@@ -16,7 +17,7 @@ import (
 )
 
 type file struct {
-	// TODO: store relative to the root to conserve RAM
+	root    *os.Root
 	path    string
 	Wpath   string
 	regular bool
@@ -35,6 +36,15 @@ type file struct {
 type fileList struct {
 	TotalSize int64
 	Files     []file
+	Roots     []*os.Root
+}
+
+// A fileList must not be used after calling Close().
+func (fl *fileList) Close() {
+	for _, root := range fl.Roots {
+		root.Close()
+	}
+	fl.Roots = nil
 }
 
 // rsync/rsync.h defines chunkSize as 32 * 1024, but increasing it to 256K
@@ -73,37 +83,63 @@ func (st *Transfer) SendFileList(localDir string, opts *rsyncopts.Options, paths
 		st.Logger.Printf("sendFileList()")
 	}
 	ioErrors := int32(0)
+
+	ioError := func(err error) {
+		if os.IsNotExist(err) {
+			st.Logger.Printf("file vanished: %v", err)
+		} else {
+			st.Logger.Printf("lstat: %v", err)
+		}
+		ioErrors = 1
+	}
+
 	// TODO: handle |root| referring to an individual file, symlink or special (skip)
 	for _, requested := range paths {
 		if opts.Verbose() { // TODO: DebugGTE(FLIST, 1)
 			st.Logger.Printf("  path %q (local dir %q)", requested, localDir)
 		}
 		// st.Logger.Printf("getRootStrip(requested=%q, localDir=%q", requested, localDir)
-		root, strip := getRootStrip(requested, localDir)
+		rootPath, strip := getRootStrip(requested, localDir)
 		// st.Logger.Printf("root=%q, strip=%q", root, strip)
-		if opts.Verbose() { // TODO: DebugGTE(FLIST, 1)
-			st.Logger.Printf("  filepath.Walk(%q), strip=%q", root, strip)
+		prefix := strings.TrimPrefix(rootPath, filepath.Clean(strip))
+		if prefix != "" {
+			prefix = strings.TrimPrefix(prefix, "/")
+			prefix += "/"
 		}
-		err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
-			// st.Logger.Printf("filepath.WalkFn(path=%s)", path)
+		if opts.Verbose() { // TODO: DebugGTE(FLIST, 1)
+			st.Logger.Printf("  filepath.Walk(%q), strip=%q", rootPath, strip)
+			st.Logger.Printf("  prefix=%q", prefix)
+		}
+
+		root, err := os.OpenRoot(rootPath)
+		if err != nil {
+			// set the I/O error flag, but keep going
+			ioError(err)
+			continue
+		}
+		fileList.Roots = append(fileList.Roots, root)
+		err = fs.WalkDir(root.FS(), ".", func(path string, d fs.DirEntry, err error) error {
+			st.Logger.Printf("filepath.WalkFn(path=%s)", path)
+			var info fs.FileInfo
+			if err == nil {
+				info, err = d.Info()
+			}
 			if err != nil {
-				if os.IsNotExist(err) {
-					st.Logger.Printf("file vanished: %v", err)
-				} else {
-					st.Logger.Printf("lstat: %v", err)
-				}
 				// set the I/O error flag, but keep walking
-				ioErrors = 1
+				ioError(err)
 				return nil
 			}
 
 			// Only ever transmit long names, like openrsync
 			flags := byte(rsync.XMIT_LONG_NAME)
 
-			name := strings.TrimPrefix(path, strip)
-			// st.Logger.Printf("Trim(path=%q, %q) = %q", path, strip, name)
-			if name == root {
-				name = "."
+			name := prefix + path
+			st.Logger.Printf("Trim(path=%q, %q) = %q", path, strip, name)
+			if path == "." {
+				name = prefix
+				if prefix == "" {
+					name = "."
+				}
 				flags |= rsync.XMIT_TOP_DIR
 			}
 			// st.logger.Printf("flags for %q: %v", name, flags)
@@ -113,6 +149,7 @@ func (st *Transfer) SendFileList(localDir string, opts *rsyncopts.Options, paths
 			}
 
 			fileList.Files = append(fileList.Files, file{
+				root:    root,
 				path:    path,
 				regular: info.Mode().IsRegular(),
 				Wpath:   name,
@@ -223,7 +260,9 @@ func (st *Transfer) SendFileList(localDir string, opts *rsyncopts.Options, paths
 			if opts.PreserveLinks() && info.Mode().Type()&os.ModeSymlink != 0 {
 				// 11.  if a symbolic link and -l, the link target's length (integer)
 				// 12.  if a symbolic link and -l, the link target (byte array)
-				target, err := os.Readlink(path)
+
+				// TODO(go1.25): use fl.root.Readlink(fl.path)
+				target, err := os.Readlink(filepath.Join(rootPath, path))
 				if err != nil {
 					return err // TODO
 				}
@@ -236,7 +275,7 @@ func (st *Transfer) SendFileList(localDir string, opts *rsyncopts.Options, paths
 				checksum := emptyChecksum[:]
 				if info.Mode().IsRegular() {
 					// TODO: send md4 checksum of this file
-					checksum, err = rsyncchecksum.FileChecksum(path)
+					checksum, err = rsyncchecksum.FileChecksum(root, path)
 					if err != nil {
 						return err
 					}

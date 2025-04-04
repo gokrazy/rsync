@@ -7,7 +7,6 @@ import (
 	"sort"
 
 	"github.com/gokrazy/rsync"
-	"github.com/gokrazy/rsync/internal/nofollow"
 	"github.com/gokrazy/rsync/internal/rsyncchecksum"
 	"github.com/gokrazy/rsync/internal/rsynccommon"
 	"github.com/mmcloughlin/md4"
@@ -151,7 +150,7 @@ func (st *Transfer) sendFile(fileIndex int32, fl file) error {
 	// increases throughput with “tridge” rsync as client by 50 Mbit/s.
 	const chunkSize = 256 * 1024
 
-	f, err := os.OpenFile(fl.path, os.O_RDONLY|nofollow.Maybe, 0)
+	f, err := fl.root.Open(fl.path)
 	if err != nil {
 		return err
 	}
@@ -184,7 +183,7 @@ func (st *Transfer) sendFile(fileIndex int32, fl file) error {
 	// into the network socket as quickly as possible.
 	var eg errgroup.Group
 	eg.Go(func() error {
-		f, err := os.Open(fl.path)
+		f, err := fl.root.Open(fl.path)
 		if err != nil {
 			return err
 		}

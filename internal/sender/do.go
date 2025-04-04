@@ -46,6 +46,7 @@ func (st *Transfer) Do(crd *rsyncwire.CountingReader, cwr *rsyncwire.CountingWri
 	if err != nil {
 		return nil, err
 	}
+	defer fileList.Close()
 
 	if st.Opts.Verbose() { // TODO: DebugGTE(FLIST, 3)
 		st.Logger.Printf("file list sent")
