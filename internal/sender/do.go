@@ -5,7 +5,6 @@ import (
 	"sort"
 
 	"github.com/gokrazy/rsync/internal/log"
-	"github.com/gokrazy/rsync/internal/rsyncopts"
 	"github.com/gokrazy/rsync/internal/rsyncstats"
 	"github.com/gokrazy/rsync/internal/rsyncwire"
 )
@@ -43,10 +42,7 @@ func (st *Transfer) Do(crd *rsyncwire.CountingReader, cwr *rsyncwire.CountingWri
 
 	// send file list
 	log.Printf("SendFileList(modPath=%q, paths=%q)", modPath, paths)
-	fileList, err := func() (*fileList, error) {
-		var opts *rsyncopts.Options = st.Opts
-		return st.SendFileList(modPath, opts, paths, exclusionList)
-	}()
+	fileList, err := st.SendFileList(modPath, st.Opts, paths, exclusionList)
 	if err != nil {
 		return nil, err
 	}
