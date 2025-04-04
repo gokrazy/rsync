@@ -352,6 +352,14 @@ func TestReceiverSymlinkTraversal(t *testing.T) {
 	if err := os.WriteFile(hello, []byte("benign"), 0644); err != nil {
 		t.Fatal(err)
 	}
+	subdir := filepath.Join(source, "dir")
+	if err := os.MkdirAll(subdir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	subhello := filepath.Join(subdir, "passwd")
+	if err := os.WriteFile(subhello, []byte("benign"), 0644); err != nil {
+		t.Fatal(err)
+	}
 
 	// start a server to sync from
 	srv := rsynctest.New(t, rsynctest.InteropModule(source))
@@ -368,7 +376,18 @@ func TestReceiverSymlinkTraversal(t *testing.T) {
 			t.Fatal(err)
 		}
 		if diff := cmp.Diff(want, got); diff != "" {
-			t.Fatalf("unexpected file contents: diff (-want +got):\n%s", diff)
+			t.Errorf("unexpected file contents: diff (-want +got):\n%s", diff)
+		}
+	}
+
+	{
+		want := []byte("benign")
+		got, err := os.ReadFile(filepath.Join(dest, "dir", "passwd"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if diff := cmp.Diff(want, got); diff != "" {
+			t.Errorf("unexpected file contents: diff (-want +got):\n%s", diff)
 		}
 	}
 }
