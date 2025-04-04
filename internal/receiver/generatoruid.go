@@ -55,8 +55,9 @@ func (rt *Transfer) setUid(f *File, local string, st fs.FileInfo) (fs.FileInfo, 
 	if changeGid {
 		gid = uint32(f.Gid)
 	}
+	// TODO(go1.25): use os.Root.Lchown
 	if err := os.Lchown(local, int(uid), int(gid)); err != nil {
 		return nil, err
 	}
-	return os.Lstat(local)
+	return rt.DestRoot.Lstat(f.Name)
 }

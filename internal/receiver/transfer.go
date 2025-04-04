@@ -1,6 +1,8 @@
 package receiver
 
 import (
+	"os"
+
 	"github.com/gokrazy/rsync/internal/log"
 	"github.com/gokrazy/rsync/internal/rsyncos"
 	"github.com/gokrazy/rsync/internal/rsyncwire"
@@ -25,10 +27,11 @@ type TransferOpts struct {
 
 type Transfer struct {
 	// config
-	Logger log.Logger
-	Opts   *TransferOpts
-	Dest   string
-	Env    rsyncos.Env
+	Logger   log.Logger
+	Opts     *TransferOpts
+	Dest     string
+	DestRoot *os.Root
+	Env      rsyncos.Env
 
 	// state
 	Conn     *rsyncwire.Conn

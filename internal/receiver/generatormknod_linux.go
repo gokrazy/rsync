@@ -1,8 +1,7 @@
-//go:build linux || darwin
-
 package receiver
 
 import (
+	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -13,7 +12,12 @@ import (
 )
 
 func (rt *Transfer) createDevice(f *File, st fs.FileInfo) error {
-	local := filepath.Join(rt.Dest, f.Name)
+	base := filepath.Base(f.Name)
+	parentDir, err := rt.DestRoot.OpenFile(filepath.Dir(f.Name), 0, 0)
+	if err != nil {
+		return fmt.Errorf("Open(parent(%s)): %v", f.Name, err)
+	}
+	defer parentDir.Close()
 	perm := fs.FileMode(f.Mode) & os.ModePerm
 	mode := f.Mode & rsync.S_IFMT
 	switch mode {
@@ -21,7 +25,7 @@ func (rt *Transfer) createDevice(f *File, st fs.FileInfo) error {
 		if st != nil && st.Mode().Type()&os.ModeCharDevice != 0 {
 			return nil // file of correct type exists
 		}
-		return unix.Mknod(local, uint32(perm)|syscall.S_IFCHR, int(f.Rdev))
+		return unix.Mknodat(int(parentDir.Fd()), base, uint32(perm)|syscall.S_IFCHR, int(f.Rdev))
 
 	case rsync.S_IFBLK:
 		if st != nil && (st.Mode().Type()&os.ModeDevice != 0 ||
@@ -29,7 +33,7 @@ func (rt *Transfer) createDevice(f *File, st fs.FileInfo) error {
 			return nil // file of correct type exists
 		}
 
-		return unix.Mknod(local, uint32(perm)|syscall.S_IFBLK, int(f.Rdev))
+		return unix.Mknodat(int(parentDir.Fd()), base, uint32(perm)|syscall.S_IFBLK, int(f.Rdev))
 
 	case rsync.S_IFSOCK:
 		if st != nil && st.Mode().Type()&os.ModeSocket != 0 {
@@ -41,6 +45,7 @@ func (rt *Transfer) createDevice(f *File, st fs.FileInfo) error {
 			return err
 		}
 
+		local := filepath.Join(rt.Dest, f.Name)
 		if err := unix.Bind(fd, &unix.SockaddrUnix{Name: local}); err != nil {
 			return err
 		}
@@ -55,7 +60,7 @@ func (rt *Transfer) createDevice(f *File, st fs.FileInfo) error {
 			return nil // file of correct type exists
 		}
 
-		return unix.Mkfifo(local, uint32(perm))
+		return unix.Mkfifoat(int(parentDir.Fd()), base, uint32(perm))
 	}
 	return nil
 }

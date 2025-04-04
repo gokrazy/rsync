@@ -340,12 +340,19 @@ func ClientRun(osenv rsyncos.Env, opts *rsyncopts.Options, conn io.ReadWriter, p
 	}
 	if rt.Dest == "" {
 		// just listing modules, not transferring anything
-	} else if osenv.Restrict() {
+	} else {
 		if err := os.MkdirAll(rt.Dest, 0755); err != nil {
 			return nil, fmt.Errorf("MkdirAll(dest=%s): %v", rt.Dest, err)
 		}
-		if err := restrict.MaybeFileSystem(nil, []string{rt.Dest}); err != nil {
-			return nil, fmt.Errorf("landlock: %v", err)
+		rt.DestRoot, err = os.OpenRoot(rt.Dest)
+		if err != nil {
+			return nil, fmt.Errorf("OpenRoot(dest=%s): %v", rt.Dest, err)
+		}
+		defer rt.DestRoot.Close()
+		if osenv.Restrict() {
+			if err := restrict.MaybeFileSystem(nil, []string{rt.Dest}); err != nil {
+				return nil, fmt.Errorf("landlock: %v", err)
+			}
 		}
 	}
 

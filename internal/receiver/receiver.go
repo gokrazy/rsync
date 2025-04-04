@@ -9,7 +9,6 @@ import (
 	"path/filepath"
 
 	"github.com/gokrazy/rsync"
-	"github.com/gokrazy/rsync/internal/nofollow"
 	"github.com/mmcloughlin/md4"
 )
 
@@ -65,9 +64,7 @@ func (rt *Transfer) recvFile1(f *File) error {
 }
 
 func (rt *Transfer) openLocalFile(f *File) (*os.File, error) {
-	local := filepath.Join(rt.Dest, f.Name)
-
-	in, err := os.OpenFile(local, os.O_RDONLY|nofollow.Maybe, 0)
+	in, err := rt.DestRoot.Open(f.Name)
 	if err != nil {
 		return nil, err
 	}
@@ -78,7 +75,7 @@ func (rt *Transfer) openLocalFile(f *File) (*os.File, error) {
 	}
 
 	if st.IsDir() {
-		return nil, fmt.Errorf("%s is a directory", local)
+		return nil, fmt.Errorf("%s is a directory", filepath.Join(rt.Dest, f.Name))
 	}
 
 	if !st.Mode().IsRegular() {
@@ -102,7 +99,7 @@ func (rt *Transfer) receiveData(f *File, localFile *os.File) error {
 	}
 
 	local := filepath.Join(rt.Dest, f.Name)
-
+	// TODO: use rt.DestRoot once renameio supports it
 	rt.Logger.Printf("creating %s", local)
 	out, err := newPendingFile(local)
 	if err != nil {

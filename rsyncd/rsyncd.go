@@ -436,6 +436,14 @@ func (s *Server) handleConnReceiver(module *Module, crd *rsyncwire.CountingReade
 		Conn: c,
 		Seed: sessionChecksumSeed,
 	}
+	if err := os.MkdirAll(rt.Dest, 0755); err != nil {
+		return fmt.Errorf("MkdirAll(dest=%s): %v", rt.Dest, err)
+	}
+	rt.DestRoot, err = os.OpenRoot(rt.Dest)
+	if err != nil {
+		return fmt.Errorf("OpenRoot(dest=%s): %v", rt.Dest, err)
+	}
+	defer rt.DestRoot.Close()
 
 	if opts.PreserveHardLinks() {
 		return fmt.Errorf("support for hard links not yet implemented")

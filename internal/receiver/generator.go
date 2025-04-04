@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/gokrazy/rsync"
-	"github.com/gokrazy/rsync/internal/nofollow"
 	"github.com/gokrazy/rsync/internal/rsyncchecksum"
 	"github.com/gokrazy/rsync/internal/rsynccommon"
 )
@@ -75,17 +74,18 @@ func (rt *Transfer) setPerms(f *File) error {
 		return nil
 	}
 
-	local := filepath.Join(rt.Dest, f.Name)
-	st, err := os.Lstat(local)
+	st, err := rt.DestRoot.Lstat(f.Name)
 	if err != nil {
 		return err
 	}
 
+	local := filepath.Join(rt.Dest, f.Name)
 	perm := fs.FileMode(f.Mode) & os.ModePerm
 	mode := f.Mode & rsync.S_IFMT
 	if rt.Opts.PreserveTimes &&
 		mode != rsync.S_IFLNK &&
 		!modTimeEqual(st.ModTime(), f.ModTime) {
+		// TODO(go1.25): use os.Root.Chtimes
 		if err := os.Chtimes(local, f.ModTime, f.ModTime); err != nil {
 			return err
 		}
@@ -97,6 +97,7 @@ func (rt *Transfer) setPerms(f *File) error {
 	}
 
 	if mode != rsync.S_IFLNK {
+		// TODO(go1.25): use os.Root.Chmod
 		if err := os.Chmod(local, perm); err != nil {
 			return err
 		}
@@ -120,7 +121,7 @@ func (rt *Transfer) recvGenerator(idx int, f *File) error {
 	}
 
 	local := filepath.Join(rt.Dest, f.Name)
-	st, err := os.Lstat(local)
+	st, err := rt.DestRoot.Lstat(f.Name)
 
 	mode := f.Mode & rsync.S_IFMT
 	if mode == rsync.S_IFDIR {
@@ -130,7 +131,7 @@ func (rt *Transfer) recvGenerator(idx int, f *File) error {
 		if err == nil && !st.IsDir() {
 			// A file (not a directory) with this name exists. Delete it so that
 			// we can create a directory instead.
-			if err := os.Remove(local); err != nil {
+			if err := rt.DestRoot.Remove(f.Name); err != nil {
 				return fmt.Errorf("unlinking to make room for directory: %v", err)
 			}
 			err = fmt.Errorf("file removed")
@@ -138,6 +139,7 @@ func (rt *Transfer) recvGenerator(idx int, f *File) error {
 		if err != nil {
 			perm := fs.FileMode(f.Mode) & os.ModePerm
 			rt.Logger.Printf("MkdirAll(%s, %v)", local, perm)
+			// TODO: use os.Root.Mkdir
 			if err := os.MkdirAll(local, perm); err != nil {
 				// TODO: EEXIST is okay
 				return err
@@ -154,6 +156,7 @@ func (rt *Transfer) recvGenerator(idx int, f *File) error {
 		// TODO: safe_symlinks option
 		if err == nil {
 			// local file exists, verify target matches
+			// TODO(go1.25): use os.Root.Readlink
 			if target, err := os.Readlink(local); err == nil {
 				rt.Logger.Printf("existing target: %q", target)
 				if target == f.LinkTarget {
@@ -167,6 +170,7 @@ func (rt *Transfer) recvGenerator(idx int, f *File) error {
 			// fallthrough to create or replace the symlink
 		}
 		rt.Logger.Printf("symlink %s -> %s", local, f.LinkTarget)
+		// TODO(go1.25): use os.Root.Symlink
 		if err := symlink(f.LinkTarget, local); err != nil {
 			return err
 		}
@@ -221,7 +225,7 @@ func (rt *Transfer) recvGenerator(idx int, f *File) error {
 	if !st.Mode().IsRegular() {
 		// A non-regular file with this name exists. Delete it so that we can
 		// create our file instead.
-		if err := os.Remove(local); err != nil {
+		if err := rt.DestRoot.Remove(f.Name); err != nil {
 			return fmt.Errorf("unlinking to make room for regular file: %v", err)
 		}
 		return requestFullFile()
@@ -253,7 +257,7 @@ func (rt *Transfer) recvGenerator(idx int, f *File) error {
 
 	// TODO: if deltas are disabled, request the file in full
 
-	in, err := os.OpenFile(local, os.O_RDONLY|nofollow.Maybe, 0)
+	in, err := rt.DestRoot.Open(f.Name)
 	if err != nil {
 		rt.Logger.Printf("failed to open %s, continuing: %v", local, err)
 		return requestFullFile()
