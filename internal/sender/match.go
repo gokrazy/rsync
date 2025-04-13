@@ -69,7 +69,10 @@ func (st *Transfer) hashSearch(targets []target, tagTable map[uint16]int, head r
 			k = remaining
 		}
 
-		chunk := ms.ptr(offset, int32(k))
+		chunk, err := ms.ptr(offset, int32(k))
+		if err != nil {
+			return err
+		}
 		sum = rsyncchecksum.Checksum1(chunk)
 		s1 = uint32(sum & 0xFFFF)
 		s2 = uint32(sum >> 16)
@@ -112,7 +115,10 @@ Outer:
 				// st.logger.Printf("potential match at %d target=%d %d sum=%08x", offset, j, i, sum)
 
 				if !doneCsum2 {
-					buf := ms.ptr(offset, int32(l))
+					buf, err := ms.ptr(offset, int32(l))
+					if err != nil {
+						return err
+					}
 					sum2 = rsyncchecksum.Checksum2(st.Seed, buf[:])
 					doneCsum2 = true
 				}
@@ -164,7 +170,10 @@ Outer:
 		if more {
 			mmore = 1
 		}
-		update := ms.ptr(offset-backup, int32(int64(k)+mmore+backup))
+		update, err := ms.ptr(offset-backup, int32(int64(k)+mmore+backup))
+		if err != nil {
+			return err
+		}
 		update = update[backup:]
 
 		s1 -= rsyncchecksum.SignExtend(update[0])
@@ -241,7 +250,10 @@ func (st *Transfer) matched(h hash.Hash, ms *mapStruct, head rsync.SumHead, offs
 
 	for j := int64(0); j < n; j += chunkSize {
 		n1 := min(int64(chunkSize), n-j)
-		chunk := ms.ptr(st.lastMatch+j, int32(n1))
+		chunk, err := ms.ptr(st.lastMatch+j, int32(n1))
+		if err != nil {
+			return err
+		}
 		h.Write(chunk)
 	}
 

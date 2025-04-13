@@ -10,7 +10,6 @@ import (
 	"strings"
 
 	"github.com/gokrazy/rsync"
-	"github.com/gokrazy/rsync/internal/log"
 	"github.com/gokrazy/rsync/internal/receiver"
 	"github.com/gokrazy/rsync/internal/restrict"
 	"github.com/gokrazy/rsync/internal/rsyncopts"
@@ -22,21 +21,21 @@ import (
 )
 
 // rsync/main.c:start_client
-func rsyncMain(ctx context.Context, osenv rsyncos.Env, opts *rsyncopts.Options, sources []string, dest string) (*rsyncstats.TransferStats, error) {
+func rsyncMain(ctx context.Context, osenv *rsyncos.Env, opts *rsyncopts.Options, sources []string, dest string) (*rsyncstats.TransferStats, error) {
 	if opts.Verbose() {
-		log.Printf("dest: %q, sources: %q", dest, sources)
-		log.Printf("opts: %+v", opts)
+		osenv.Logf("dest: %q, sources: %q", dest, sources)
+		osenv.Logf("opts: %+v", opts)
 	}
 	// Guaranteed to be non-empty by caller of rsyncMain().
 	src := sources[0]
 
 	if opts.Verbose() {
-		log.Printf("processing src=%s", src)
+		osenv.Logf("processing src=%s", src)
 	}
 	daemonConnection := 0 // no daemon
 	host, path, port, err := checkForHostspec(src)
 	if opts.Verbose() {
-		log.Printf("host=%q, path=%q, port=%d, err=%v", host, path, port, err)
+		osenv.Logf("host=%q, path=%q, port=%d, err=%v", host, path, port, err)
 	}
 	if err != nil {
 		// source is local, check dest arg
@@ -44,11 +43,11 @@ func rsyncMain(ctx context.Context, osenv rsyncos.Env, opts *rsyncopts.Options, 
 		// TODO: remote_argv == "."?
 		host, path, port, err = checkForHostspec(dest)
 		if opts.Verbose() {
-			log.Printf("host=%q, path=%q, port=%d, err=%v", host, path, port, err)
+			osenv.Logf("host=%q, path=%q, port=%d, err=%v", host, path, port, err)
 		}
 		if path == "" {
 			if opts.Verbose() {
-				log.Printf("source and dest are both local!")
+				osenv.Logf("source and dest are both local!")
 			}
 			host = ""
 			port = 0
@@ -112,7 +111,7 @@ func rsyncMain(ctx context.Context, osenv rsyncos.Env, opts *rsyncopts.Options, 
 		module = module[:idx]
 	}
 	if opts.Verbose() {
-		log.Printf("module=%q, path=%q, other=%q", module, path, other)
+		osenv.Logf("module=%q, path=%q, other=%q", module, path, other)
 	}
 
 	if daemonConnection < 0 {
@@ -158,9 +157,9 @@ func rsyncMain(ctx context.Context, osenv rsyncos.Env, opts *rsyncopts.Options, 
 }
 
 // rsync/main.c:do_cmd
-func doCmd(osenv rsyncos.Env, opts *rsyncopts.Options, machine, user, path string, daemonConnection int) (io.ReadCloser, io.WriteCloser, error) {
+func doCmd(osenv *rsyncos.Env, opts *rsyncopts.Options, machine, user, path string, daemonConnection int) (io.ReadCloser, io.WriteCloser, error) {
 	if opts.Verbose() {
-		log.Printf("doCmd(machine=%q, user=%q, path=%q, daemonConnection=%d)",
+		osenv.Logf("doCmd(machine=%q, user=%q, path=%q, daemonConnection=%d)",
 			machine, user, path, daemonConnection)
 	}
 	var args []string
@@ -207,7 +206,7 @@ func doCmd(osenv rsyncos.Env, opts *rsyncopts.Options, machine, user, path strin
 	}
 
 	if opts.Verbose() {
-		log.Printf("args: %q", args)
+		osenv.Logf("args: %q", args)
 	}
 
 	if opts.LocalServer() {
@@ -216,7 +215,7 @@ func doCmd(osenv rsyncos.Env, opts *rsyncopts.Options, machine, user, path strin
 		go func() {
 			defer stdinrd.Close()
 			defer stdoutwr.Close()
-			osenv := rsyncos.Env{
+			osenv := &rsyncos.Env{
 				Stdin:  stdinrd,
 				Stdout: stdoutwr,
 				Stderr: os.Stderr,
@@ -226,7 +225,7 @@ func doCmd(osenv rsyncos.Env, opts *rsyncopts.Options, machine, user, path strin
 			}
 			_, err := Main(context.Background(), osenv, args, nil)
 			if err != nil {
-				log.Printf("Main(): %v", err)
+				osenv.Logf("Main(): %v", err)
 			}
 		}()
 		return stdoutrd, stdinwr, nil
@@ -250,7 +249,7 @@ func doCmd(osenv rsyncos.Env, opts *rsyncopts.Options, machine, user, path strin
 		// TODO: correctly terminate the main process when the underlying SSH
 		// process exits.
 		if err := ssh.Wait(); err != nil {
-			log.Printf("remote shell exited: %v", err)
+			osenv.Logf("remote shell exited: %v", err)
 		}
 	}()
 
@@ -258,7 +257,7 @@ func doCmd(osenv rsyncos.Env, opts *rsyncopts.Options, machine, user, path strin
 }
 
 // rsync/main.c:client_run
-func ClientRun(osenv rsyncos.Env, opts *rsyncopts.Options, conn io.ReadWriter, paths []string, negotiate bool) (*rsyncstats.TransferStats, error) {
+func ClientRun(osenv *rsyncos.Env, opts *rsyncopts.Options, conn io.ReadWriter, paths []string, negotiate bool) (*rsyncstats.TransferStats, error) {
 	crd := &rsyncwire.CountingReader{R: conn}
 	cwr := &rsyncwire.CountingWriter{W: conn}
 	c := &rsyncwire.Conn{
@@ -275,7 +274,7 @@ func ClientRun(osenv rsyncos.Env, opts *rsyncopts.Options, conn io.ReadWriter, p
 			return nil, err
 		}
 		if opts.Verbose() {
-			log.Printf("remote protocol: %d", remoteProtocol)
+			osenv.Logf("remote protocol: %d", remoteProtocol)
 		}
 	}
 
@@ -285,6 +284,7 @@ func ClientRun(osenv rsyncos.Env, opts *rsyncopts.Options, conn io.ReadWriter, p
 	}
 
 	mrd := &rsyncwire.MultiplexReader{
+		Env:    osenv,
 		Reader: conn,
 	}
 	// TODO: rearchitect such that our buffer can be smaller than the largest
@@ -294,13 +294,13 @@ func ClientRun(osenv rsyncos.Env, opts *rsyncopts.Options, conn io.ReadWriter, p
 
 	if opts.Sender() {
 		st := &sender.Transfer{
-			Logger: log.New(osenv.Stderr),
+			Logger: osenv.Logger(),
 			Opts:   opts,
 			Conn:   c,
 			Seed:   seed,
 		}
 		if opts.Verbose() {
-			log.Printf("sender(paths=%q)", paths)
+			osenv.Logf("sender(paths=%q)", paths)
 		}
 
 		stats, err := st.Do(crd, cwr, "/", paths, nil)
@@ -315,7 +315,7 @@ func ClientRun(osenv rsyncos.Env, opts *rsyncopts.Options, conn io.ReadWriter, p
 	}
 
 	rt := &receiver.Transfer{
-		Logger: log.New(osenv.Stderr),
+		Logger: osenv.Logger(),
 		Opts: &receiver.TransferOpts{
 			Verbose: opts.Verbose(),
 			DryRun:  opts.DryRun(),
@@ -336,7 +336,7 @@ func ClientRun(osenv rsyncos.Env, opts *rsyncopts.Options, conn io.ReadWriter, p
 		Seed: seed,
 	}
 	if opts.Verbose() {
-		log.Printf("receiving to dest=%s", rt.Dest)
+		osenv.Logf("receiving to dest=%s", rt.Dest)
 	}
 	if rt.Dest == "" {
 		// just listing modules, not transferring anything
@@ -366,25 +366,25 @@ func ClientRun(osenv rsyncos.Env, opts *rsyncopts.Options, conn io.ReadWriter, p
 	}
 
 	if opts.Verbose() { // TODO: should be DebugGTE(RECV, 1)
-		log.Printf("exclusion list sent")
+		osenv.Logf("exclusion list sent")
 	}
 
 	// receive file list
 	if opts.Verbose() { // TODO: should be debug (FLOG)
-		log.Printf("receiving file list")
+		osenv.Logf("receiving file list")
 	}
 	fileList, err := rt.ReceiveFileList()
 	if err != nil {
 		return nil, err
 	}
 	if opts.Verbose() { // TODO: should be debugGTE(FLIST, 2)
-		log.Printf("received %d names", len(fileList))
+		osenv.Logf("received %d names", len(fileList))
 	}
 
 	return rt.Do(c, fileList, false)
 }
 
-func clientMain(ctx context.Context, osenv rsyncos.Env, opts *rsyncopts.Options, remaining []string) (*rsyncstats.TransferStats, error) {
+func clientMain(ctx context.Context, osenv *rsyncos.Env, opts *rsyncopts.Options, remaining []string) (*rsyncstats.TransferStats, error) {
 	if len(remaining) == 0 {
 		// help goes to stderr when no arguments were specified
 		fmt.Fprintln(osenv.Stderr, opts.Help())

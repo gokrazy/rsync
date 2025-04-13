@@ -11,14 +11,13 @@ import (
 	"time"
 
 	"github.com/gokrazy/rsync"
-	"github.com/gokrazy/rsync/internal/log"
 	"github.com/gokrazy/rsync/internal/rsyncopts"
 	"github.com/gokrazy/rsync/internal/rsyncos"
 	"github.com/gokrazy/rsync/internal/rsyncstats"
 )
 
 // rsync/clientserver.c:start_socket_client
-func socketClient(ctx context.Context, osenv rsyncos.Env, opts *rsyncopts.Options, host string, path string, port int, paths []string) (*rsyncstats.TransferStats, error) {
+func socketClient(ctx context.Context, osenv *rsyncos.Env, opts *rsyncopts.Options, host string, path string, port int, paths []string) (*rsyncstats.TransferStats, error) {
 	if port < 0 {
 		host += ":873" // rsync daemon port
 	} else {
@@ -37,7 +36,7 @@ func socketClient(ctx context.Context, osenv rsyncos.Env, opts *rsyncopts.Option
 		dialer.Timeout = time.Duration(timeout) * time.Second
 		timeoutStr = fmt.Sprintf(" (timeout: %d seconds)", timeout)
 	}
-	log.Printf("Opening TCP connection to %s%s", host, timeoutStr)
+	osenv.Logf("Opening TCP connection to %s%s", host, timeoutStr)
 	conn, err := dialer.DialContext(ctx, "tcp", host)
 	if err != nil {
 		return nil, err
@@ -46,7 +45,7 @@ func socketClient(ctx context.Context, osenv rsyncos.Env, opts *rsyncopts.Option
 	if idx := strings.IndexByte(module, '/'); idx > -1 {
 		module = module[:idx]
 	}
-	log.Printf("rsync module %q, path %q", module, path)
+	osenv.Logf("rsync module %q, path %q", module, path)
 	done, err := startInbandExchange(osenv, opts, conn, module, path)
 	if err != nil {
 		return nil, err
@@ -62,7 +61,7 @@ func socketClient(ctx context.Context, osenv rsyncos.Env, opts *rsyncopts.Option
 }
 
 // rsync/clientserver.c:start_inband_exchange
-func startInbandExchange(osenv rsyncos.Env, opts *rsyncopts.Options, conn io.ReadWriter, module, path string) (done bool, _ error) {
+func startInbandExchange(osenv *rsyncos.Env, opts *rsyncopts.Options, conn io.ReadWriter, module, path string) (done bool, _ error) {
 	rd := bufio.NewReader(conn)
 
 	// send client greeting
@@ -91,8 +90,8 @@ func startInbandExchange(osenv rsyncos.Env, opts *rsyncopts.Options, conn io.Rea
 	}
 
 	if opts.Verbose() {
-		log.Printf("(Client) Protocol versions: remote=%d, negotiated=%d", remoteProtocol, rsync.ProtocolVersion)
-		log.Printf("Client checksum: md4")
+		osenv.Logf("(Client) Protocol versions: remote=%d, negotiated=%d", remoteProtocol, rsync.ProtocolVersion)
+		osenv.Logf("Client checksum: md4")
 	}
 
 	// send module name
@@ -104,7 +103,7 @@ func startInbandExchange(osenv rsyncos.Env, opts *rsyncopts.Options, conn io.Rea
 		}
 		line = strings.TrimSpace(line)
 		if opts.Verbose() { // TODO: should be debug
-			log.Printf("read line: %q", line)
+			osenv.Logf("read line: %q", line)
 		}
 
 		if strings.HasPrefix(line, "@RSYNCD: AUTHREQD ") {
@@ -135,7 +134,7 @@ func startInbandExchange(osenv rsyncos.Env, opts *rsyncopts.Options, conn io.Rea
 		sargv = append(sargv, path)
 	}
 	if opts.Verbose() {
-		log.Printf("sending daemon args: %s", sargv)
+		osenv.Logf("sending daemon args: %s", sargv)
 	}
 	for _, argv := range sargv {
 		fmt.Fprintf(conn, "%s\n", argv)

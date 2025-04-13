@@ -6,15 +6,15 @@ import (
 	"fmt"
 	"syscall"
 
-	"github.com/gokrazy/rsync/internal/log"
+	"github.com/gokrazy/rsync/internal/rsyncos"
 )
 
-func dropPrivileges() error {
+func dropPrivileges(osenv *rsyncos.Env) error {
 	if syscall.Getuid() != 0 {
 		return nil
 	}
 
-	log.Printf("running as root (uid 0), dropping privileges to nobody (uid/gid 65534)")
+	osenv.Logf("running as root (uid 0), dropping privileges to nobody (uid/gid 65534)")
 	if err := syscall.Setgid(65534); err != nil {
 		return fmt.Errorf("setgid(65534): %v", err)
 	}

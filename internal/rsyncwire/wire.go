@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/gokrazy/rsync/internal/log"
+	"github.com/gokrazy/rsync/internal/rsyncos"
 )
 
 const (
@@ -36,6 +36,7 @@ func (w *MultiplexWriter) WriteMsg(tag uint8, p []byte) (n int, err error) {
 }
 
 type MultiplexReader struct {
+	Env    *rsyncos.Env
 	Reader io.Reader
 }
 
@@ -77,7 +78,7 @@ func (w *MultiplexReader) Read(p []byte) (n int, err error) {
 		return 0, fmt.Errorf("%s", payload)
 	}
 	if tag == MsgInfo {
-		log.Printf("info: %s", payload)
+		w.Env.Logf("info: %s", payload)
 	}
 	if tag != MsgData {
 		return 0, fmt.Errorf("unexpected tag: got %v, want %v", tag, MsgData)

@@ -47,10 +47,6 @@ func (f serverOptionFunc) applyServer(s *Server) {
 func WithLogger(logger log.Logger) Option {
 	return serverOptionFunc(func(s *Server) {
 		s.logger = logger
-
-		// TODO: remove global logger usage once we remove
-		//       the ad-hoc logger reference.
-		log.SetLogger(logger)
 	})
 }
 
@@ -88,6 +84,7 @@ func NewServer(modules []Module, opts ...Option) (*Server, error) {
 	}
 
 	if server.logger == nil {
+		// TODO: use the logger in a *rsyncos.Env instead
 		server.logger = log.New(server.stderr)
 	}
 
@@ -246,7 +243,7 @@ func (s *Server) HandleDaemonConn(ctx context.Context, conn *Conn) (err error) {
 	}
 
 	s.logger.Printf("flags: %+v", flags)
-	pc, err := rsyncopts.ParseArguments(flags)
+	pc, err := rsyncopts.ParseArguments(&rsyncos.Env{Stderr: s.stderr}, flags)
 	if err != nil {
 		err = fmt.Errorf("parsing server args: %v", err)
 
@@ -324,7 +321,7 @@ func (s *Server) InternalHandleConn(ctx context.Context, conn *Conn, module *Mod
 }
 
 func (s *Server) HandleConnArgs(ctx context.Context, conn *Conn, module *Module, args []string) error {
-	pc, err := rsyncopts.ParseArguments(args)
+	pc, err := rsyncopts.ParseArguments(&rsyncos.Env{Stderr: s.stderr}, args)
 	if err != nil {
 		return fmt.Errorf("parsing server args: %v", err)
 	}
@@ -430,7 +427,7 @@ func (s *Server) handleConnReceiver(module *Module, crd *rsyncwire.CountingReade
 			// TODO: PreserveHardlinks: opts.PreserveHardlinks,
 		},
 		Dest: module.Path,
-		Env: rsyncos.Env{
+		Env: &rsyncos.Env{
 			Stderr: s.stderr,
 		},
 		Conn: c,

@@ -31,7 +31,7 @@ type Transfer struct {
 	Opts     *TransferOpts
 	Dest     string
 	DestRoot *os.Root
-	Env      rsyncos.Env
+	Env      *rsyncos.Env
 
 	// state
 	Conn     *rsyncwire.Conn

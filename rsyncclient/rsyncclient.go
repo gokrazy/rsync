@@ -56,7 +56,7 @@ func DontRestrict() Option {
 }
 
 type Client struct {
-	osenv     rsyncos.Env
+	osenv     *rsyncos.Env
 	opts      *rsyncopts.Options
 	negotiate bool
 	sender    bool
@@ -66,7 +66,7 @@ type Client struct {
 // the same [Client].
 func New(args []string, opts ...Option) (*Client, error) {
 	c := &Client{
-		osenv: rsyncos.Env{
+		osenv: &rsyncos.Env{
 			Stderr: os.Stderr,
 		},
 		negotiate: true,
@@ -76,7 +76,7 @@ func New(args []string, opts ...Option) (*Client, error) {
 		opt.applyServer(c)
 	}
 
-	pc, err := rsyncopts.ParseArguments(args)
+	pc, err := rsyncopts.ParseArguments(c.osenv, args)
 	if err != nil {
 		return nil, err
 	}

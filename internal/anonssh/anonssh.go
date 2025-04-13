@@ -17,8 +17,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/gokrazy/rsync/internal/log"
 	"github.com/gokrazy/rsync/internal/rsyncdconfig"
+	"github.com/gokrazy/rsync/internal/rsyncos"
 	"github.com/google/shlex"
 	"golang.org/x/crypto/ssh"
 )
@@ -26,8 +26,9 @@ import (
 type mainFunc func(args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer) error
 
 type anonssh struct {
-	cfg  *rsyncdconfig.Config
-	main mainFunc
+	cfg   *rsyncdconfig.Config
+	main  mainFunc
+	osenv *rsyncos.Env
 }
 
 // env is a Environment Variable request as per RFC4254 6.4.
@@ -57,7 +58,7 @@ func (s *session) request(ctx context.Context, req *ssh.Request) error {
 			return err
 		}
 
-		log.Printf("env request: %s=%s", r.VariableName, r.VariableValue)
+		s.anonssh.osenv.Logf("env request: %s=%s", r.VariableName, r.VariableValue)
 		//s.env = append(s.env, fmt.Sprintf("%s=%s", r.VariableName, r.VariableValue))
 
 	case "exec":
@@ -71,7 +72,7 @@ func (s *session) request(ctx context.Context, req *ssh.Request) error {
 			return err
 		}
 
-		log.Printf("cmdline: %q", cmdline)
+		s.anonssh.osenv.Logf("cmdline: %q", cmdline)
 		// 2021/09/12 21:25:34 cmdline: ["rsync" "--server" "--daemon" "."]
 		go func() {
 			stderr := s.channel.Stderr()
@@ -87,7 +88,7 @@ func (s *session) request(ctx context.Context, req *ssh.Request) error {
 
 			// See https://tools.ietf.org/html/rfc4254#section-6.10
 			if _, err := s.channel.SendRequest("exit-status", false /* wantReply */, status); err != nil {
-				log.Printf("err2: %v", err)
+				s.anonssh.osenv.Logf("err2: %v", err)
 			}
 			s.channel.Close()
 		}()
@@ -146,7 +147,7 @@ func (s *session) request(ctx context.Context, req *ssh.Request) error {
 func (as *anonssh) handleSession(newChannel ssh.NewChannel) {
 	channel, requests, err := newChannel.Accept()
 	if err != nil {
-		log.Printf("Could not accept channel (%s)", err)
+		as.osenv.Logf("Could not accept channel (%s)", err)
 		return
 	}
 
@@ -154,10 +155,13 @@ func (as *anonssh) handleSession(newChannel ssh.NewChannel) {
 	go func(channel ssh.Channel, requests <-chan *ssh.Request) {
 		ctx, canc := context.WithCancel(context.Background())
 		defer canc()
-		s := session{channel: channel, anonssh: as}
+		s := session{
+			channel: channel,
+			anonssh: as,
+		}
 		for req := range requests {
 			if err := s.request(ctx, req); err != nil {
-				log.Printf("request(%q): %v", req.Type, err)
+				s.anonssh.osenv.Logf("request(%q): %v", req.Type, err)
 				errmsg := []byte(err.Error())
 				// Append a trailing newline; the error message is
 				// displayed as-is by ssh(1).
@@ -169,7 +173,7 @@ func (as *anonssh) handleSession(newChannel ssh.NewChannel) {
 				channel.Close()
 			}
 		}
-		log.Printf("SSH requests exhausted")
+		s.anonssh.osenv.Logf("SSH requests exhausted")
 	}(channel, requests)
 }
 
@@ -220,7 +224,7 @@ type Listener struct {
 	authorizedKeysPath string
 }
 
-func ListenerFromConfig(cfg rsyncdconfig.Listener) (*Listener, error) {
+func ListenerFromConfig(osenv *rsyncos.Env, cfg rsyncdconfig.Listener) (*Listener, error) {
 	hostKeyPath := cfg.HostKeyPath
 	if hostKeyPath == "" {
 		dir, err := os.UserConfigDir()
@@ -241,7 +245,7 @@ func ListenerFromConfig(cfg rsyncdconfig.Listener) (*Listener, error) {
 		}
 
 		var err error
-		authorizedKeys, err = loadAuthorizedKeys(cfg.AuthorizedSSH.AuthorizedKeys)
+		authorizedKeys, err = loadAuthorizedKeys(osenv, cfg.AuthorizedSSH.AuthorizedKeys)
 		if err != nil {
 			return nil, err
 		}
@@ -273,7 +277,7 @@ func loadHostKey(path string) (ssh.Signer, error) {
 	return ssh.ParsePrivateKey(b)
 }
 
-func loadAuthorizedKeys(path string) (map[string]bool, error) {
+func loadAuthorizedKeys(osenv *rsyncos.Env, path string) (map[string]bool, error) {
 	b, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
@@ -290,7 +294,7 @@ func loadAuthorizedKeys(path string) (map[string]bool, error) {
 
 		// This warning can be removed once the mentioned issue is resolved
 		if keyType := pubKey.Type(); keyType == "ssh-rsa" {
-			log.Printf("Warning: ignoring unsupported ssh-rsa key in %s:%d (see https://github.com/gokrazy/breakglass/issues/11)", path, lineNum)
+			osenv.Logf("Warning: ignoring unsupported ssh-rsa key in %s:%d (see https://github.com/gokrazy/breakglass/issues/11)", path, lineNum)
 		}
 
 		if err != nil {
@@ -305,25 +309,26 @@ func loadAuthorizedKeys(path string) (map[string]bool, error) {
 	return result, nil
 }
 
-func Serve(ctx context.Context, ln net.Listener, listener *Listener, cfg *rsyncdconfig.Config, main mainFunc) error {
+func Serve(ctx context.Context, osenv *rsyncos.Env, ln net.Listener, listener *Listener, cfg *rsyncdconfig.Config, main mainFunc) error {
 	go func() {
 		<-ctx.Done()
 		ln.Close() // unblocks Accept()
 	}()
 
 	as := &anonssh{
-		cfg:  cfg,
-		main: main,
+		cfg:   cfg,
+		main:  main,
+		osenv: osenv,
 	}
 
 	config := &ssh.ServerConfig{
 		PublicKeyCallback: func(conn ssh.ConnMetadata, pubKey ssh.PublicKey) (*ssh.Permissions, error) {
 			if listener.authorizedKeys == nil {
-				log.Printf("user %q successfully authorized from remote addr %s", conn.User(), conn.RemoteAddr())
+				osenv.Logf("user %q successfully authorized from remote addr %s", conn.User(), conn.RemoteAddr())
 				return nil, nil
 			}
 			if listener.authorizedKeys[string(pubKey.Marshal())] {
-				log.Printf("user %q successfully authorized from remote addr %s", conn.User(), conn.RemoteAddr())
+				osenv.Logf("user %q successfully authorized from remote addr %s", conn.User(), conn.RemoteAddr())
 				return nil, nil
 			}
 			return nil, fmt.Errorf("public key not found in %s", listener.authorizedKeysPath)
@@ -332,7 +337,7 @@ func Serve(ctx context.Context, ln net.Listener, listener *Listener, cfg *rsyncd
 
 	config.AddHostKey(listener.hostKey)
 
-	log.Printf("SSH host key fingerprint: %s", ssh.FingerprintSHA256(listener.hostKey.PublicKey()))
+	osenv.Logf("SSH host key fingerprint: %s", ssh.FingerprintSHA256(listener.hostKey.PublicKey()))
 
 	for {
 		conn, err := ln.Accept()
@@ -346,14 +351,14 @@ func Serve(ctx context.Context, ln net.Listener, listener *Listener, cfg *rsyncd
 			if errors.Is(err, net.ErrClosed) {
 				return err
 			}
-			log.Printf("accept: %v", err)
+			osenv.Logf("accept: %v", err)
 			continue
 		}
 
 		go func(conn net.Conn) {
 			_, chans, reqs, err := ssh.NewServerConn(conn, config)
 			if err != nil {
-				log.Printf("handshake: %v", err)
+				osenv.Logf("handshake: %v", err)
 				return
 			}
 

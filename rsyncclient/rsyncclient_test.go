@@ -12,6 +12,8 @@ import (
 	"testing"
 
 	"github.com/gokrazy/rsync/internal/rsyncopts"
+	"github.com/gokrazy/rsync/internal/rsyncos"
+	"github.com/gokrazy/rsync/internal/rsyncostest"
 	"github.com/gokrazy/rsync/internal/rsynctest"
 	"github.com/gokrazy/rsync/internal/testlogger"
 	"github.com/gokrazy/rsync/rsyncclient"
@@ -73,7 +75,7 @@ func ExampleClient_Run_sendToGoroutine() {
 	stdoutrd, stdoutwr := io.Pipe()
 	go func() {
 		conn := rsyncd.NewConnection(stdinrd, stdoutwr, "<io.Pipe>")
-		pc, err := rsyncopts.ParseArguments(client.ServerCommandOptions(dest))
+		pc, err := rsyncopts.ParseArguments(&rsyncos.Env{Stderr: os.Stderr}, client.ServerCommandOptions(dest))
 		if err != nil {
 			log.Fatalf("parsing server args: %v", err)
 		}
@@ -168,7 +170,8 @@ func TestClientServerModule(t *testing.T) {
 	stdinrd, stdinwr := io.Pipe()
 	stdoutrd, stdoutwr := io.Pipe()
 	conn := rsyncd.NewConnection(stdinrd, stdoutwr, "<io.Pipe>")
-	pc, err := rsyncopts.ParseArguments(client.ServerCommandOptions("./"))
+	osenv := rsyncostest.New(t)
+	pc, err := rsyncopts.ParseArguments(osenv, client.ServerCommandOptions("./"))
 	if err != nil {
 		t.Fatalf("parsing server args: %v", err)
 	}
@@ -235,7 +238,8 @@ func TestClientServerCommand(t *testing.T) {
 	stdinrd, stdinwr := io.Pipe()
 	stdoutrd, stdoutwr := io.Pipe()
 	conn := rsyncd.NewConnection(stdinrd, stdoutwr, "<io.Pipe>")
-	pc, err := rsyncopts.ParseArguments(client.ServerCommandOptions(src))
+	osenv := rsyncostest.New(t)
+	pc, err := rsyncopts.ParseArguments(osenv, client.ServerCommandOptions(src))
 	if err != nil {
 		t.Fatalf("parsing server args: %v", err)
 	}
@@ -301,7 +305,8 @@ func TestClientServerCommandSender(t *testing.T) {
 	stdinrd, stdinwr := io.Pipe()
 	stdoutrd, stdoutwr := io.Pipe()
 	conn := rsyncd.NewConnection(stdinrd, stdoutwr, "<io.Pipe>")
-	pc, err := rsyncopts.ParseArguments(client.ServerCommandOptions(dest))
+	osenv := rsyncostest.New(t)
+	pc, err := rsyncopts.ParseArguments(osenv, client.ServerCommandOptions(dest))
 	if err != nil {
 		t.Fatalf("parsing server args: %v", err)
 	}

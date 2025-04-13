@@ -2,7 +2,6 @@
 package log
 
 import (
-	"fmt"
 	"io"
 	"log"
 )
@@ -17,24 +16,6 @@ type Logger interface {
 }
 
 const logFlags = log.LstdFlags | log.Lshortfile
-
-// instance is the global instance of the logger.
-// Default logger is log.Logger.
-var instance = func() Logger {
-	log.SetFlags(logFlags)
-	return log.Default()
-}()
-
-// Printf logs message to the default logger.
-func Printf(msg string, a ...any) {
-	instance.Output(2, fmt.Sprintf(msg, a...))
-}
-
-// SetLogger overrides the default logger to use in rsync.
-// This should be call from the very beggining of the program.
-func SetLogger(logger Logger) {
-	instance = logger
-}
 
 func New(out io.Writer) Logger {
 	return log.New(out, "", logFlags)

@@ -52,7 +52,7 @@ type Result struct {
 
 // Run starts the specified rsync invocation.
 func (c *Cmd) Run(ctx context.Context) (*Result, error) {
-	osenv := rsyncos.Env{
+	osenv := &rsyncos.Env{
 		Stdin:  c.Stdin,
 		Stdout: c.Stdout,
 		Stderr: c.Stderr,

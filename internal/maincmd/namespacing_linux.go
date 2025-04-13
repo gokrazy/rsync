@@ -12,7 +12,7 @@ import (
 	"strconv"
 	"syscall"
 
-	"github.com/gokrazy/rsync/internal/log"
+	"github.com/gokrazy/rsync/internal/rsyncos"
 	"github.com/gokrazy/rsync/rsyncd"
 	"golang.org/x/sys/unix"
 )
@@ -70,9 +70,9 @@ func pivotRoot(newroot string) error {
 	return nil
 }
 
-func namespace(modules []rsyncd.Module, listen string) error {
+func namespace(osenv *rsyncos.Env, modules []rsyncd.Module, listen string) error {
 	if os.Getenv("GOKRAZY_RSYNC_NAMESPACE") != "" {
-		log.Printf("pid %d (inside Linux mount/pid namespace)", os.Getpid())
+		osenv.Logf("pid %d (inside Linux mount/pid namespace)", os.Getpid())
 
 		// Expected by the go-systemd package, and hard to set before creating
 		// the process in Go.
@@ -101,9 +101,9 @@ func namespace(modules []rsyncd.Module, listen string) error {
 		}
 
 		// prepare read-only bind mounts for each configured rsync module:
-		log.Printf("mounting rsync modules read-only:")
+		osenv.Logf("mounting rsync modules read-only:")
 		for _, mod := range modules {
-			log.Printf("  rsync module %q from host=%s to namespace=/%s", mod.Name, mod.Path, mod.Name)
+			osenv.Logf("  rsync module %q from host=%s to namespace=/%s", mod.Name, mod.Path, mod.Name)
 			// TODO: restrict module names to not contain slashes. does rsync do that?
 			if err := os.MkdirAll(mod.Name, 0755); err != nil {
 				return err
@@ -122,7 +122,7 @@ func namespace(modules []rsyncd.Module, listen string) error {
 			return fmt.Errorf("pivotRoot(%q): %v", wd, err)
 		}
 
-		if err := dropPrivileges(); err != nil {
+		if err := dropPrivileges(osenv); err != nil {
 			return fmt.Errorf("dropPrivileges: %v", err)
 		}
 
@@ -139,14 +139,14 @@ func namespace(modules []rsyncd.Module, listen string) error {
 	}
 
 	if os.Getuid() != 0 {
-		version()
-		log.Printf("environment: unprivileged")
+		version(osenv)
+		osenv.Logf("environment: unprivileged")
 		return nil
 	}
 
-	version()
-	log.Printf("environment: privileged")
-	log.Printf("creating Linux mount/pid namespace for read-only rsync module mounts")
+	version(osenv)
+	osenv.Logf("environment: privileged")
+	osenv.Logf("creating Linux mount/pid namespace for read-only rsync module mounts")
 
 	exe, err := os.Executable()
 	if err != nil {

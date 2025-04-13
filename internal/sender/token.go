@@ -8,7 +8,10 @@ func (st *Transfer) simpleSendToken(ms *mapStruct, token int32, offset int64, n 
 		for l < n {
 			n1 := min(int64(chunkSize), n-l)
 
-			chunk := ms.ptr(offset+l, int32(n1))
+			chunk, err := ms.ptr(offset+l, int32(n1))
+			if err != nil {
+				return err
+			}
 
 			if err := st.Conn.WriteInt32(int32(n1)); err != nil {
 				return err

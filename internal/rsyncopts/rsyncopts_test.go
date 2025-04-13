@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/gokrazy/rsync/internal/rsyncostest"
 	"github.com/google/go-cmp/cmp"
 )
 
@@ -152,7 +153,8 @@ func TestParseArguments(t *testing.T) {
 			}
 			wantLines := discardKnownDifferences(strings.Split(strings.TrimSpace(string(want)), "\n"))
 
-			pc, err := ParseArguments(tt.args)
+			osenv := rsyncostest.New(t)
+			pc, err := ParseArguments(osenv, tt.args)
 			if err != nil {
 				t.Fatalf("ParseArguments: %v", err)
 			}
@@ -190,7 +192,8 @@ func TestParseArgumentsError(t *testing.T) {
 		},
 	} {
 		t.Run(strings.Join(tt.args, " "), func(t *testing.T) {
-			_, err := ParseArguments(tt.args)
+			osenv := rsyncostest.New(t)
+			_, err := ParseArguments(osenv, tt.args)
 			if err == nil {
 				t.Fatalf("ParseArguments unexpectedly did not fail!")
 			}
@@ -216,7 +219,8 @@ func TestParseArgumentsRemaining(t *testing.T) {
 		},
 	} {
 		t.Run(strings.Join(tt.args, " "), func(t *testing.T) {
-			pc, err := ParseArguments(tt.args)
+			osenv := rsyncostest.New(t)
+			pc, err := ParseArguments(osenv, tt.args)
 			if err != nil {
 				t.Fatalf("ParseArguments: %v", err)
 			}

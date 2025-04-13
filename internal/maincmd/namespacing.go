@@ -10,13 +10,13 @@ import (
 	"os/exec"
 	"strconv"
 
-	"github.com/gokrazy/rsync/internal/log"
+	"github.com/gokrazy/rsync/internal/rsyncos"
 	"github.com/gokrazy/rsync/rsyncd"
 )
 
-func namespace(modules []rsyncd.Module, listen string) error {
+func namespace(osenv *rsyncos.Env, modules []rsyncd.Module, listen string) error {
 	if os.Getenv("GOKRAZY_RSYNC_PRIVDROP") != "" {
-		log.Printf("pid %d (privileges dropped)", os.Getpid())
+		osenv.Logf("pid %d (privileges dropped)", os.Getpid())
 
 		// Expected by the go-systemd package, and hard to set before creating
 		// the process in Go.
@@ -26,14 +26,14 @@ func namespace(modules []rsyncd.Module, listen string) error {
 	}
 
 	if os.Getuid() != 0 {
-		version()
-		log.Printf("environment: unprivileged")
+		version(osenv)
+		osenv.Logf("environment: unprivileged")
 		return nil
 	}
 
-	version()
-	log.Printf("environment: privileged")
-	log.Printf("running as root (uid 0), dropping privileges to nobody (uid/gid 65534)")
+	version(osenv)
+	osenv.Logf("environment: privileged")
+	osenv.Logf("running as root (uid 0), dropping privileges to nobody (uid/gid 65534)")
 
 	exe, err := os.Executable()
 	if err != nil {

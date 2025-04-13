@@ -18,11 +18,11 @@ import (
 	"testing"
 
 	"github.com/gokrazy/rsync/internal/anonssh"
-	"github.com/gokrazy/rsync/internal/log"
 	"github.com/gokrazy/rsync/internal/maincmd"
 	"github.com/gokrazy/rsync/internal/rsyncdconfig"
 	"github.com/gokrazy/rsync/internal/rsyncopts"
 	"github.com/gokrazy/rsync/internal/rsyncos"
+	"github.com/gokrazy/rsync/internal/rsyncostest"
 	"github.com/gokrazy/rsync/internal/rsyncstats"
 	"github.com/gokrazy/rsync/internal/testlogger"
 	"github.com/gokrazy/rsync/rsyncclient"
@@ -119,8 +119,9 @@ func New(t *testing.T, modules []rsyncd.Module, opts ...Option) *TestServer {
 	}
 	ts.Port = port
 
+	osenv := rsyncostest.New(t)
 	if ts.listeners[0].AuthorizedSSH.Address != "" {
-		sshListener, err := anonssh.ListenerFromConfig(ts.listeners[0])
+		sshListener, err := anonssh.ListenerFromConfig(osenv, ts.listeners[0])
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -128,8 +129,8 @@ func New(t *testing.T, modules []rsyncd.Module, opts ...Option) *TestServer {
 			Modules: modules,
 		}
 		go func() {
-			err := anonssh.Serve(ctx, ts.listener, sshListener, cfg, func(args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer) error {
-				osenv := rsyncos.Env{
+			err := anonssh.Serve(ctx, osenv, ts.listener, sshListener, cfg, func(args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer) error {
+				osenv := &rsyncos.Env{
 					Stdin:  stdin,
 					Stdout: stdout,
 					Stderr: stderr,
@@ -143,11 +144,11 @@ func New(t *testing.T, modules []rsyncd.Module, opts ...Option) *TestServer {
 			}
 
 			if err != nil {
-				log.Printf("%s", err.Error())
+				t.Error(err)
 			}
 		}()
 	} else if ts.listeners[0].AnonSSH != "" {
-		sshListener, err := anonssh.ListenerFromConfig(ts.listeners[0])
+		sshListener, err := anonssh.ListenerFromConfig(osenv, ts.listeners[0])
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -155,8 +156,8 @@ func New(t *testing.T, modules []rsyncd.Module, opts ...Option) *TestServer {
 			Modules: modules,
 		}
 		go func() {
-			err := anonssh.Serve(ctx, ts.listener, sshListener, cfg, func(args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer) error {
-				osenv := rsyncos.Env{
+			err := anonssh.Serve(ctx, osenv, ts.listener, sshListener, cfg, func(args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer) error {
+				osenv := &rsyncos.Env{
 					Stdin:  stdin,
 					Stdout: stdout,
 					Stderr: stderr,
@@ -170,7 +171,7 @@ func New(t *testing.T, modules []rsyncd.Module, opts ...Option) *TestServer {
 			}
 
 			if err != nil {
-				log.Printf("%s", err.Error())
+				t.Error(err)
 			}
 		}()
 	} else {
@@ -246,7 +247,8 @@ func (ts *TestServer) pipe(t *testing.T, args []string) (*sync.WaitGroup, io.Rea
 	stdinrd, stdinwr := io.Pipe()
 	stdoutrd, stdoutwr := io.Pipe()
 	conn := rsyncd.NewConnection(stdinrd, stdoutwr, "<io.Pipe>")
-	pc, err := rsyncopts.ParseArguments(args)
+	osenv := rsyncostest.New(t)
+	pc, err := rsyncopts.ParseArguments(osenv, args)
 	if err != nil {
 		t.Fatalf("parsing server args: %v", err)
 	}
@@ -285,7 +287,7 @@ func (ts *TestServer) RunClient(t *testing.T, args []string, remaining []string)
 }
 
 func CommandMain(m *testing.M) error {
-	osenv := rsyncos.Env{
+	osenv := &rsyncos.Env{
 		Stdin:  os.Stdin,
 		Stdout: os.Stdout,
 		Stderr: os.Stderr,

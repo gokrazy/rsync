@@ -18,7 +18,7 @@ import (
 	"syscall"
 	"unicode"
 
-	"github.com/gokrazy/rsync/internal/log"
+	"github.com/gokrazy/rsync/internal/rsyncos"
 	"github.com/gokrazy/rsync/internal/version"
 )
 
@@ -84,8 +84,9 @@ const (
 // NewOptions returns an Options struct with all options initialized to their
 // default values. Note that ParseArguments will set some options (that default
 // to -1) based on the encountered command-line flags and built-in rules.
-func NewOptions() *Options {
+func NewOptions(osenv *rsyncos.Env) *Options {
 	return &Options{
+		osenv:                osenv,
 		msgs2stderr:          2, // Default: send errors to stderr for local & remote-shell transfers
 		output_motd:          1,
 		human_readable:       1,
@@ -138,6 +139,8 @@ func (o *GokrazyDaemonOptions) table() []poptOption {
 }
 
 type Options struct {
+	osenv *rsyncos.Env
+
 	GokrazyClient GokrazyClientOptions
 	GokrazyDaemon GokrazyDaemonOptions
 
@@ -311,7 +314,7 @@ var infoWords = [...]output{
 	{"SYMSAFE", W_SND | W_REC, "Mention symlinks that are unsafe"},
 }
 
-func parseOutputWords(words []output, levels []uint16, str string, prio priority) error {
+func parseOutputWords(osenv *rsyncos.Env, words []output, levels []uint16, str string, prio priority) error {
 Level:
 	for s := range strings.SplitSeq(str, ",") {
 		if strings.TrimSpace(s) == "" {
@@ -330,7 +333,7 @@ Level:
 		all := false
 		switch trimmed {
 		case "help":
-			log.Printf("TODO: print --info/--debug help and exit")
+			osenv.Logf("TODO: print --info/--debug help and exit")
 			os.Exit(0)
 		case "none":
 			lev = 0
@@ -370,7 +373,7 @@ func (o *Options) setOutputVerbosity(prio priority) error {
 	}
 	for j := 0; j <= o.verbose; j++ {
 		if j < len(infoVerbosity) {
-			if err := parseOutputWords(infoWords[:], o.info[:], infoVerbosity[j], prio); err != nil {
+			if err := parseOutputWords(o.osenv, infoWords[:], o.info[:], infoVerbosity[j], prio); err != nil {
 				return err
 			}
 		}
@@ -912,13 +915,13 @@ func (o *Options) table() []poptOption {
 var errNotYetImplemented = errors.New("option not yet implemented in gokrazy/rsync")
 
 // rsync/options.c:parse_arguments
-func ParseArguments(args []string) (*Context, error) {
+func ParseArguments(osenv *rsyncos.Env, args []string) (*Context, error) {
 	// NOTE: We do not implement support for refusing options per rsyncd.conf
 	// here, as we have our own configuration file.
 
 	version_opt_cnt := 0
 
-	opts := NewOptions()
+	opts := NewOptions(osenv)
 	table := opts.table()
 	table = slices.Concat(opts.GokrazyClient.table(), table)
 	pc := Context{
@@ -1095,11 +1098,11 @@ func ParseArguments(args []string) (*Context, error) {
 			return nil, errNotYetImplemented
 
 		case OPT_INFO:
-			parseOutputWords(infoWords[:], opts.info[:], pc.poptGetOptArg(), USER_PRIORITY)
+			parseOutputWords(osenv, infoWords[:], opts.info[:], pc.poptGetOptArg(), USER_PRIORITY)
 
 		case OPT_DEBUG:
 			// TODO: plumb the debug level that make sense for our implementation
-			log.Printf("TODO: set debug level to %q", pc.poptGetOptArg())
+			osenv.Logf("TODO: set debug level to %q", pc.poptGetOptArg())
 
 		case OPT_USERMAP,
 			OPT_GROUPMAP,

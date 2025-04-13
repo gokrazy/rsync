@@ -14,7 +14,6 @@ import (
 	"strings"
 
 	"github.com/gokrazy/rsync/internal/anonssh"
-	"github.com/gokrazy/rsync/internal/log"
 	"github.com/gokrazy/rsync/internal/restrict"
 	"github.com/gokrazy/rsync/internal/rsyncdconfig"
 	"github.com/gokrazy/rsync/internal/rsyncopts"
@@ -26,8 +25,8 @@ import (
 	_ "net/http/pprof"
 )
 
-func version() {
-	log.Printf("gokrazy rsync, pid %d", os.Getpid())
+func version(osenv *rsyncos.Env) {
+	osenv.Logf("gokrazy rsync, pid %d", os.Getpid())
 }
 
 type readWriter struct {
@@ -38,9 +37,9 @@ type readWriter struct {
 func (r *readWriter) Read(p []byte) (n int, err error)  { return r.r.Read(p) }
 func (r *readWriter) Write(p []byte) (n int, err error) { return r.w.Write(p) }
 
-func Main(ctx context.Context, osenv rsyncos.Env, args []string, cfg *rsyncdconfig.Config) (*rsyncstats.TransferStats, error) {
-	log.Printf("Main(osenv=%v, args=%q)", osenv, args)
-	pc, err := rsyncopts.ParseArguments(args[1:])
+func Main(ctx context.Context, osenv *rsyncos.Env, args []string, cfg *rsyncdconfig.Config) (*rsyncstats.TransferStats, error) {
+	osenv.Logf("Main(osenv=%v, args=%q)", osenv, args)
+	pc, err := rsyncopts.ParseArguments(osenv, args[1:])
 	if err != nil {
 		if pe, ok := err.(*rsyncopts.PoptError); ok &&
 			pe.Errno == rsyncopts.POPT_ERROR_BADOPT &&
@@ -51,7 +50,7 @@ func Main(ctx context.Context, osenv rsyncos.Env, args []string, cfg *rsyncdconf
 	}
 	opts := pc.Options
 	remaining := pc.RemainingArgs
-	// log.Printf("remaining: %v", remaining)
+	// osenv.Logf("remaining: %v", remaining)
 
 	// calling convention: daemon mode over remote shell (also builtin SSH)
 	// Example: --server --daemon .
@@ -96,7 +95,7 @@ func Main(ctx context.Context, osenv rsyncos.Env, args []string, cfg *rsyncdconf
 		}
 		paths := remaining[1:]
 		if opts.Verbose() {
-			log.Printf("paths: %q", paths)
+			osenv.Logf("paths: %q", paths)
 		}
 		var roDirs, rwDirs []string
 		if opts.Sender() {
@@ -141,7 +140,7 @@ func Main(ctx context.Context, osenv rsyncos.Env, args []string, cfg *rsyncdconf
 		}
 		if cfgErr != nil {
 			if os.IsNotExist(cfgErr) {
-				log.Printf("config file not found, relying on flags")
+				osenv.Logf("config file not found, relying on flags")
 				// a non-existant config file is not an error: users can start
 				// gokr-rsyncd with e.g. the -gokr.listen and -gokr.modulemap flags.
 				cfg = &rsyncdconfig.Config{
@@ -157,7 +156,7 @@ func Main(ctx context.Context, osenv rsyncos.Env, args []string, cfg *rsyncdconf
 				return nil, cfgErr
 			}
 		} else {
-			log.Printf("config file %s loaded", cfgfn)
+			osenv.Logf("config file %s loaded", cfgfn)
 		}
 	}
 
@@ -196,13 +195,13 @@ func Main(ctx context.Context, osenv rsyncos.Env, args []string, cfg *rsyncdconf
 		if listenAddr == "" {
 			listenAddr = cfg.Listeners[0].AuthorizedSSH.Address
 			var err error
-			sshListener, err = anonssh.ListenerFromConfig(cfg.Listeners[0])
+			sshListener, err = anonssh.ListenerFromConfig(osenv, cfg.Listeners[0])
 			if err != nil {
 				return nil, err
 			}
 		} else {
 			var err error
-			sshListener, err = anonssh.ListenerFromConfig(cfg.Listeners[0])
+			sshListener, err = anonssh.ListenerFromConfig(osenv, cfg.Listeners[0])
 			if err != nil {
 				return nil, err
 			}
@@ -225,16 +224,16 @@ func Main(ctx context.Context, osenv rsyncos.Env, args []string, cfg *rsyncdconf
 			cfg.Listeners[0].AnonSSH != "" {
 			return nil, fmt.Errorf("dont_namespace must be used with authorized_ssh listeners only")
 		}
-		version()
-		log.Printf("environment: not namespace due to dont_namespace option")
+		version(osenv)
+		osenv.Logf("environment: not namespace due to dont_namespace option")
 	} else {
-		if err := namespace(cfg.Modules, listenAddr); err == errIsParent {
+		if err := namespace(osenv, cfg.Modules, listenAddr); err == errIsParent {
 			return nil, nil
 		} else if err != nil {
 			return nil, fmt.Errorf("namespace: %v", err)
 		}
 	}
-	log.Printf("%d rsync modules configured in total", len(cfg.Modules))
+	osenv.Logf("%d rsync modules configured in total", len(cfg.Modules))
 	for _, mod := range cfg.Modules {
 		if !cfg.DontNamespace && !mod.Writable {
 			if err := canUnexpectedlyWriteTo(mod.Path); err != nil {
@@ -242,14 +241,14 @@ func Main(ctx context.Context, osenv rsyncos.Env, args []string, cfg *rsyncdconf
 			}
 		}
 
-		log.Printf("rsync module %q with path %s configured", mod.Name, mod.Path)
+		osenv.Logf("rsync module %q with path %s configured", mod.Name, mod.Path)
 	}
 
 	if monitoringListen := opts.GokrazyDaemon.MonitoringListen; monitoringListen != "" {
 		go func() {
-			log.Printf("HTTP server for monitoring listening on http://%s/debug/pprof", monitoringListen)
+			osenv.Logf("HTTP server for monitoring listening on http://%s/debug/pprof", monitoringListen)
 			if err := http.ListenAndServe(monitoringListen, nil); err != nil {
-				log.Printf("-monitoring_listen: %v", err)
+				osenv.Logf("-monitoring_listen: %v", err)
 			}
 		}()
 	}
@@ -266,7 +265,7 @@ func Main(ctx context.Context, osenv rsyncos.Env, args []string, cfg *rsyncdconf
 	if len(listeners) > 0 {
 		ln = listeners[0]
 	} else {
-		log.Printf("not using systemd socket activation, creating listener")
+		osenv.Logf("not using systemd socket activation, creating listener")
 		ln, err = net.Listen("tcp", listenAddr)
 		if err != nil {
 			return nil, err
@@ -277,9 +276,9 @@ func Main(ctx context.Context, osenv rsyncos.Env, args []string, cfg *rsyncdconf
 		if cfg.Listeners[0].AuthorizedSSH.AuthorizedKeys == "" {
 			return nil, fmt.Errorf("misconfiguration: authorized_keys must not be empty when using an authorized_ssh listener")
 		}
-		log.Printf("rsync daemon listening (authorized SSH) on %s", ln.Addr())
-		return nil, anonssh.Serve(ctx, ln, sshListener, cfg, func(args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer) error {
-			osenv := rsyncos.Env{
+		osenv.Logf("rsync daemon listening (authorized SSH) on %s", ln.Addr())
+		return nil, anonssh.Serve(ctx, osenv, ln, sshListener, cfg, func(args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer) error {
+			osenv := &rsyncos.Env{
 				Stdin:  stdin,
 				Stdout: stdout,
 				Stderr: stderr,
@@ -294,9 +293,9 @@ func Main(ctx context.Context, osenv rsyncos.Env, args []string, cfg *rsyncdconf
 	}
 
 	if cfg.Listeners[0].AnonSSH != "" {
-		log.Printf("rsync daemon listening (anon SSH) on %s", ln.Addr())
-		return nil, anonssh.Serve(ctx, ln, sshListener, cfg, func(args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer) error {
-			osenv := rsyncos.Env{
+		osenv.Logf("rsync daemon listening (anon SSH) on %s", ln.Addr())
+		return nil, anonssh.Serve(ctx, osenv, ln, sshListener, cfg, func(args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer) error {
+			osenv := &rsyncos.Env{
 				Stdin:  stdin,
 				Stdout: stdout,
 				Stderr: stderr,
@@ -310,6 +309,6 @@ func Main(ctx context.Context, osenv rsyncos.Env, args []string, cfg *rsyncdconf
 		})
 	}
 
-	log.Printf("rsync daemon listening on rsync://%s", ln.Addr())
+	osenv.Logf("rsync daemon listening on rsync://%s", ln.Addr())
 	return nil, srv.Serve(ctx, ln)
 }

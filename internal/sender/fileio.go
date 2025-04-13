@@ -1,10 +1,9 @@
 package sender
 
 import (
+	"fmt"
 	"io"
 	"os"
-
-	"github.com/gokrazy/rsync/internal/log"
 )
 
 // rsync.h:map_struct
@@ -41,22 +40,21 @@ func mapFile(f *os.File, len int64, readSize int32, blkSize int32) *mapStruct {
 	}
 }
 
-func (ms *mapStruct) ptr(offset int64, l int32) []byte {
+func (ms *mapStruct) ptr(offset int64, l int32) ([]byte, error) {
 	//log.Printf("ptr(offset=%d, l=%d)", offset, l)
 	len := int64(l)
 	if len == 0 {
-		return nil
+		return nil, nil
 	}
 	if len < 0 {
-		log.Printf("BUG: invalid len %d", len)
-		os.Exit(1)
+		return nil, fmt.Errorf("invalid length: %d < 0", len)
 	}
 
 	if offset >= ms.pOffset && offset+int64(len) <= ms.pOffset+int64(ms.pLen) {
 		//log.Printf("-> already available")
 		// region already available
 		off := offset - ms.pOffset
-		return ms.window[off : off+int64(len)]
+		return ms.window[off : off+int64(len)], nil
 	}
 
 	alignFudge := alignedOvershoot(offset)
@@ -88,13 +86,11 @@ func (ms *mapStruct) ptr(offset int64, l int32) []byte {
 		copy(ms.window[:], ms.window[off:off+readOffset])
 	}
 	if readSize <= 0 {
-		log.Printf("BUG: invalid readSize=%d", readSize)
-		os.Exit(1)
+		return nil, fmt.Errorf("invalid readSize: %d <= 0", readSize)
 	}
 	if ms.pFdOffset != readStart {
 		if _, err := ms.f.Seek(readStart, io.SeekStart); err != nil {
-			log.Printf("seek error: %v", err)
-			os.Exit(1)
+			return nil, fmt.Errorf("seek error: %v", err)
 		}
 		ms.pFdOffset = readStart
 	}
@@ -106,13 +102,12 @@ func (ms *mapStruct) ptr(offset int64, l int32) []byte {
 		if err != nil {
 			ms.err = err
 			// TODO: zero the buffer, file has changed mid-transfer
-			log.Printf("file has changed mid-transfer")
-			os.Exit(1)
+			return nil, fmt.Errorf("file has changed mid-transfer")
 			break
 		}
 		ms.pFdOffset += int64(n)
 		readOffset += int64(n)
 		readSize -= int64(n)
 	}
-	return ms.window[alignFudge : alignFudge+len]
+	return ms.window[alignFudge : alignFudge+len], nil
 }
