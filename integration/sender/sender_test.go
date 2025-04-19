@@ -456,6 +456,45 @@ func TestSenderBothLocal(t *testing.T) {
 	}
 }
 
+// like TestSender, but the source is a single regular file, not a directory
+func TestSenderBothLocalFile(t *testing.T) {
+	t.Parallel()
+
+	tmp := t.TempDir()
+	source := filepath.Join(tmp, "source")
+	dest := filepath.Join(tmp, "dest")
+
+	if err := os.WriteFile(source, []byte("hey"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	mtime, err := time.Parse(time.RFC3339, "2009-11-10T23:00:00Z")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chtimes(source, mtime, mtime); err != nil {
+		t.Fatal(err)
+	}
+
+	args := []string{
+		"gokr-rsync",
+		"-avH",
+		source,
+		dest,
+	}
+	rsynctest.Run(t, args...)
+
+	{
+		want := []byte("hey")
+		got, err := os.ReadFile(filepath.Join(dest, "source"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if diff := cmp.Diff(want, got); diff != "" {
+			t.Fatalf("unexpected file contents: diff (-want +got):\n%s", diff)
+		}
+	}
+}
+
 func TestReceiverCommandDryRun(t *testing.T) {
 	t.Parallel()
 

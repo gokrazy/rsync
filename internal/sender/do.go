@@ -41,7 +41,7 @@ func (st *Transfer) Do(crd *rsyncwire.CountingReader, cwr *rsyncwire.CountingWri
 
 	// send file list
 	st.Logger.Printf("SendFileList(modPath=%q, paths=%q)", modPath, paths)
-	fileList, err := st.SendFileList(modPath, st.Opts, paths, exclusionList)
+	fileList, err := st.SendFileList(modPath, paths, exclusionList)
 	if err != nil {
 		return nil, err
 	}

@@ -40,11 +40,23 @@ var sshDevices = []string{
 	"/dev/null",
 }
 
-func MaybeFileSystem(roDirs []string, rwDirs []string) error {
+func MaybeFileSystem(roDirsOrFiles []string, rwDirs []string) error {
 	re := ExtraHook
 	if re == nil {
 		re = func() []landlock.Rule {
 			return nil
+		}
+	}
+	var roDirs, roFiles []string
+	for _, fn := range roDirsOrFiles {
+		st, err := os.Stat(fn)
+		if err != nil {
+			return err
+		}
+		if st.IsDir() {
+			roDirs = append(roDirs, fn)
+		} else {
+			roFiles = append(roFiles, fn)
 		}
 	}
 	log.Printf("setting up landlock ACL (paths ro: %q, paths rw: %q)", roDirs, rwDirs)
@@ -56,6 +68,7 @@ func MaybeFileSystem(roDirs []string, rwDirs []string) error {
 			landlock.RODirs(sshDirs...).IgnoreIfMissing(),
 			landlock.RWFiles(sshDevices...).IgnoreIfMissing(),
 			landlock.RODirs(roDirs...).IgnoreIfMissing(),
+			landlock.ROFiles(roFiles...).IgnoreIfMissing(),
 			landlock.RWDirs(rwDirs...).WithRefer(),
 		}...)...)
 	if err != nil {
