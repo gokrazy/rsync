@@ -4,10 +4,10 @@ FROM alpine
 
 WORKDIR /
 
-COPY gokr-rsyncd /usr/bin
+COPY gokr-rsync /usr/bin
 
 USER nobody:nobody
 
 EXPOSE 8730
 
-ENTRYPOINT ["/usr/bin/gokr-rsyncd", "-listen=:8730"]
+ENTRYPOINT ["/usr/bin/gokr-rsync", "--daemon", "--gokr.listen=:8730"]
