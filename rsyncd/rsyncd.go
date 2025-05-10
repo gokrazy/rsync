@@ -12,6 +12,7 @@ import (
 	"io"
 	"net"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -392,18 +393,30 @@ func (s *Server) handleConn(ctx context.Context, conn *Conn, module *Module, pc 
 
 // handleConnReceiver is equivalent to rsync/main.c:do_server_recv
 func (s *Server) handleConnReceiver(module *Module, crd *rsyncwire.CountingReader, cwr *rsyncwire.CountingWriter, paths []string, opts *rsyncopts.Options, negotiate bool, c *rsyncwire.Conn, sessionChecksumSeed int32) (err error) {
+	var destPath string
+
 	if module == nil {
 		if len(paths) != 1 {
-			return fmt.Errorf("precisely one destination path required, got %q", paths)
+			return fmt.Errorf("module is nil, and precisely one destination path is required, got %q", paths)
 		}
 		module = &Module{
 			Name:     "implicit",
 			Path:     paths[0],
 			Writable: true,
 		}
+		destPath = module.Path
+	} else {
+		if len(paths) > 1 {
+			return fmt.Errorf("module is available, and at most one destination path is allowed, got %q", paths)
+		} else if len(paths) == 1 {
+			destPath = filepath.Join(module.Path, paths[0])
+		} else {
+			destPath = module.Path
+		}
 	}
+
 	if opts.Verbose() {
-		s.logger.Printf("handleConnReceiver(module=%+v)", module)
+		s.logger.Printf("handleConnReceiver(module=%+v, destPath=%q)", module, destPath)
 	}
 
 	if !module.Writable {
@@ -426,7 +439,7 @@ func (s *Server) handleConnReceiver(module *Module, crd *rsyncwire.CountingReade
 			PreserveTimes:    opts.PreserveMTimes(),
 			// TODO: PreserveHardlinks: opts.PreserveHardlinks,
 		},
-		Dest: module.Path,
+		Dest: destPath,
 		Env: &rsyncos.Env{
 			Stderr: s.stderr,
 		},
