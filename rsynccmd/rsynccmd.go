@@ -29,10 +29,11 @@ import (
 
 // Cmd represents an rsync invocation being prepared or run.
 type Cmd struct {
-	Args   []string
-	Stdin  io.Reader
-	Stdout io.Writer
-	Stderr io.Writer
+	Args         []string
+	Stdin        io.Reader
+	Stdout       io.Writer
+	Stderr       io.Writer
+	DontRestrict bool
 }
 
 // Command returns the [Cmd] struct to execute rsync with the given arguments.
@@ -53,9 +54,10 @@ type Result struct {
 // Run starts the specified rsync invocation.
 func (c *Cmd) Run(ctx context.Context) (*Result, error) {
 	osenv := &rsyncos.Env{
-		Stdin:  c.Stdin,
-		Stdout: c.Stdout,
-		Stderr: c.Stderr,
+		Stdin:        c.Stdin,
+		Stdout:       c.Stdout,
+		Stderr:       c.Stderr,
+		DontRestrict: c.DontRestrict,
 	}
 	stats, err := maincmd.Main(ctx, osenv, c.Args, nil)
 	if err != nil {
