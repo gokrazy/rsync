@@ -41,6 +41,7 @@ func socketClient(ctx context.Context, osenv *rsyncos.Env, opts *rsyncopts.Optio
 	if err != nil {
 		return nil, err
 	}
+	defer conn.Close()
 	module := path
 	if idx := strings.IndexByte(module, '/'); idx > -1 {
 		module = module[:idx]
