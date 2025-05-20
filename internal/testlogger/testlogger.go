@@ -5,6 +5,7 @@ package testlogger
 import (
 	"bufio"
 	"io"
+	"sync"
 	"testing"
 )
 
@@ -21,12 +22,19 @@ func New(tb testing.TB) *Logger {
 		writer:  w,
 		scanner: bufio.NewScanner(r),
 	}
+	var wg sync.WaitGroup
+	wg.Add(1)
 	tb.Cleanup(func() {
 		w.Close()
 		// tl.scanner.Scan() will return false,
 		// tl.scanner.Err() will return nil.
+
+		// Ensure the goroutine below is done
+		// to prevent data races in tb.Log()
+		wg.Wait()
 	})
 	go func() {
+		defer wg.Done()
 		for tl.scanner.Scan() {
 			tb.Log(tl.scanner.Text())
 		}
