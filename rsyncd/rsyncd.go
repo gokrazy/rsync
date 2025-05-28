@@ -12,6 +12,7 @@ import (
 	"io"
 	"net"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -392,7 +393,9 @@ func (s *Server) handleConn(ctx context.Context, conn *Conn, module *Module, pc 
 
 // handleConnReceiver is equivalent to rsync/main.c:do_server_recv
 func (s *Server) handleConnReceiver(module *Module, crd *rsyncwire.CountingReader, cwr *rsyncwire.CountingWriter, paths []string, opts *rsyncopts.Options, negotiate bool, c *rsyncwire.Conn, sessionChecksumSeed int32) (err error) {
-	if module == nil {
+	var destPath string
+	implicitModule := module == nil
+	if implicitModule {
 		if len(paths) != 1 {
 			return fmt.Errorf("precisely one destination path required, got %q", paths)
 		}
@@ -401,9 +404,10 @@ func (s *Server) handleConnReceiver(module *Module, crd *rsyncwire.CountingReade
 			Path:     paths[0],
 			Writable: true,
 		}
+		destPath = module.Path
 	}
 	if opts.Verbose() {
-		s.logger.Printf("handleConnReceiver(module=%+v)", module)
+		s.logger.Printf("handleConnReceiver(module=%+v, destPath=%q)", module, destPath)
 	}
 
 	if !module.Writable {
@@ -441,6 +445,34 @@ func (s *Server) handleConnReceiver(module *Module, crd *rsyncwire.CountingReade
 		return fmt.Errorf("OpenRoot(dest=%s): %v", rt.Dest, err)
 	}
 	defer rt.DestRoot.Close()
+
+	if !implicitModule {
+		if len(paths) > 1 {
+			return fmt.Errorf("module is available, and at most one destination path is allowed, got %q", paths)
+		}
+		// Descend into subdirectory (if requested),
+		// using the os.OpenRoot traversal-safe API.
+		if len(paths) == 1 && paths[0] != "/" {
+			subdir := strings.TrimPrefix(paths[0], "/")
+			subRoot, err := rt.DestRoot.OpenRoot(subdir)
+			if err != nil {
+				if os.IsNotExist(err) {
+					if err := rt.DestRoot.Mkdir(subdir, 0755); err != nil {
+						return fmt.Errorf("Mkdir(%s): %v", subdir, err)
+					}
+					subRoot, err = rt.DestRoot.OpenRoot(subdir)
+				}
+				if err != nil {
+					return fmt.Errorf("OpenRoot(%s): %v", subdir, err)
+				}
+			}
+			rt.Dest = filepath.Join(rt.Dest, subRoot.Name())
+			rt.DestRoot = subRoot
+			if opts.Verbose() {
+				s.logger.Printf("opened subdirectory %q", rt.Dest)
+			}
+		}
+	}
 
 	if opts.PreserveHardLinks() {
 		return fmt.Errorf("support for hard links not yet implemented")
