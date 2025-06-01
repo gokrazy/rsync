@@ -457,8 +457,8 @@ func (s *Server) handleConnReceiver(module *Module, crd *rsyncwire.CountingReade
 			subRoot, err := rt.DestRoot.OpenRoot(subdir)
 			if err != nil {
 				if os.IsNotExist(err) {
-					if err := rt.DestRoot.Mkdir(subdir, 0755); err != nil {
-						return fmt.Errorf("Mkdir(%s): %v", subdir, err)
+					if err := mkdirAll(rt.DestRoot, subdir, 0755); err != nil {
+						return fmt.Errorf("MkdirAll(%s): %v", subdir, err)
 					}
 					subRoot, err = rt.DestRoot.OpenRoot(subdir)
 				}
