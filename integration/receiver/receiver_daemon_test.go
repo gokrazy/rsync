@@ -79,7 +79,6 @@ func TestDaemonReceiverSyncSubdir(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -142,7 +141,7 @@ func TestDaemonReceiverSyncSubdirTraversal(t *testing.T) {
 		{
 			name:        "nested subdir",
 			destPath:    "subdir/destsubdir",
-			rsyncTarget: "rsync://localhost/interop/subdir/../",
+			rsyncTarget: "rsync://localhost/interop/subdir/../../",
 		},
 	}
 
