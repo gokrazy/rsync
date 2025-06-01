@@ -523,7 +523,7 @@ func (s *Server) handleConnSender(module *Module, crd *rsyncwire.CountingReader,
 		Conn:   c,
 		Seed:   sessionChecksumSeed,
 	}
-	// receive the exclusion list (openrsync's is always empty)
+	// receive the exclusion list (openrsync’s is always empty)
 	exclusionList, err := sender.RecvFilterList(st.Conn)
 	if err != nil {
 		return err
