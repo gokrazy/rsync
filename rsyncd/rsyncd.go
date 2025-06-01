@@ -337,7 +337,7 @@ func (s *Server) handleConn(ctx context.Context, conn *Conn, module *Module, pc 
 	opts := pc.Options
 	paths := pc.RemainingArgs[1:]
 
-	// “SHOULD be unique to each connection” as per
+	// "SHOULD be unique to each connection" as per
 	// https://github.com/JohannesBuchner/Jarsync/blob/master/jarsync/rsync.txt
 	//
 	// Computed the same way that tridge rsync does it, but the details do not
@@ -454,19 +454,28 @@ func (s *Server) handleConnReceiver(module *Module, crd *rsyncwire.CountingReade
 		// using the os.OpenRoot traversal-safe API.
 		if len(paths) == 1 && paths[0] != "/" {
 			subdir := strings.TrimPrefix(paths[0], "/")
-			subRoot, err := rt.DestRoot.OpenRoot(subdir)
-			if err != nil {
-				if os.IsNotExist(err) {
-					if err := rt.DestRoot.Mkdir(subdir, 0755); err != nil {
-						return fmt.Errorf("Mkdir(%s): %v", subdir, err)
-					}
-					subRoot, err = rt.DestRoot.OpenRoot(subdir)
+			subdirParts := strings.SplitSeq(subdir, "/")
+			subRoot := rt.DestRoot
+			for subdirPart := range subdirParts {
+				if subdirPart == "" {
+					continue
 				}
+				nextSubRoot, err := subRoot.OpenRoot(subdirPart)
 				if err != nil {
-					return fmt.Errorf("OpenRoot(%s): %v", subdir, err)
+					if os.IsNotExist(err) {
+						if err := subRoot.Mkdir(subdirPart, 0755); err != nil {
+							return fmt.Errorf("Mkdir(%s): %v", subdirPart, err)
+						}
+						subRoot, err = subRoot.OpenRoot(subdirPart)
+					}
+					if err != nil {
+						return fmt.Errorf("OpenRoot(%s): %v", subdirPart, err)
+					}
+				} else {
+					subRoot = nextSubRoot
 				}
 			}
-			rt.Dest = filepath.Join(rt.Dest, subRoot.Name())
+			rt.Dest = filepath.Join(rt.Dest, subdir)
 			rt.DestRoot = subRoot
 			if opts.Verbose() {
 				s.logger.Printf("opened subdirectory %q", rt.Dest)
@@ -479,7 +488,7 @@ func (s *Server) handleConnReceiver(module *Module, crd *rsyncwire.CountingReade
 	}
 
 	if opts.DeleteMode() {
-		// receive the exclusion list (openrsync’s is always empty)
+		// receive the exclusion list (openrsync's is always empty)
 		exclusionList, err := sender.RecvFilterList(c)
 		if err != nil {
 			return err
@@ -523,7 +532,7 @@ func (s *Server) handleConnSender(module *Module, crd *rsyncwire.CountingReader,
 		Conn:   c,
 		Seed:   sessionChecksumSeed,
 	}
-	// receive the exclusion list (openrsync’s is always empty)
+	// receive the exclusion list (openrsync's is always empty)
 	exclusionList, err := sender.RecvFilterList(st.Conn)
 	if err != nil {
 		return err
