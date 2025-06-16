@@ -369,7 +369,13 @@ func (s *Server) handleConn(ctx context.Context, conn *Conn, module *Module, pc 
 	// Switch to multiplexing protocol, but only for server-side transmissions.
 	// Transmissions received from the client are not multiplexed.
 	mpx := &rsyncwire.MultiplexWriter{Writer: c.Writer}
-	c.Writer = mpx
+	// Update cwr to track the multiplexed writer,
+	// but copy the number of bytes written.
+	cwr = &rsyncwire.CountingWriter{
+		W:            mpx,
+		BytesWritten: cwr.BytesWritten,
+	}
+	c.Writer = cwr
 
 	if opts.Sender() {
 		// If returning an error, send the error to the client for display, too:

@@ -290,7 +290,13 @@ func ClientRun(osenv *rsyncos.Env, opts *rsyncopts.Options, conn io.ReadWriter, 
 	// TODO: rearchitect such that our buffer can be smaller than the largest
 	// rsync message size
 	rd := bufio.NewReaderSize(mrd, 256*1024)
-	c.Reader = rd
+	// Update crd to track the multiplexed reader,
+	// but copy the number of bytes read.
+	crd = &rsyncwire.CountingReader{
+		R:         rd,
+		BytesRead: crd.BytesRead,
+	}
+	c.Reader = crd
 
 	if opts.Sender() {
 		st := &sender.Transfer{
