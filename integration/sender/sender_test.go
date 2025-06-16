@@ -495,6 +495,45 @@ func TestSenderBothLocalFile(t *testing.T) {
 	}
 }
 
+// like TestSenderBothLocalFile, but with an invocation that once caused a hang
+// (see issue #43).
+func TestSenderBothLocalHang(t *testing.T) {
+	t.Parallel()
+
+	tmp := t.TempDir()
+	source := filepath.Join(tmp, "source")
+	dest := filepath.Join(tmp, "dest")
+
+	if err := os.MkdirAll(source, 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	hello := filepath.Join(source, "hello.txt")
+
+	if err := os.WriteFile(hello, []byte("world"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	args := []string{
+		"gokr-rsync",
+		"-rv",
+		source,
+		dest,
+	}
+	rsynctest.Run(t, args...)
+
+	{
+		want := []byte("world")
+		got, err := os.ReadFile(filepath.Join(dest, "source", "hello.txt"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if diff := cmp.Diff(want, got); diff != "" {
+			t.Fatalf("unexpected file contents: diff (-want +got):\n%s", diff)
+		}
+	}
+}
+
 func TestReceiverCommandDryRun(t *testing.T) {
 	t.Parallel()
 
