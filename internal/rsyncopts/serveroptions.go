@@ -25,10 +25,11 @@ func (o *Options) ServerOptions() []string {
 	}
 
 	argstr := "-"
-	// x = 1;
-	// argstr[0] = '-';
-	// for (i = 0; i < verbose; i++)
-	// 	argstr[x++] = 'v';
+
+	// TODO: support verbosity levels, i.e. one or more -v
+	if o.Verbose() {
+		argstr += "v"
+	}
 
 	// /* the -q option is intentionally left out */
 	// if (make_backups)
