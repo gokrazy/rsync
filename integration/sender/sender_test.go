@@ -93,7 +93,7 @@ func TestSender(t *testing.T) {
 		rsynctest.CreateDummyDeviceFiles(t, devices)
 	}
 
-	// start a server to sync from
+	// start a server to sync to
 	srv := rsynctest.New(t, rsynctest.WritableInteropModule(dest))
 
 	args := []string{
@@ -228,7 +228,7 @@ func TestSenderNoSlash(t *testing.T) {
 		rsynctest.CreateDummyDeviceFiles(t, devices)
 	}
 
-	// start a server to sync from
+	// start a server to sync to
 	srv := rsynctest.New(t, rsynctest.WritableInteropModule(dest))
 
 	args := []string{
@@ -319,6 +319,46 @@ func TestSenderNoSlash(t *testing.T) {
 		want := "hello"
 		if got != want {
 			t.Fatalf("unexpected link target: got %q, want %q", got, want)
+		}
+	}
+}
+
+// like TestSender, but using a relative path
+func TestSenderRelative(t *testing.T) {
+	tmp := t.TempDir()
+	t.Chdir(tmp)
+	source := filepath.Join(tmp, "source")
+	dest := filepath.Join(tmp, "dest")
+
+	if err := os.MkdirAll(source, 0755); err != nil {
+		t.Fatal(err)
+	}
+	hello := filepath.Join(source, "hello")
+	if err := os.WriteFile(hello, []byte("world"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	// start a server to sync to
+	srv := rsynctest.New(t, rsynctest.WritableInteropModule(dest))
+
+	args := []string{
+		"gokr-rsync",
+		"-aH",
+		"source",
+		"rsync://localhost:" + srv.Port + "/interop/",
+	}
+	rsynctest.Run(t, args...)
+
+	dest = filepath.Join(dest, "source")
+
+	{
+		want := []byte("world")
+		got, err := os.ReadFile(filepath.Join(dest, "hello"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if diff := cmp.Diff(want, got); diff != "" {
+			t.Fatalf("unexpected file contents: diff (-want +got):\n%s", diff)
 		}
 	}
 }

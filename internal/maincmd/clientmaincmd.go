@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 
 	"github.com/gokrazy/rsync"
@@ -307,6 +308,23 @@ func ClientRun(osenv *rsyncos.Env, opts *rsyncopts.Options, conn io.ReadWriter, 
 		}
 		if opts.Verbose() {
 			osenv.Logf("sender(paths=%q)", paths)
+		}
+
+		// Turn relative paths like ./gcexportdata or bin/gcexportdata
+		// into absolute paths so that we can call Transfer.Do()
+		// with modPath="/" below.
+		for idx, path := range paths {
+			// Trailing slashes are meaningful to rsync,
+			// so preserve a trailing slash across filepath.Abs.
+			hasTrailingSlash := strings.HasSuffix(path, "/")
+			abs, err := filepath.Abs(path)
+			if err != nil {
+				return nil, err
+			}
+			paths[idx] = abs
+			if hasTrailingSlash {
+				paths[idx] += "/"
+			}
 		}
 
 		stats, err := st.Do(crd, cwr, "/", paths, nil)
