@@ -55,7 +55,7 @@ jobs:
         echo "::endgroup::"
 
     - name: run tests (macos)
-      if: matrix.os == 'macos-latest'
+      if: matrix.os == 'macos-14'
       run: sudo go test -v ./...
 
     - name: run tests (windows)
