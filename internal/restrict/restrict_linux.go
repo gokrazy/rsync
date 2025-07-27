@@ -35,6 +35,7 @@ var sshConfigDirs = []string{
 }
 var sshDirs = []string{
 	"/usr", // for running ssh(1)
+	"/nix", // for running ssh(1) on NixOS
 }
 var sshDevices = []string{
 	"/dev/null",
