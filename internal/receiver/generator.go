@@ -98,8 +98,10 @@ func (rt *Transfer) setPerms(f *File) error {
 
 	if mode != rsync.S_IFLNK {
 		// TODO(go1.25): use os.Root.Chmod
-		if err := os.Chmod(local, perm); err != nil {
-			return err
+		if st.Mode().Perm() != perm { // only call Chmod if the permissions actually differ
+			if err := os.Chmod(local, perm); err != nil {
+				return err
+			}
 		}
 	}
 
