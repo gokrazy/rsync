@@ -578,6 +578,10 @@ func TestInteropRemoteDaemonSSH(t *testing.T) {
 					"-e", "ssh -o IdentityFile=" + privKeyPath + " -o StrictHostKeyChecking=no -o CheckHostIP=no -o UserKnownHostsFile=/dev/null -p " + srv.Port,
 				}, sourcesArgs(t)...),
 				dest)...)
+		// Ensure SSH_* environment variables (like SSH_ASKPASS or
+		// SSH_AUTH_SOCK) do not leak into the test, otherwise tests
+		// might be interrupted by a text UI password prompt.
+		rsync.Env = []string{} // non-nil, but empty
 		rsync.Stdout = testlogger.New(t)
 		rsync.Stderr = testlogger.New(t)
 		if err := rsync.Run(); err != nil {

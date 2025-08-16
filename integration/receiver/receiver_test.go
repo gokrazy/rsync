@@ -271,8 +271,6 @@ func TestReceiverSyncDelete(t *testing.T) {
 }
 
 func TestReceiverSSH(t *testing.T) {
-	t.Parallel()
-
 	tmp := t.TempDir()
 	source := filepath.Join(tmp, "source")
 	dest := filepath.Join(tmp, "dest")
@@ -301,6 +299,11 @@ func TestReceiverSSH(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// Ensure SSH_* environment variables (like SSH_ASKPASS or
+	// SSH_AUTH_SOCK) do not leak into the test, otherwise tests
+	// might be interrupted by a text UI password prompt.
+	t.Setenv("SSH_ASKPASS", "")
+	t.Setenv("SSH_AUTH_SOCK", "")
 	// sync into dest dir
 	rsynctest.Run(t, "gokr-rsync",
 		"-aH",
