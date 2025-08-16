@@ -79,27 +79,24 @@ func (rt *Transfer) setPerms(f *File) error {
 		return err
 	}
 
-	local := filepath.Join(rt.Dest, f.Name)
 	perm := fs.FileMode(f.Mode) & os.ModePerm
 	mode := f.Mode & rsync.S_IFMT
 	if rt.Opts.PreserveTimes &&
 		mode != rsync.S_IFLNK &&
 		!modTimeEqual(st.ModTime(), f.ModTime) {
-		// TODO(go1.25): use os.Root.Chtimes
-		if err := os.Chtimes(local, f.ModTime, f.ModTime); err != nil {
+		if err := rt.DestRoot.Chtimes(f.Name, f.ModTime, f.ModTime); err != nil {
 			return err
 		}
 	}
 
-	_, err = rt.setUid(f, local, st)
+	_, err = rt.setUid(f, st)
 	if err != nil {
 		return err
 	}
 
 	if mode != rsync.S_IFLNK {
-		// TODO(go1.25): use os.Root.Chmod
 		if st.Mode().Perm() != perm { // only call Chmod if the permissions actually differ
-			if err := os.Chmod(local, perm); err != nil {
+			if err := rt.DestRoot.Chmod(f.Name, perm); err != nil {
 				return err
 			}
 		}
@@ -140,9 +137,8 @@ func (rt *Transfer) recvGenerator(idx int, f *File) error {
 		}
 		if err != nil {
 			perm := fs.FileMode(f.Mode) & os.ModePerm
-			rt.Logger.Printf("MkdirAll(%s, %v)", local, perm)
-			// TODO: use os.Root.Mkdir
-			if err := os.MkdirAll(local, perm); err != nil {
+			rt.Logger.Printf("MkdirAll(%s, %v)", f.Name, perm)
+			if err := rt.DestRoot.MkdirAll(f.Name, perm); err != nil {
 				// TODO: EEXIST is okay
 				return err
 			}
@@ -158,8 +154,7 @@ func (rt *Transfer) recvGenerator(idx int, f *File) error {
 		// TODO: safe_symlinks option
 		if err == nil {
 			// local file exists, verify target matches
-			// TODO(go1.25): use os.Root.Readlink
-			if target, err := os.Readlink(local); err == nil {
+			if target, err := rt.DestRoot.Readlink(local); err == nil {
 				rt.Logger.Printf("existing target: %q", target)
 				if target == f.LinkTarget {
 					if err := rt.setPerms(f); err != nil {
@@ -172,8 +167,7 @@ func (rt *Transfer) recvGenerator(idx int, f *File) error {
 			// fallthrough to create or replace the symlink
 		}
 		rt.Logger.Printf("symlink %s -> %s", local, f.LinkTarget)
-		// TODO(go1.25): use os.Root.Symlink
-		if err := symlink(f.LinkTarget, local); err != nil {
+		if err := symlink(rt.DestRoot, f.LinkTarget, local); err != nil {
 			return err
 		}
 		if err := rt.setPerms(f); err != nil {

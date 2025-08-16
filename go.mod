@@ -1,10 +1,6 @@
 module github.com/gokrazy/rsync
 
-go 1.24
-
-// Ensure we have https://github.com/golang/go/issues/73556, otherwise
-// our tests fail: https://github.com/gokrazy/rsync/issues/40
-toolchain go1.24.3
+go 1.25.0
 
 require (
 	github.com/BurntSushi/toml v1.4.0

@@ -2,8 +2,12 @@
 
 package receiver
 
-import "github.com/google/renameio/v2"
+import (
+	"os"
 
-func symlink(oldname, newname string) error {
+	"github.com/google/renameio/v2"
+)
+
+func symlink(_ *os.Root, oldname, newname string) error {
 	return renameio.Symlink(oldname, newname)
 }

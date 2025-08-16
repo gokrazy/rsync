@@ -279,8 +279,7 @@ func (s *scopedWalker) walkFn(path string, d fs.DirEntry, err error) error {
 		// 11.  if a symbolic link and -l, the link target's length (integer)
 		// 12.  if a symbolic link and -l, the link target (byte array)
 
-		// TODO(go1.25): use fl.root.Readlink(fl.path)
-		target, err := os.Readlink(filepath.Join(s.rootPath, path))
+		target, err := s.root.Readlink(path)
 		if err != nil {
 			return err // TODO
 		}

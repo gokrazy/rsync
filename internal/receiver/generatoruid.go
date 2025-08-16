@@ -32,7 +32,7 @@ var inGroup = func() map[uint32]bool {
 	return m
 }()
 
-func (rt *Transfer) setUid(f *File, local string, st fs.FileInfo) (fs.FileInfo, error) {
+func (rt *Transfer) setUid(f *File, st fs.FileInfo) (fs.FileInfo, error) {
 	stt := st.Sys().(*syscall.Stat_t)
 
 	changeUid := rt.Opts.PreserveUid &&
@@ -55,8 +55,7 @@ func (rt *Transfer) setUid(f *File, local string, st fs.FileInfo) (fs.FileInfo, 
 	if changeGid {
 		gid = uint32(f.Gid)
 	}
-	// TODO(go1.25): use os.Root.Lchown
-	if err := os.Lchown(local, int(uid), int(gid)); err != nil {
+	if err := rt.DestRoot.Lchown(f.Name, int(uid), int(gid)); err != nil {
 		return nil, err
 	}
 	return rt.DestRoot.Lstat(f.Name)
