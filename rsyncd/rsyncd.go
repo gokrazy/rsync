@@ -473,7 +473,14 @@ func (s *Server) handleConnReceiver(module *Module, crd *rsyncwire.CountingReade
 					return fmt.Errorf("OpenRoot(%s): %v", subdir, err)
 				}
 			}
-			rt.Dest = filepath.Join(rt.Dest, subRoot.Name())
+			if name := subRoot.Name(); filepath.IsAbs(name) {
+				rt.Dest = name
+			} else {
+				// Go changed behavior: In Go 1.25, subRoot.Name()
+				// did not return an absolute path:
+				// https://go.googlesource.com/go/+/ed7f804
+				rt.Dest = filepath.Join(rt.Dest, name)
+			}
 			rt.DestRoot = subRoot
 			if opts.Verbose() {
 				s.logger.Printf("opened subdirectory %q", rt.Dest)
