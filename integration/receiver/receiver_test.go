@@ -62,8 +62,20 @@ func TestReceiver(t *testing.T) {
 	if err := os.MkdirAll(source, 0755); err != nil {
 		t.Fatal(err)
 	}
+	sourcesub := filepath.Join(source, "subdir")
+	if err := os.MkdirAll(sourcesub, 0755); err != nil {
+		t.Fatal(err)
+	}
+	sourcesubempty := filepath.Join(source, "subdirempty")
+	if err := os.MkdirAll(sourcesubempty, 0755); err != nil {
+		t.Fatal(err)
+	}
 	hello := filepath.Join(source, "hello")
 	if err := os.WriteFile(hello, []byte("world"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	hellosub := filepath.Join(sourcesub, "hello")
+	if err := os.WriteFile(hellosub, []byte("space"), 0644); err != nil {
 		t.Fatal(err)
 	}
 	mtime, err := time.Parse(time.RFC3339, "2009-11-10T23:00:00Z")
@@ -74,6 +86,12 @@ func TestReceiver(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err := os.Chtimes(source, mtime, mtime); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chtimes(hellosub, mtime, mtime); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chtimes(sourcesubempty, mtime, mtime); err != nil {
 		t.Fatal(err)
 	}
 
@@ -131,6 +149,24 @@ func TestReceiver(t *testing.T) {
 		}
 		if got, want := int(stt.Gid), gid; got != want {
 			t.Errorf("unexpected gid: got %d, want %d", got, want)
+		}
+	}
+	{
+		st, err := os.Stat(filepath.Join(dest, "subdir", "hello"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got, want := st.ModTime(), mtime; !got.Equal(want) {
+			t.Errorf("dest/subdir/hello has unexpected mod time: got %v, want %v", got, want)
+		}
+	}
+	{
+		st, err := os.Stat(filepath.Join(dest, "subdirempty"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got, want := st.ModTime(), mtime; !got.Equal(want) {
+			t.Errorf("dest/subdirempty has unexpected mod time: got %v, want %v", got, want)
 		}
 	}
 	if os.Getuid() == 0 {

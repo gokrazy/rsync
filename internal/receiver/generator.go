@@ -142,7 +142,7 @@ func (rt *Transfer) recvGenerator(idx int, f *File) error {
 				// TODO: EEXIST is okay
 				return err
 			}
-			return nil
+			// fallthrough to setPerms and return nil
 		}
 		if err := rt.setPerms(f); err != nil {
 			return err
