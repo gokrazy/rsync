@@ -58,11 +58,12 @@ var (
 )
 
 func getRootStrip(requested, localDir string) (string, string) {
-	root := filepath.Clean(localDir + "/" + requested)
+	root := filepath.Clean(filepath.Join(localDir, requested))
 
-	strip := filepath.Dir(filepath.Clean(root)) + "/"
-	if strings.HasSuffix(requested, "/") {
-		strip = filepath.Clean(root) + "/"
+	sep := string(os.PathSeparator)
+	strip := filepath.Dir(filepath.Clean(root)) + sep
+	if strings.HasSuffix(requested, sep) {
+		strip = filepath.Clean(root) + sep
 	}
 	return root, strip
 }
