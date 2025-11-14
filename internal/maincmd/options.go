@@ -2,6 +2,7 @@ package maincmd
 
 import (
 	"fmt"
+	"os"
 	"strconv"
 	"strings"
 	"unicode"
@@ -87,6 +88,16 @@ func parseHostspec(src string, parsingURL bool) (host, path string, port int, _ 
 		hostlen += userlen
 	}
 	host += src[hoststart:hostlen]
+
+	// On Windows, a local disk path like C:\rsync parses as
+	// host="C", path="\\rsync". Detect that and error out.
+	isDriveLetter := len(host) == 1 &&
+		((host[0] >= 'A' && host[0] <= 'Z') ||
+			(host[0] >= 'a' && host[0] <= 'z'))
+	if isDriveLetter && src[i] == os.PathSeparator {
+		return "", "", 0, fmt.Errorf("local disk path detected")
+	}
+
 	return host, src[i:], port, nil
 }
 
