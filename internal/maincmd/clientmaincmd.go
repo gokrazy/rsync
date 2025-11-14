@@ -327,7 +327,7 @@ func ClientRun(osenv *rsyncos.Env, opts *rsyncopts.Options, conn io.ReadWriter, 
 			}
 		}
 
-		stats, err := st.Do(crd, cwr, "/", paths, nil)
+		stats, err := st.Do(crd, cwr, FileSystemRoot, paths, nil)
 		if err != nil {
 			return nil, err
 		}

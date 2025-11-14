@@ -1,0 +1,3 @@
+package maincmd
+
+const FileSystemRoot = "\\\\?\\"
