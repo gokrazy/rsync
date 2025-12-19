@@ -57,7 +57,9 @@ func (rt *Transfer) skipFile(f *File, st os.FileInfo) (bool, error) {
 
 	// TODO: size only
 
-	// TODO: ignore times
+	if rt.Opts.IgnoreTimes {
+		return false, nil
+	}
 
 	return modTimeEqual(st.ModTime(), f.ModTime), nil
 }

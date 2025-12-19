@@ -23,6 +23,7 @@ type TransferOpts struct {
 	PreserveSpecials  bool
 	PreserveTimes     bool
 	PreserveHardlinks bool
+	IgnoreTimes       bool
 }
 
 type Transfer struct {

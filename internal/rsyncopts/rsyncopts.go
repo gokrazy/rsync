@@ -658,6 +658,7 @@ func (o *Options) Server() bool               { return o.am_server != 0 }
 func (o *Options) Daemon() bool               { return o.am_daemon != 0 }
 func (o *Options) ConnectTimeoutSeconds() int { return o.connect_timeout }
 func (o *Options) AlwaysChecksum() bool       { return o.always_checksum != 0 }
+func (o *Options) IgnoreTimes() bool          { return o.ignore_times != 0 }
 
 func (o *Options) daemonTable() []poptOption {
 	return []poptOption{

@@ -438,6 +438,7 @@ func (s *Server) handleConnReceiver(module *Module, crd *rsyncwire.CountingReade
 			PreserveSpecials: opts.PreserveSpecials(),
 			PreserveTimes:    opts.PreserveMTimes(),
 			// TODO: PreserveHardlinks: opts.PreserveHardlinks,
+			IgnoreTimes: opts.IgnoreTimes(),
 		},
 		Dest: module.Path,
 		Env: &rsyncos.Env{
