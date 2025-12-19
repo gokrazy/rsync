@@ -76,8 +76,8 @@ func New(args []string, opts ...Option) (*Client, error) {
 		opt.applyServer(c)
 	}
 
-	pc, err := rsyncopts.ParseArguments(c.osenv, args)
-	if err != nil {
+	pc := rsyncopts.NewContext(rsyncopts.NewOptionsWithGokrazyDefaults(c.osenv))
+	if err := pc.ParseArguments(c.osenv, args); err != nil {
 		return nil, err
 	}
 	c.opts = pc.Options

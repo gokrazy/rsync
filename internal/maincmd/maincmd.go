@@ -39,8 +39,8 @@ func (r *readWriter) Write(p []byte) (n int, err error) { return r.w.Write(p) }
 
 func Main(ctx context.Context, osenv *rsyncos.Env, args []string, cfg *rsyncdconfig.Config) (*rsyncstats.TransferStats, error) {
 	osenv.Logf("Main(osenv=%v, args=%q)", osenv, args)
-	pc, err := rsyncopts.ParseArguments(osenv, args[1:])
-	if err != nil {
+	pc := rsyncopts.NewContext(rsyncopts.NewOptionsWithGokrazyDefaults(osenv))
+	if err := pc.ParseArguments(osenv, args[1:]); err != nil {
 		if pe, ok := err.(*rsyncopts.PoptError); ok &&
 			pe.Errno == rsyncopts.POPT_ERROR_BADOPT &&
 			strings.HasPrefix(pe.Error(), "--gokr.") {

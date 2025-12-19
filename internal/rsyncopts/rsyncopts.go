@@ -81,27 +81,58 @@ const (
 	COUNT_INFO
 )
 
+var tridgeDefaults = Options{
+	msgs2stderr:          2, // Default: send errors to stderr for local & remote-shell transfers
+	output_motd:          1,
+	human_readable:       1,
+	allow_inc_recurse:    1,
+	xfer_dirs:            -1,
+	relative_paths:       -1,
+	implied_dirs:         1,
+	max_delete:           math.MinInt32,
+	whole_file:           -1,
+	do_compression_level: math.MinInt32,
+	rsync_path:           "rsync",
+	default_af_hint:      syscall.AF_INET6,
+	blocking_io:          -1,
+	protocol_version:     27,
+}
+
 // NewOptions returns an Options struct with all options initialized to their
 // default values. Note that ParseArguments will set some options (that default
 // to -1) based on the encountered command-line flags and built-in rules.
 func NewOptions(osenv *rsyncos.Env) *Options {
-	return &Options{
-		osenv:                osenv,
-		msgs2stderr:          2, // Default: send errors to stderr for local & remote-shell transfers
-		output_motd:          1,
-		human_readable:       1,
-		allow_inc_recurse:    1,
-		xfer_dirs:            -1,
-		relative_paths:       -1,
-		implied_dirs:         1,
-		max_delete:           math.MinInt32,
-		whole_file:           -1,
-		do_compression_level: math.MinInt32,
-		rsync_path:           "rsync",
-		default_af_hint:      syscall.AF_INET6,
-		blocking_io:          -1,
-		protocol_version:     27,
-	}
+	opts := tridgeDefaults // copy
+	opts.osenv = osenv
+	return &opts
+}
+
+var gokrazyDefaults = Options{
+	msgs2stderr:    2, // Default: send errors to stderr for local & remote-shell transfers
+	output_motd:    1,
+	human_readable: 1,
+	// TODO: if/when allow_inc_recurse gets implemented,
+	// default to 1 to match tridge rsync
+	allow_inc_recurse:    0,
+	xfer_dirs:            -1,
+	relative_paths:       -1,
+	implied_dirs:         1,
+	max_delete:           math.MinInt32,
+	whole_file:           -1,
+	do_compression_level: math.MinInt32,
+	rsync_path:           "rsync",
+	default_af_hint:      syscall.AF_INET6,
+	blocking_io:          -1,
+	protocol_version:     27,
+}
+
+// NewOptions returns an Options struct with all options initialized to their
+// default values. Note that ParseArguments will set some options (that default
+// to -1) based on the encountered command-line flags and built-in rules.
+func NewOptionsWithGokrazyDefaults(osenv *rsyncos.Env) *Options {
+	opts := gokrazyDefaults // copy
+	opts.osenv = osenv
+	return &opts
 }
 
 // GokrazyClientOptions contains additional command-line flags, prefixed with
@@ -914,26 +945,29 @@ func (o *Options) table() []poptOption {
 
 var errNotYetImplemented = errors.New("option not yet implemented in gokrazy/rsync")
 
+func NewContext(opts *Options) *Context {
+	table := opts.table()
+	table = slices.Concat(opts.GokrazyClient.table(), table)
+	return &Context{
+		Options: opts,
+		table:   table,
+	}
+}
+
 // rsync/options.c:parse_arguments
-func ParseArguments(osenv *rsyncos.Env, args []string) (*Context, error) {
+func (pc *Context) ParseArguments(osenv *rsyncos.Env, args []string) error {
 	// NOTE: We do not implement support for refusing options per rsyncd.conf
 	// here, as we have our own configuration file.
 
 	version_opt_cnt := 0
 
-	opts := NewOptions(osenv)
-	table := opts.table()
-	table = slices.Concat(opts.GokrazyClient.table(), table)
-	pc := Context{
-		Options: opts,
-		table:   table,
-		args:    args,
-	}
+	pc.args = args
+	opts := pc.Options
 
 	for {
 		opt, err := pc.poptGetNextOpt()
 		if err != nil {
-			return nil, err
+			return err
 		}
 		if opt == -1 {
 			break // done
@@ -949,7 +983,7 @@ func ParseArguments(osenv *rsyncos.Env, args []string) (*Context, error) {
 
 		case OPT_SENDER:
 			if opts.am_server == 0 {
-				return nil, fmt.Errorf("--sender only allowed with --server")
+				return fmt.Errorf("--sender only allowed with --server")
 			}
 			opts.am_sender = 1
 
@@ -967,7 +1001,7 @@ func ParseArguments(osenv *rsyncos.Env, args []string) (*Context, error) {
 				opt, err := pc.poptGetNextOpt()
 				if err != nil {
 					err.(*PoptError).DaemonMode = true
-					return nil, err
+					return err
 				}
 				if opt == -1 {
 					break // done
@@ -979,26 +1013,26 @@ func ParseArguments(osenv *rsyncos.Env, args []string) (*Context, error) {
 					fmt.Println(opts.DaemonHelp()) // tridge rsync prints help to stdout
 					os.Exit(0)                     // exit with code 0 for compatibility with tridge rsync
 				case 'M':
-					return nil, errNotYetImplemented
+					return errNotYetImplemented
 
 				case 'v':
 					opts.verbose++
 
 				default:
-					return nil, fmt.Errorf("unhandled special case opt: %v", opt)
+					return fmt.Errorf("unhandled special case opt: %v", opt)
 				}
 			}
 
 			opts.am_daemon = 1
 
-			return &pc, nil
+			return nil
 
 		case OPT_FILTER,
 			OPT_EXCLUDE,
 			OPT_INCLUDE,
 			OPT_INCLUDE_FROM,
 			OPT_EXCLUDE_FROM:
-			return nil, errNotYetImplemented
+			return errNotYetImplemented
 
 		case 'a':
 			if opts.recurse == 0 {
@@ -1039,7 +1073,7 @@ func ParseArguments(osenv *rsyncos.Env, args []string) (*Context, error) {
 			opts.verbose++
 
 		case 'y':
-			return nil, errNotYetImplemented
+			return errNotYetImplemented
 
 		case 'q':
 			opts.quiet++
@@ -1048,7 +1082,7 @@ func ParseArguments(osenv *rsyncos.Env, args []string) (*Context, error) {
 			opts.one_file_system++
 
 		case 'F':
-			return nil, errNotYetImplemented
+			return errNotYetImplemented
 
 		case 'P':
 			opts.do_progress = 1
@@ -1068,34 +1102,34 @@ func ParseArguments(osenv *rsyncos.Env, args []string) (*Context, error) {
 			opts.compress_choice = ""
 
 		case OPT_OLD_ARGS:
-			return nil, errNotYetImplemented
+			return errNotYetImplemented
 
 		case 'M': // --remote-option
-			return nil, errNotYetImplemented
+			return errNotYetImplemented
 
 		case OPT_WRITE_BATCH,
 			OPT_ONLY_WRITE_BATCH,
 			OPT_READ_BATCH:
-			return nil, errNotYetImplemented
+			return errNotYetImplemented
 
 		case OPT_BLOCK_SIZE:
-			return nil, errNotYetImplemented
+			return errNotYetImplemented
 
 		case OPT_MAX_SIZE, // (needs parse_size_arg)
 			OPT_MIN_SIZE,
 			OPT_BWLIMIT:
-			return nil, errNotYetImplemented
+			return errNotYetImplemented
 
 		case OPT_APPEND:
-			return nil, errNotYetImplemented
+			return errNotYetImplemented
 
 		case OPT_LINK_DEST,
 			OPT_COPY_DEST,
 			OPT_COMPARE_DEST:
-			return nil, errNotYetImplemented
+			return errNotYetImplemented
 
 		case OPT_CHMOD: // (needs parse_chmod):
-			return nil, errNotYetImplemented
+			return errNotYetImplemented
 
 		case OPT_INFO:
 			parseOutputWords(osenv, infoWords[:], opts.info[:], pc.poptGetOptArg(), USER_PRIORITY)
@@ -1107,14 +1141,14 @@ func ParseArguments(osenv *rsyncos.Env, args []string) (*Context, error) {
 		case OPT_USERMAP,
 			OPT_GROUPMAP,
 			OPT_CHOWN:
-			return nil, errNotYetImplemented
+			return errNotYetImplemented
 
 		case OPT_HELP:
 			fmt.Println(opts.Help()) // tridge rsync prints help to stdout
 			os.Exit(0)               // exit with code 0 for compatibility with tridge rsync
 
 		case 'A':
-			return nil, fmt.Errorf("ACLs are not supported by gokrazy/rsync")
+			return fmt.Errorf("ACLs are not supported by gokrazy/rsync")
 
 		case 'X':
 			opts.preserve_xattrs++
@@ -1122,10 +1156,10 @@ func ParseArguments(osenv *rsyncos.Env, args []string) (*Context, error) {
 		case OPT_STOP_AFTER,
 			OPT_STOP_AT,
 			OPT_STDERR:
-			return nil, errNotYetImplemented
+			return errNotYetImplemented
 
 		default:
-			return nil, fmt.Errorf("unhandled special case opt: %v", opt)
+			return fmt.Errorf("unhandled special case opt: %v", opt)
 		}
 	}
 
@@ -1197,5 +1231,5 @@ func ParseArguments(osenv *rsyncos.Env, args []string) (*Context, error) {
 		opts.stdout_format = "%n%L"
 	}
 
-	return &pc, nil
+	return nil
 }

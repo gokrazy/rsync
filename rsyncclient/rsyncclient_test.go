@@ -75,8 +75,9 @@ func ExampleClient_Run_sendToGoroutine() {
 	stdoutrd, stdoutwr := io.Pipe()
 	go func() {
 		conn := rsyncd.NewConnection(stdinrd, stdoutwr, "<io.Pipe>")
-		pc, err := rsyncopts.ParseArguments(&rsyncos.Env{Stderr: os.Stderr}, client.ServerCommandOptions(dest))
-		if err != nil {
+		osenv := &rsyncos.Env{Stderr: os.Stderr}
+		pc := rsyncopts.NewContext(rsyncopts.NewOptions(osenv))
+		if err := pc.ParseArguments(osenv, client.ServerCommandOptions(dest)); err != nil {
 			log.Fatalf("parsing server args: %v", err)
 		}
 		if err := rsync.InternalHandleConn(ctx, conn, nil, pc); err != nil {
@@ -171,8 +172,8 @@ func TestClientServerModule(t *testing.T) {
 	stdoutrd, stdoutwr := io.Pipe()
 	conn := rsyncd.NewConnection(stdinrd, stdoutwr, "<io.Pipe>")
 	osenv := rsyncostest.New(t)
-	pc, err := rsyncopts.ParseArguments(osenv, client.ServerCommandOptions("./"))
-	if err != nil {
+	pc := rsyncopts.NewContext(rsyncopts.NewOptions(osenv))
+	if err := pc.ParseArguments(osenv, client.ServerCommandOptions("./")); err != nil {
 		t.Fatalf("parsing server args: %v", err)
 	}
 	t.Logf("pc.RemainingArgs=%q", pc.RemainingArgs)
@@ -239,8 +240,8 @@ func TestClientServerCommand(t *testing.T) {
 	stdoutrd, stdoutwr := io.Pipe()
 	conn := rsyncd.NewConnection(stdinrd, stdoutwr, "<io.Pipe>")
 	osenv := rsyncostest.New(t)
-	pc, err := rsyncopts.ParseArguments(osenv, client.ServerCommandOptions(src))
-	if err != nil {
+	pc := rsyncopts.NewContext(rsyncopts.NewOptions(osenv))
+	if err := pc.ParseArguments(osenv, client.ServerCommandOptions(src)); err != nil {
 		t.Fatalf("parsing server args: %v", err)
 	}
 	t.Logf("pc.RemainingArgs=%q", pc.RemainingArgs)
@@ -306,8 +307,8 @@ func TestClientServerCommandSender(t *testing.T) {
 	stdoutrd, stdoutwr := io.Pipe()
 	conn := rsyncd.NewConnection(stdinrd, stdoutwr, "<io.Pipe>")
 	osenv := rsyncostest.New(t)
-	pc, err := rsyncopts.ParseArguments(osenv, client.ServerCommandOptions(dest))
-	if err != nil {
+	pc := rsyncopts.NewContext(rsyncopts.NewOptions(osenv))
+	if err := pc.ParseArguments(osenv, client.ServerCommandOptions(dest)); err != nil {
 		t.Fatalf("parsing server args: %v", err)
 	}
 	t.Logf("pc.RemainingArgs=%q", pc.RemainingArgs)

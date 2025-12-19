@@ -154,8 +154,8 @@ func TestParseArguments(t *testing.T) {
 			wantLines := discardKnownDifferences(strings.Split(strings.TrimSpace(string(want)), "\n"))
 
 			osenv := rsyncostest.New(t)
-			pc, err := ParseArguments(osenv, tt.args)
-			if err != nil {
+			pc := NewContext(NewOptions(osenv))
+			if err := pc.ParseArguments(osenv, tt.args); err != nil {
 				t.Fatalf("ParseArguments: %v", err)
 			}
 
@@ -193,7 +193,8 @@ func TestParseArgumentsError(t *testing.T) {
 	} {
 		t.Run(strings.Join(tt.args, " "), func(t *testing.T) {
 			osenv := rsyncostest.New(t)
-			_, err := ParseArguments(osenv, tt.args)
+			pc := NewContext(NewOptions(osenv))
+			err := pc.ParseArguments(osenv, tt.args)
 			if err == nil {
 				t.Fatalf("ParseArguments unexpectedly did not fail!")
 			}
@@ -220,8 +221,8 @@ func TestParseArgumentsRemaining(t *testing.T) {
 	} {
 		t.Run(strings.Join(tt.args, " "), func(t *testing.T) {
 			osenv := rsyncostest.New(t)
-			pc, err := ParseArguments(osenv, tt.args)
-			if err != nil {
+			pc := NewContext(NewOptions(osenv))
+			if err := pc.ParseArguments(osenv, tt.args); err != nil {
 				t.Fatalf("ParseArguments: %v", err)
 			}
 			got := pc.RemainingArgs

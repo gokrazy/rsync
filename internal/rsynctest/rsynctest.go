@@ -248,8 +248,8 @@ func (ts *TestServer) pipe(t *testing.T, args []string) (*sync.WaitGroup, io.Rea
 	stdoutrd, stdoutwr := io.Pipe()
 	conn := rsyncd.NewConnection(stdinrd, stdoutwr, "<io.Pipe>")
 	osenv := rsyncostest.New(t)
-	pc, err := rsyncopts.ParseArguments(osenv, args)
-	if err != nil {
+	pc := rsyncopts.NewContext(rsyncopts.NewOptions(osenv))
+	if err := pc.ParseArguments(osenv, args); err != nil {
 		t.Fatalf("parsing server args: %v", err)
 	}
 	t.Logf("pc.RemainingArgs=%q", pc.RemainingArgs)

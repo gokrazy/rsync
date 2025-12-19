@@ -244,8 +244,9 @@ func (s *Server) HandleDaemonConn(ctx context.Context, conn *Conn) (err error) {
 	}
 
 	s.logger.Printf("flags: %+v", flags)
-	pc, err := rsyncopts.ParseArguments(&rsyncos.Env{Stderr: s.stderr}, flags)
-	if err != nil {
+	osenv := &rsyncos.Env{Stderr: s.stderr}
+	pc := rsyncopts.NewContext(rsyncopts.NewOptionsWithGokrazyDefaults(osenv))
+	if err := pc.ParseArguments(osenv, flags); err != nil {
 		err = fmt.Errorf("parsing server args: %v", err)
 
 		// terminate connection with an error about which flag is not supported
@@ -322,8 +323,9 @@ func (s *Server) InternalHandleConn(ctx context.Context, conn *Conn, module *Mod
 }
 
 func (s *Server) HandleConnArgs(ctx context.Context, conn *Conn, module *Module, args []string) error {
-	pc, err := rsyncopts.ParseArguments(&rsyncos.Env{Stderr: s.stderr}, args)
-	if err != nil {
+	osenv := &rsyncos.Env{Stderr: s.stderr}
+	pc := rsyncopts.NewContext(rsyncopts.NewOptionsWithGokrazyDefaults(osenv))
+	if err := pc.ParseArguments(osenv, args); err != nil {
 		return fmt.Errorf("parsing server args: %v", err)
 	}
 	return s.handleConn(ctx, conn, module, pc, true /* negotiate */)
