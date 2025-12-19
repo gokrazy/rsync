@@ -125,8 +125,10 @@ func startInbandExchange(osenv *rsyncos.Env, opts *rsyncopts.Options, conn io.Re
 			return false, fmt.Errorf("abort (rsync fatal error)")
 		}
 
-		// print rsync server message of the day (MOTD)
-		fmt.Fprintf(osenv.Stdout, "%s\n", line)
+		if opts.OutputMOTD() {
+			// print rsync server message of the day (MOTD)
+			fmt.Fprintf(osenv.Stdout, "%s\n", line)
+		}
 	}
 
 	sargv := opts.ServerOptions()

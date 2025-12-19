@@ -666,6 +666,7 @@ func (o *Options) Daemon() bool               { return o.am_daemon != 0 }
 func (o *Options) ConnectTimeoutSeconds() int { return o.connect_timeout }
 func (o *Options) AlwaysChecksum() bool       { return o.always_checksum != 0 }
 func (o *Options) IgnoreTimes() bool          { return o.ignore_times != 0 }
+func (o *Options) OutputMOTD() bool           { return o.output_motd != 0 }
 
 func (o *Options) daemonTable() []poptOption {
 	return []poptOption{
@@ -708,8 +709,8 @@ func (o *Options) gokrazyTable() []poptOption {
 		//{"msgs2stderr", "", POPT_ARG_VAL, &o.msgs2stderr, 1},
 		//{"no-msgs2stderr", "", POPT_ARG_VAL, &o.msgs2stderr, 0},
 		//{"quiet", "q", POPT_ARG_NONE, nil, 'q'},
-		//{"motd", "", POPT_ARG_VAL, &o.output_motd, 1},
-		//{"no-motd", "", POPT_ARG_VAL, &o.output_motd, 0},
+		{"motd", "", POPT_ARG_VAL, &o.output_motd, 1},
+		{"no-motd", "", POPT_ARG_VAL, &o.output_motd, 0},
 		//{"stats", "", POPT_ARG_NONE, &o.do_stats, 0},
 		//{"human-readable", "h", POPT_ARG_NONE, nil, 'h'},
 		//{"no-human-readable", "", POPT_ARG_VAL, &o.human_readable, 0},
