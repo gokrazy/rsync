@@ -857,6 +857,10 @@ func (o *Options) gokrazyTable() []poptOption {
 		//{"fuzzy", "y", POPT_ARG_NONE, nil, 'y'},
 		//{"no-fuzzy", "", POPT_ARG_VAL, &o.fuzzy_basis, 0},
 		//{"no-y", "", POPT_ARG_VAL, &o.fuzzy_basis, 0},
+
+		// Regarding compression support, see:
+		// https://github.com/gokrazy/rsync/issues/35#issuecomment-2988582190
+		//
 		//{"compress", "z", POPT_ARG_NONE, nil, 'z'},
 		//{"old-compress", "", POPT_ARG_NONE, nil, OPT_OLD_COMPRESS},
 		//{"new-compress", "", POPT_ARG_NONE, nil, OPT_NEW_COMPRESS},
@@ -867,6 +871,7 @@ func (o *Options) gokrazyTable() []poptOption {
 		//{"skip-compress", "", POPT_ARG_STRING, &o.skip_compress, 0},
 		//{"compress-level", "", POPT_ARG_INT, &o.do_compression_level, 0},
 		//{"zl", "", POPT_ARG_INT, &o.do_compression_level, 0},
+
 		//{"", "P", POPT_ARG_NONE, nil, 'P'},
 		//{"progress", "", POPT_ARG_VAL, &o.do_progress, 1},
 		//{"no-progress", "", POPT_ARG_VAL, &o.do_progress, 0},
