@@ -120,6 +120,37 @@ func TestModuleListingClientPort(t *testing.T) {
 	}
 }
 
+func TestModuleContentsListingDirs(t *testing.T) {
+	t.Parallel()
+
+	tmp := t.TempDir()
+	source := filepath.Join(tmp, "source")
+
+	// create files in source to be copied
+	if err := os.MkdirAll(source, 0755); err != nil {
+		t.Fatal(err)
+	}
+	dummy := filepath.Join(source, "dummy")
+	want := []byte("heyo")
+	if err := os.WriteFile(dummy, want, 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	// start a server to sync from
+	srv := rsynctest.New(t, rsynctest.InteropModule(tmp))
+
+	// request module content listing
+	rsync := exec.Command(rsynctest.AnyRsync(t),
+		"--dirs",
+		"--port="+srv.Port,
+		"rsync://localhost/interop")
+	rsync.Stdout = testlogger.New(t)
+	rsync.Stderr = testlogger.New(t)
+	if err := rsync.Run(); err != nil {
+		t.Fatalf("%v: %v", rsync.Args, err)
+	}
+}
+
 func TestInterop(t *testing.T) {
 	t.Parallel()
 

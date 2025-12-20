@@ -149,6 +149,12 @@ func (s *scopedWalker) walkFn(path string, d fs.DirEntry, err error) error {
 		return nil
 	}
 
+	logger.Printf("isDir=%v, xferDirs=%v", info.Mode().IsDir(), opts.XferDirs())
+	if info.Mode().IsDir() && opts.XferDirs() == 0 {
+		logger.Printf("skipping directory %s", path)
+		return filepath.SkipDir
+	}
+
 	// Only ever transmit long names, like openrsync
 	flags := byte(rsync.XMIT_LONG_NAME)
 
@@ -314,6 +320,10 @@ func (s *scopedWalker) walkFn(path string, d fs.DirEntry, err error) error {
 	// 0x80    Do not send the file modification time: it is a repeat of the last file's.
 
 	// If the status byte is zero, the file-list has terminated.
+
+	if info.Mode().IsDir() && !opts.Recurse() {
+		return filepath.SkipDir
+	}
 
 	return nil
 }

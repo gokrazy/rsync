@@ -668,6 +668,7 @@ func (o *Options) AlwaysChecksum() bool       { return o.always_checksum != 0 }
 func (o *Options) IgnoreTimes() bool          { return o.ignore_times != 0 }
 func (o *Options) OutputMOTD() bool           { return o.output_motd != 0 }
 func (o *Options) RsyncPort() int             { return o.rsync_port }
+func (o *Options) XferDirs() int              { return o.xfer_dirs }
 
 func (o *Options) daemonTable() []poptOption {
 	return []poptOption{
@@ -725,9 +726,9 @@ func (o *Options) gokrazyTable() []poptOption {
 		//{"no-inc-recursive", "", POPT_ARG_VAL, &o.allow_inc_recurse, 0},
 		//{"i-r", "", POPT_ARG_VAL, &o.allow_inc_recurse, 1},
 		//{"no-i-r", "", POPT_ARG_VAL, &o.allow_inc_recurse, 0},
-		//{"dirs", "d", POPT_ARG_VAL, &o.xfer_dirs, 2},
-		//{"no-dirs", "", POPT_ARG_VAL, &o.xfer_dirs, 0},
-		//{"no-d", "", POPT_ARG_VAL, &o.xfer_dirs, 0},
+		{"dirs", "d", POPT_ARG_VAL, &o.xfer_dirs, 2},
+		{"no-dirs", "", POPT_ARG_VAL, &o.xfer_dirs, 0},
+		{"no-d", "", POPT_ARG_VAL, &o.xfer_dirs, 0},
 		//{"old-dirs", "", POPT_ARG_VAL, &o.xfer_dirs, 4},
 		//{"old-d", "", POPT_ARG_VAL, &o.xfer_dirs, 4},
 		{"perms", "p", POPT_ARG_VAL, &o.preserve_perms, 1},
