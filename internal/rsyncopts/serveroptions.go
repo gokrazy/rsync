@@ -76,8 +76,9 @@ func (o *Options) ServerOptions() []string {
 	// 	argstr[x++] = 'c';
 	// if (cvs_exclude)
 	// 	argstr[x++] = 'C';
-	// if (ignore_times)
-	// 	argstr[x++] = 'I';
+	if o.IgnoreTimes() {
+		argstr += "I"
+	}
 	// if (relative_paths)
 	// 	argstr[x++] = 'R';
 	// if (one_file_system)
