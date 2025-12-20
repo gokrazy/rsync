@@ -19,7 +19,11 @@ import (
 // rsync/clientserver.c:start_socket_client
 func socketClient(ctx context.Context, osenv *rsyncos.Env, opts *rsyncopts.Options, host string, path string, port int, paths []string) (*rsyncstats.TransferStats, error) {
 	if port < 0 {
-		host += ":873" // rsync daemon port
+		if port := opts.RsyncPort(); port > 0 {
+			host += ":" + strconv.Itoa(port)
+		} else {
+			host += ":873" // rsync daemon port
+		}
 	} else {
 		host += ":" + strconv.Itoa(port)
 	}

@@ -98,6 +98,28 @@ func TestModuleListingClient(t *testing.T) {
 	}
 }
 
+func TestModuleListingClientPort(t *testing.T) {
+	t.Parallel()
+
+	tmp := t.TempDir()
+
+	// start a server to sync from
+	srv := rsynctest.New(t, rsynctest.InteropModule(tmp))
+
+	// request module list
+	args := []string{
+		"gokr-rsync",
+		"-aH",
+		"--port=" + srv.Port,
+		"rsync://localhost/",
+	}
+	stdout, _ := rsynctest.Output(t, args...)
+
+	if want := "interop\tinterop"; !strings.Contains(string(stdout), want) {
+		t.Fatalf("rsync output unexpectedly did not contain %q:\n%s", want, string(stdout))
+	}
+}
+
 func TestInterop(t *testing.T) {
 	t.Parallel()
 

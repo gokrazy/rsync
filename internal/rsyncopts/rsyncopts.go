@@ -667,6 +667,7 @@ func (o *Options) ConnectTimeoutSeconds() int { return o.connect_timeout }
 func (o *Options) AlwaysChecksum() bool       { return o.always_checksum != 0 }
 func (o *Options) IgnoreTimes() bool          { return o.ignore_times != 0 }
 func (o *Options) OutputMOTD() bool           { return o.output_motd != 0 }
+func (o *Options) RsyncPort() int             { return o.rsync_port }
 
 func (o *Options) daemonTable() []poptOption {
 	return []poptOption{
@@ -932,7 +933,7 @@ func (o *Options) gokrazyTable() []poptOption {
 		//{"qsort", "", POPT_ARG_NONE, &o.use_qsort, 0},
 		//{"copy-as", "", POPT_ARG_STRING, &o.copy_as, 0},
 		//{"address", "", POPT_ARG_STRING, &o.bind_address, 0},
-		//{"port", "", POPT_ARG_INT, &o.rsync_port, 0},
+		{"port", "", POPT_ARG_INT, &o.rsync_port, 0},
 		//{"sockopts", "", POPT_ARG_STRING, &o.sockopts, 0},
 		//{"password-file", "", POPT_ARG_STRING, &o.password_file, 0},
 		//{"early-input", "", POPT_ARG_STRING, &o.early_input_file, 0},
