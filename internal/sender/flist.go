@@ -374,8 +374,7 @@ func (st *Transfer) SendFileList(localDir string, paths []string, excl *filterRu
 		if prefix != "" {
 			prefix = strings.TrimPrefix(prefix, "/")
 
-			//add by yjh
-			//此处会导致服务器路径带\
+			// server directory have prefix \
 			prefix = strings.TrimPrefix(prefix, "\\")
 			//
 
