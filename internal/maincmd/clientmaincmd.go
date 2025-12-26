@@ -316,7 +316,7 @@ func ClientRun(osenv *rsyncos.Env, opts *rsyncopts.Options, conn io.ReadWriter, 
 		for idx, path := range paths {
 			// Trailing slashes are meaningful to rsync,
 			// so preserve a trailing slash across filepath.Abs.
-			hasTrailingSlash := strings.HasSuffix(path, "/")
+			hasTrailingSlash := strings.HasSuffix(path, "/") || strings.HasSuffix(path, "\\")
 			abs, err := filepath.Abs(path)
 			if err != nil {
 				return nil, err
