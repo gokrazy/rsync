@@ -71,6 +71,7 @@ func getRootStrip(requested, localDir string) (string, string) {
 type scopedWalker struct {
 	st       *Transfer
 	ioError  func(err error)
+	conn     *rsyncwire.Conn
 	fec      *rsyncwire.Buffer
 	excl     *filterRuleList
 	uidMap   map[int32]string
@@ -179,6 +180,8 @@ func (s *scopedWalker) walkFn(path string, d fs.DirEntry, err error) error {
 		regular: info.Mode().IsRegular(),
 		Wpath:   name,
 	})
+
+	s.fec.Reset()
 
 	// 1.   status byte (integer)
 	s.fec.WriteByte(flags)
@@ -309,6 +312,8 @@ func (s *scopedWalker) walkFn(path string, d fs.DirEntry, err error) error {
 		s.fec.WriteString(string(checksum))
 	}
 
+	s.conn.WriteString(s.fec.String())
+
 	// The status byte may consist of the following bits and determines which of the optional fields are transmitted.
 
 	// 0x01    A top-level directory.  (Only applies to directory files.)  If specified, the matching local directory is for deletions.
@@ -374,6 +379,7 @@ func (st *Transfer) SendFileList(localDir string, paths []string, excl *filterRu
 
 		sw := &scopedWalker{
 			st:       st,
+			conn:     st.Conn,
 			fec:      fec,
 			excl:     excl,
 			uidMap:   uidMap,
@@ -387,6 +393,8 @@ func (st *Transfer) SendFileList(localDir string, paths []string, excl *filterRu
 			return nil, err
 		}
 	}
+
+	fec.Reset()
 
 	const endOfFileList = 0
 	fec.WriteByte(endOfFileList)

@@ -121,6 +121,10 @@ func (b *Buffer) String() string {
 	return b.buf.String()
 }
 
+func (b *Buffer) Reset() {
+	b.buf.Reset()
+}
+
 type Conn struct {
 	Writer io.Writer
 	Reader io.Reader
