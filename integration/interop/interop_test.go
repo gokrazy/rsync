@@ -435,6 +435,34 @@ func TestInteropSubdirExclude(t *testing.T) {
 	}
 }
 
+func TestInteropSubdirExcludeGokrazy(t *testing.T) {
+	t.Parallel()
+
+	_, source, dest := createSourceFiles(t)
+
+	// start a server to sync from
+	srv := rsynctest.New(t, rsynctest.InteropModule(source))
+
+	// sync into dest dir
+	args := []string{
+		"gokr-rsync",
+		"-f", "- expensive",
+		"-avH",
+		"rsync://localhost:" + srv.Port + "/interop/",
+		dest,
+	}
+	rsynctest.Run(t, args...)
+
+	expensiveFn := filepath.Join(dest, "expensive", "dummy")
+	if _, err := os.ReadFile(expensiveFn); !os.IsNotExist(err) {
+		t.Fatalf("ReadFile(%s) did not return -ENOENT, but %v", expensiveFn, err)
+	}
+	cheapFn := filepath.Join(dest, "cheap", "dummy")
+	if _, err := os.ReadFile(cheapFn); err != nil {
+		t.Fatalf("ReadFile(%s): %v", cheapFn, err)
+	}
+}
+
 func TestInteropSubdirExcludeMultipleNested(t *testing.T) {
 	t.Parallel()
 

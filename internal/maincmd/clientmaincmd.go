@@ -381,10 +381,10 @@ func ClientRun(osenv *rsyncos.Env, opts *rsyncopts.Options, conn io.ReadWriter, 
 		}
 	}
 
-	// TODO: this is different for client/server
-	// client always sends exclusion list, server always receives
-
-	// TODO: implement support for exclusion, send exclusion list here
+	for _, rule := range opts.FilterRules() {
+		c.WriteInt32(int32(len(rule)))
+		c.WriteString(rule)
+	}
 	const exclusionListEnd = 0
 	if err := c.WriteInt32(exclusionListEnd); err != nil {
 		return nil, err

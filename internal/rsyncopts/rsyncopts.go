@@ -186,6 +186,7 @@ type Options struct {
 	do_compression int
 	info           [COUNT_INFO]uint16
 	local_server   int
+	filterRules    []string
 
 	// order matches long_options order
 	verbose                int
@@ -669,6 +670,7 @@ func (o *Options) IgnoreTimes() bool          { return o.ignore_times != 0 }
 func (o *Options) OutputMOTD() bool           { return o.output_motd != 0 }
 func (o *Options) RsyncPort() int             { return o.rsync_port }
 func (o *Options) XferDirs() int              { return o.xfer_dirs }
+func (o *Options) FilterRules() []string      { return o.filterRules }
 
 func (o *Options) daemonTable() []poptOption {
 	return []poptOption{
@@ -836,9 +838,9 @@ func (o *Options) gokrazyTable() []poptOption {
 		//{"no-ignore-errors", "", POPT_ARG_VAL, &o.ignore_errors, 0},
 		//{"max-delete", "", POPT_ARG_INT, &o.max_delete, 0},
 		//{"", "F", POPT_ARG_NONE, nil, 'F'},
-		//{"filter", "f", POPT_ARG_STRING, nil, OPT_FILTER},
-		//{"exclude", "", POPT_ARG_STRING, nil, OPT_EXCLUDE},
-		//{"include", "", POPT_ARG_STRING, nil, OPT_INCLUDE},
+		{"filter", "f", POPT_ARG_STRING, nil, OPT_FILTER},
+		{"exclude", "", POPT_ARG_STRING, nil, OPT_EXCLUDE},
+		{"include", "", POPT_ARG_STRING, nil, OPT_INCLUDE},
 		//{"exclude-from", "", POPT_ARG_STRING, nil, OPT_EXCLUDE_FROM},
 		//{"include-from", "", POPT_ARG_STRING, nil, OPT_INCLUDE_FROM},
 		//{"cvs-exclude", "C", POPT_ARG_NONE, &o.cvs_exclude, 0},
@@ -1302,10 +1304,14 @@ func (pc *Context) ParseArguments(osenv *rsyncos.Env, args []string) error {
 
 			return nil
 
-		case OPT_FILTER,
-			OPT_EXCLUDE,
-			OPT_INCLUDE,
-			OPT_INCLUDE_FROM,
+		case OPT_FILTER:
+			opts.filterRules = append(opts.filterRules, pc.poptGetOptArg())
+		case OPT_EXCLUDE:
+			opts.filterRules = append(opts.filterRules, "- "+pc.poptGetOptArg())
+		case OPT_INCLUDE:
+			opts.filterRules = append(opts.filterRules, "+ "+pc.poptGetOptArg())
+
+		case OPT_INCLUDE_FROM,
 			OPT_EXCLUDE_FROM:
 			return errNotYetImplemented
 
