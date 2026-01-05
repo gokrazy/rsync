@@ -354,6 +354,9 @@ func ClientRun(osenv *rsyncos.Env, opts *rsyncopts.Options, conn io.ReadWriter, 
 			PreserveTimes:     opts.PreserveMTimes(),
 			PreserveHardlinks: opts.PreserveHardLinks(),
 			IgnoreTimes:       opts.IgnoreTimes(),
+
+			InfoGTE:  opts.InfoGTE,
+			DebugGTE: opts.DebugGTE,
 		},
 		Dest: paths[0],
 		Env:  osenv,
@@ -390,19 +393,19 @@ func ClientRun(osenv *rsyncos.Env, opts *rsyncopts.Options, conn io.ReadWriter, 
 		return nil, err
 	}
 
-	if opts.Verbose() { // TODO: should be DebugGTE(RECV, 1)
+	if opts.DebugGTE(rsyncopts.DEBUG_RECV, 1) {
 		osenv.Logf("exclusion list sent")
 	}
 
 	// receive file list
-	if opts.Verbose() { // TODO: should be debug (FLOG)
+	if opts.DebugGTE(rsyncopts.DEBUG_FLIST, 1) {
 		osenv.Logf("receiving file list")
 	}
 	fileList, err := rt.ReceiveFileList()
 	if err != nil {
 		return nil, err
 	}
-	if opts.Verbose() { // TODO: should be debugGTE(FLIST, 2)
+	if opts.DebugGTE(rsyncopts.DEBUG_FLIST, 2) {
 		osenv.Logf("received %d names", len(fileList))
 	}
 

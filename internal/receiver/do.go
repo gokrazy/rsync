@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/gokrazy/rsync/internal/rsyncopts"
 	"github.com/gokrazy/rsync/internal/rsyncstats"
 	"github.com/gokrazy/rsync/internal/rsyncwire"
 	"golang.org/x/sync/errgroup"
@@ -143,7 +144,7 @@ func (rt *Transfer) report(c *rsyncwire.Conn) (*rsyncstats.TransferStats, error)
 	if err != nil {
 		return nil, err
 	}
-	if rt.Opts.Verbose { // TODO: InfoGTE(STATS, 1)
+	if rt.Opts.InfoGTE(rsyncopts.INFO_STATS, 1) {
 		rt.Logger.Printf("server sent stats: read=%d, written=%d, size=%d", read, written, size)
 	}
 

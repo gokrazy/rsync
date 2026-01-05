@@ -356,7 +356,7 @@ func (s *Server) handleConn(ctx context.Context, conn *Conn, module *Module, pc 
 		if err != nil {
 			return err
 		}
-		if opts.Verbose() {
+		if opts.DebugGTE(rsyncopts.DEBUG_PROTO, 1) {
 			s.logger.Printf("remote protocol: %d", remoteProtocol)
 		}
 		if err := c.WriteInt32(rsync.ProtocolVersion); err != nil {
@@ -439,6 +439,9 @@ func (s *Server) handleConnReceiver(module *Module, crd *rsyncwire.CountingReade
 			PreserveTimes:    opts.PreserveMTimes(),
 			// TODO: PreserveHardlinks: opts.PreserveHardlinks,
 			IgnoreTimes: opts.IgnoreTimes(),
+
+			InfoGTE:  opts.InfoGTE,
+			DebugGTE: opts.DebugGTE,
 		},
 		Dest: module.Path,
 		Env: &rsyncos.Env{
@@ -505,21 +508,21 @@ func (s *Server) handleConnReceiver(module *Module, crd *rsyncwire.CountingReade
 	}
 
 	// receive file list
-	if opts.Verbose() { // TODO: InfoGTE(FLIST, 1)
+	if opts.InfoGTE(rsyncopts.INFO_FLIST, 1) {
 		s.logger.Printf("receiving file list")
 	}
 	fileList, err := rt.ReceiveFileList()
 	if err != nil {
 		return err
 	}
-	if opts.Verbose() { // TODO: InfoGTE(FLIST, 1)
+	if opts.InfoGTE(rsyncopts.INFO_FLIST, 1) {
 		s.logger.Printf("received %d names", len(fileList))
 	}
 	stats, err := rt.Do(c, fileList, true)
 	if err != nil {
 		return err
 	}
-	if opts.Verbose() { // TODO: InfoGTE(STATS, 1)
+	if opts.InfoGTE(rsyncopts.INFO_STATS, 1) {
 		s.logger.Printf("stats: %+v", stats)
 	}
 	return nil

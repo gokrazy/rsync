@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"sort"
 
+	"github.com/gokrazy/rsync/internal/rsyncopts"
 	"github.com/gokrazy/rsync/internal/rsyncstats"
 	"github.com/gokrazy/rsync/internal/rsyncwire"
 )
@@ -47,7 +48,7 @@ func (st *Transfer) Do(crd *rsyncwire.CountingReader, cwr *rsyncwire.CountingWri
 	}
 	defer fileList.Close()
 
-	if st.Opts.Verbose() { // TODO: DebugGTE(FLIST, 3)
+	if st.Opts.DebugGTE(rsyncopts.DEBUG_FLIST, 3) {
 		st.Logger.Printf("file list sent")
 	}
 
@@ -66,7 +67,7 @@ func (st *Transfer) Do(crd *rsyncwire.CountingReader, cwr *rsyncwire.CountingWri
 		return nil, err
 	}
 
-	if st.Opts.Verbose() { // TODO: Debug
+	if st.Opts.DebugGTE(rsyncopts.DEBUG_PROTO, 1) {
 		st.Logger.Printf("reading final int32")
 	}
 

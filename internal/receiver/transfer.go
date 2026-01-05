@@ -4,6 +4,7 @@ import (
 	"os"
 
 	"github.com/gokrazy/rsync/internal/log"
+	"github.com/gokrazy/rsync/internal/rsyncopts"
 	"github.com/gokrazy/rsync/internal/rsyncos"
 	"github.com/gokrazy/rsync/internal/rsyncwire"
 )
@@ -24,6 +25,9 @@ type TransferOpts struct {
 	PreserveTimes     bool
 	PreserveHardlinks bool
 	IgnoreTimes       bool
+
+	InfoGTE  func(rsyncopts.InfoLevel, uint16) bool
+	DebugGTE func(rsyncopts.DebugLevel, uint16) bool
 }
 
 type Transfer struct {

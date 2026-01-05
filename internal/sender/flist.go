@@ -14,6 +14,7 @@ import (
 
 	"github.com/gokrazy/rsync"
 	"github.com/gokrazy/rsync/internal/rsyncchecksum"
+	"github.com/gokrazy/rsync/internal/rsyncopts"
 	"github.com/gokrazy/rsync/internal/rsyncwire"
 )
 
@@ -105,7 +106,9 @@ func (s *scopedWalker) walk() error {
 
 func (s *scopedWalker) walkFile() error {
 	dir, file := filepath.Split(s.rootPath)
-	s.st.Logger.Printf("treating rootPath=%q as dir=%q + file=%q", s.rootPath, dir, file)
+	if s.st.Opts.DebugGTE(rsyncopts.DEBUG_FLIST, 1) {
+		s.st.Logger.Printf("treating rootPath=%q as dir=%q + file=%q", s.rootPath, dir, file)
+	}
 	s.prefix = ""
 	root, err := os.OpenRoot(dir)
 	if err != nil {
@@ -139,7 +142,9 @@ func (s *scopedWalker) walkFile() error {
 func (s *scopedWalker) walkFn(path string, d fs.DirEntry, err error) error {
 	logger := s.st.Logger // for convenience
 	opts := s.st.Opts     // for convenience
-	logger.Printf("filepath.WalkFn(path=%s)", path)
+	if opts.DebugGTE(rsyncopts.DEBUG_FLIST, 1) {
+		logger.Printf("filepath.WalkFn(path=%s)", path)
+	}
 	var info fs.FileInfo
 	if err == nil {
 		info, err = d.Info()
@@ -150,7 +155,9 @@ func (s *scopedWalker) walkFn(path string, d fs.DirEntry, err error) error {
 		return nil
 	}
 
-	logger.Printf("isDir=%v, xferDirs=%v", info.Mode().IsDir(), opts.XferDirs())
+	if opts.DebugGTE(rsyncopts.DEBUG_FLIST, 1) {
+		logger.Printf("isDir=%v, xferDirs=%v", info.Mode().IsDir(), opts.XferDirs())
+	}
 	if info.Mode().IsDir() && opts.XferDirs() == 0 {
 		logger.Printf("skipping directory %s", path)
 		return filepath.SkipDir
@@ -160,7 +167,9 @@ func (s *scopedWalker) walkFn(path string, d fs.DirEntry, err error) error {
 	flags := byte(rsync.XMIT_LONG_NAME)
 
 	name := s.prefix + path
-	logger.Printf("Trim(path=%q) = %q", path, name)
+	if opts.DebugGTE(rsyncopts.DEBUG_FLIST, 1) {
+		logger.Printf("Trim(path=%q) = %q", path, name)
+	}
 	if path == "." {
 		name = s.prefix
 		if s.prefix == "" {
@@ -346,7 +355,7 @@ func (st *Transfer) SendFileList(localDir string, paths []string, excl *filterRu
 	// TODO: handle info == nil case (permission denied?): should set an i/o
 	// error flag, but traversal should continue
 
-	if st.Opts.Verbose() { // TODO: DebugGTE(FLIST, 1)
+	if st.Opts.DebugGTE(rsyncopts.DEBUG_FLIST, 1) {
 		st.Logger.Printf("sendFileList()")
 	}
 	ioErrors := int32(0)
@@ -361,7 +370,7 @@ func (st *Transfer) SendFileList(localDir string, paths []string, excl *filterRu
 	}
 
 	for _, requested := range paths {
-		if st.Opts.Verbose() { // TODO: DebugGTE(FLIST, 1)
+		if st.Opts.DebugGTE(rsyncopts.DEBUG_FLIST, 1) {
 			st.Logger.Printf("  path %q (local dir %q)", requested, localDir)
 		}
 		// st.Logger.Printf("getRootStrip(requested=%q, localDir=%q", requested, localDir)
@@ -372,7 +381,7 @@ func (st *Transfer) SendFileList(localDir string, paths []string, excl *filterRu
 			prefix = strings.TrimPrefix(prefix, "/")
 			prefix += "/"
 		}
-		if st.Opts.Verbose() { // TODO: DebugGTE(FLIST, 1)
+		if st.Opts.DebugGTE(rsyncopts.DEBUG_FLIST, 1) {
 			st.Logger.Printf("  filepath.Walk(%q), strip=%q", rootPath, strip)
 			st.Logger.Printf("  prefix=%q", prefix)
 		}

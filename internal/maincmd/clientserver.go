@@ -107,7 +107,7 @@ func startInbandExchange(osenv *rsyncos.Env, opts *rsyncopts.Options, conn io.Re
 			return false, fmt.Errorf("did not get server startup line: %v", err)
 		}
 		line = strings.TrimSpace(line)
-		if opts.Verbose() { // TODO: should be debug
+		if opts.DebugGTE(rsyncopts.DEBUG_PROTO, 1) {
 			osenv.Logf("read line: %q", line)
 		}
 

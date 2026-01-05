@@ -11,6 +11,7 @@ import (
 	"github.com/gokrazy/rsync"
 	"github.com/gokrazy/rsync/internal/rsyncchecksum"
 	"github.com/gokrazy/rsync/internal/rsynccommon"
+	"github.com/gokrazy/rsync/internal/rsyncopts"
 )
 
 // rsync/generator.c:generate_files()
@@ -25,7 +26,7 @@ func (rt *Transfer) GenerateFiles(fileList []*File) error {
 		}
 	}
 	phase++
-	if rt.Opts.Verbose { // TODO: DebugGTE(genr, 1)
+	if rt.Opts.DebugGTE(rsyncopts.DEBUG_GENR, 1) {
 		rt.Logger.Printf("generateFiles phase=%d", phase)
 	}
 	if err := rt.Conn.WriteInt32(-1); err != nil {
@@ -34,14 +35,14 @@ func (rt *Transfer) GenerateFiles(fileList []*File) error {
 
 	// TODO: re-do any files that failed
 	phase++
-	if rt.Opts.Verbose { // TODO: DebugGTE(genr, 1)
+	if rt.Opts.DebugGTE(rsyncopts.DEBUG_GENR, 1) {
 		rt.Logger.Printf("generateFiles phase=%d", phase)
 	}
 	if err := rt.Conn.WriteInt32(-1); err != nil {
 		return err
 	}
 
-	if rt.Opts.Verbose { // TODO: DebugGTE(genr, 1)
+	if rt.Opts.DebugGTE(rsyncopts.DEBUG_GENR, 1) {
 		rt.Logger.Printf("generateFiles finished")
 	}
 	return nil
@@ -117,7 +118,7 @@ func (rt *Transfer) recvGenerator(idx int, f *File) error {
 			f.Name)
 		return nil
 	}
-	if rt.Opts.Verbose { // TODO: DebugGTE(genr, 1)
+	if rt.Opts.DebugGTE(rsyncopts.DEBUG_GENR, 1) {
 		rt.Logger.Printf("recv_generator(f=%+v)", f)
 	}
 
@@ -139,7 +140,9 @@ func (rt *Transfer) recvGenerator(idx int, f *File) error {
 		}
 		if err != nil {
 			perm := fs.FileMode(f.Mode) & os.ModePerm
-			rt.Logger.Printf("MkdirAll(%s, %v)", f.Name, perm)
+			if rt.Opts.DebugGTE(rsyncopts.DEBUG_GENR, 1) {
+				rt.Logger.Printf("MkdirAll(%s, %v)", f.Name, perm)
+			}
 			if err := rt.DestRoot.MkdirAll(f.Name, perm); err != nil {
 				// TODO: EEXIST is okay
 				return err
@@ -157,7 +160,9 @@ func (rt *Transfer) recvGenerator(idx int, f *File) error {
 		if err == nil {
 			// local file exists, verify target matches
 			if target, err := rt.DestRoot.Readlink(local); err == nil {
-				rt.Logger.Printf("existing target: %q", target)
+				if rt.Opts.DebugGTE(rsyncopts.DEBUG_GENR, 1) {
+					rt.Logger.Printf("existing target: %q", target)
+				}
 				if target == f.LinkTarget {
 					if err := rt.setPerms(f); err != nil {
 						return err
@@ -168,7 +173,9 @@ func (rt *Transfer) recvGenerator(idx int, f *File) error {
 			}
 			// fallthrough to create or replace the symlink
 		}
-		rt.Logger.Printf("symlink %s -> %s", local, f.LinkTarget)
+		if rt.Opts.DebugGTE(rsyncopts.DEBUG_GENR, 1) {
+			rt.Logger.Printf("symlink %s -> %s", local, f.LinkTarget)
+		}
 		if err := symlink(rt.DestRoot, f.LinkTarget, local); err != nil {
 			return err
 		}
@@ -199,7 +206,9 @@ func (rt *Transfer) recvGenerator(idx int, f *File) error {
 	}
 
 	requestFullFile := func() error {
-		rt.Logger.Printf("requesting: %s", f.Name)
+		if rt.Opts.DebugGTE(rsyncopts.DEBUG_GENR, 1) {
+			rt.Logger.Printf("requesting: %s", f.Name)
+		}
 		if err := rt.Conn.WriteInt32(int32(idx)); err != nil {
 			return err
 		}
@@ -236,7 +245,7 @@ func (rt *Transfer) recvGenerator(idx int, f *File) error {
 		return err
 	}
 	if skip {
-		if rt.Opts.Verbose { // TODO: InfoGTE(skip, 1)
+		if rt.Opts.InfoGTE(rsyncopts.INFO_SKIP, 1) {
 			rt.Logger.Printf("skipping %s", local)
 		}
 		if err := rt.setPerms(f); err != nil {
@@ -262,7 +271,9 @@ func (rt *Transfer) recvGenerator(idx int, f *File) error {
 	}
 	defer in.Close()
 
-	rt.Logger.Printf("sending sums for: %s", f.Name)
+	if rt.Opts.DebugGTE(rsyncopts.DEBUG_GENR, 1) {
+		rt.Logger.Printf("sending sums for: %s", f.Name)
+	}
 	if err := rt.Conn.WriteInt32(int32(idx)); err != nil {
 		return err
 	}

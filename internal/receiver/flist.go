@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/gokrazy/rsync"
+	"github.com/gokrazy/rsync/internal/rsyncopts"
 )
 
 // rsync/flist.c:flist_sort_and_clean
@@ -212,7 +213,7 @@ func (rt *Transfer) ReceiveFileList() ([]*File, error) {
 		}
 		lastFileEntry = f
 		// TODO: include depth in output?
-		if rt.Opts.Verbose { // TODO: should be debug(INFO)
+		if rt.Opts.DebugGTE(rsyncopts.DEBUG_FLIST, 1) {
 			rt.Logger.Printf("[Receiver] i=%d ? %s mode=%o len=%d uid=%d gid=%d flags=?",
 				len(fileList),
 				f.Name,
@@ -241,7 +242,7 @@ func (rt *Transfer) ReceiveFileList() ([]*File, error) {
 	if err != nil {
 		return nil, err
 	}
-	if rt.Opts.Verbose { // TODO: debugGTE(FLIST, 2)
+	if rt.Opts.DebugGTE(rsyncopts.DEBUG_FLIST, 2) {
 		rt.Logger.Printf("ioErrors: %v", ioErrors)
 	}
 	rt.IOErrors = ioErrors

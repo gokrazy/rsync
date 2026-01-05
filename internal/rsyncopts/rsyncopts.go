@@ -62,10 +62,10 @@ const (
 	OPT_REFUSED_BASE = 9000
 )
 
-type infoLevel int
+type InfoLevel int
 
 const (
-	INFO_BACKUP infoLevel = iota
+	INFO_BACKUP InfoLevel = iota
 	INFO_COPY
 	INFO_DEL
 	INFO_FLIST
@@ -79,6 +79,36 @@ const (
 	INFO_STATS
 	INFO_SYMSAFE
 	COUNT_INFO
+)
+
+type DebugLevel int
+
+const (
+	DEBUG_ACL DebugLevel = iota
+	DEBUG_BACKUP
+	DEBUG_BIND
+	DEBUG_CHDIR
+	DEBUG_CONNECT
+	DEBUG_CMD
+	DEBUG_DEL
+	DEBUG_DELTASUM
+	DEBUG_DUP
+	DEBUG_EXIT
+	DEBUG_FILTER
+	DEBUG_FLIST
+	DEBUG_FUZZY
+	DEBUG_GENR
+	DEBUG_HASH
+	DEBUG_HLINK
+	DEBUG_ICONV
+	DEBUG_IO
+	DEBUG_NSTR
+	DEBUG_OWN
+	DEBUG_PROTO
+	DEBUG_RECV
+	DEBUG_SEND
+	DEBUG_TIME
+	COUNT_DEBUG
 )
 
 var tridgeDefaults = Options{
@@ -185,6 +215,7 @@ type Options struct {
 	// not directly referenced in the table, but used in the special case code.
 	do_compression int
 	info           [COUNT_INFO]uint16
+	debug          [COUNT_DEBUG]uint16
 	local_server   int
 	filterRules    []string
 
@@ -353,6 +384,33 @@ var infoWords = [...]output{
 	{"SYMSAFE", W_SND | W_REC, "Mention symlinks that are unsafe"},
 }
 
+var debugWords = [...]output{
+	{"ACL", W_SND | W_REC, "Debug extra ACL info"},
+	{"BACKUP", W_REC, "Debug backup actions (levels 1-2)"},
+	{"CHDIR", W_CLI | W_SRV, "Debug when the current directory changes"},
+	{"BIND", W_CLI, "Debug socket bind actions"},
+	{"CONNECT", W_CLI, "Debug connection events (levels 1-2)"},
+	{"CMD", W_CLI, "Debug commands+options that are issued (levels 1-2)"},
+	{"DEL", W_REC, "Debug delete actions (levels 1-3)"},
+	{"DELTASUM", W_SND | W_REC, "Debug delta-transfer checksumming (levels 1-4)"},
+	{"DUP", W_REC, "Debug weeding of duplicate names"},
+	{"EXIT", W_CLI | W_SRV, "Debug exit events (levels 1-3)"},
+	{"FILTER", W_SND | W_REC, "Debug filter actions (levels 1-3)"},
+	{"FLIST", W_SND | W_REC, "Debug file-list operations (levels 1-4)"},
+	{"FUZZY", W_REC, "Debug fuzzy scoring (levels 1-2)"},
+	{"GENR", W_REC, "Debug generator functions"},
+	{"HASH", W_SND | W_REC, "Debug hashtable code"},
+	{"HLINK", W_SND | W_REC, "Debug hard-link actions (levels 1-3)"},
+	{"ICONV", W_CLI | W_SRV, "Debug iconv character conversions (levels 1-2)"},
+	{"IO", W_CLI | W_SRV, "Debug I/O routines (levels 1-4)"},
+	{"NSTR", W_CLI | W_SRV, "Debug negotiation strings"},
+	{"OWN", W_REC, "Debug ownership changes in users & groups (levels 1-2)"},
+	{"PROTO", W_CLI | W_SRV, "Debug protocol information"},
+	{"RECV", W_REC, "Debug receiver functions"},
+	{"SEND", W_SND, "Debug sender functions"},
+	{"TIME", W_REC, "Debug setting of modified times (levels 1-2)"},
+}
+
 func parseOutputWords(osenv *rsyncos.Env, words []output, levels []uint16, str string, prio priority) error {
 Level:
 	for s := range strings.SplitSeq(str, ",") {
@@ -404,7 +462,6 @@ func (o *Options) setOutputVerbosity(prio priority) error {
 		"CMD2,DELTASUM3,DEL3,EXIT2,FLIST3,ICONV2,OWN2,PROTO,TIME2",
 		"CHDIR,DELTASUM4,FLIST4,FUZZY2,HASH,HLINK",
 	}
-	_ = debugVerbosity
 	infoVerbosity := [...]string{
 		"NONREG",
 		"COPY,DEL,FLIST,MISC,NAME,STATS,SYMSAFE",
@@ -417,7 +474,9 @@ func (o *Options) setOutputVerbosity(prio priority) error {
 			}
 		}
 		if j < len(debugVerbosity) {
-			// parseOutputWords(debugWords[:], o.debug[:], debugVerbosity[j], prio)
+			if err := parseOutputWords(o.osenv, debugWords[:], o.debug[:], debugVerbosity[j], prio); err != nil {
+				return err
+			}
 		}
 	}
 	return nil
@@ -671,6 +730,22 @@ func (o *Options) OutputMOTD() bool           { return o.output_motd != 0 }
 func (o *Options) RsyncPort() int             { return o.rsync_port }
 func (o *Options) XferDirs() int              { return o.xfer_dirs }
 func (o *Options) FilterRules() []string      { return o.filterRules }
+
+func (o *Options) InfoGTE(flag InfoLevel, lvl uint16) bool {
+	return o.info[int(flag)] >= lvl
+}
+
+func (o *Options) InfoEQ(flag InfoLevel, lvl uint16) bool {
+	return o.info[int(flag)] == lvl
+}
+
+func (o *Options) DebugGTE(flag DebugLevel, lvl uint16) bool {
+	return o.debug[int(flag)] >= lvl
+}
+
+func (o *Options) DebugEQ(flag DebugLevel, lvl uint16) bool {
+	return o.debug[int(flag)] == lvl
+}
 
 func (o *Options) daemonTable() []poptOption {
 	return []poptOption{
@@ -1416,8 +1491,7 @@ func (pc *Context) ParseArguments(osenv *rsyncos.Env, args []string) error {
 			parseOutputWords(osenv, infoWords[:], opts.info[:], pc.poptGetOptArg(), USER_PRIORITY)
 
 		case OPT_DEBUG:
-			// TODO: plumb the debug level that make sense for our implementation
-			osenv.Logf("TODO: set debug level to %q", pc.poptGetOptArg())
+			parseOutputWords(osenv, debugWords[:], opts.debug[:], pc.poptGetOptArg(), USER_PRIORITY)
 
 		case OPT_USERMAP,
 			OPT_GROUPMAP,

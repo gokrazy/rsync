@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 
 	"github.com/gokrazy/rsync"
+	"github.com/gokrazy/rsync/internal/rsyncopts"
 	"github.com/mmcloughlin/md4"
 )
 
@@ -23,7 +24,7 @@ func (rt *Transfer) RecvFiles(fileList []*File) error {
 		if idx == -1 {
 			if phase == 0 {
 				phase++
-				if rt.Opts.Verbose { // TODO: DebugGTE(RECV, 1)
+				if rt.Opts.DebugGTE(rsyncopts.DEBUG_RECV, 1) {
 					rt.Logger.Printf("recvFiles phase=%d", phase)
 				}
 				// TODO: send done message
@@ -31,14 +32,14 @@ func (rt *Transfer) RecvFiles(fileList []*File) error {
 			}
 			break
 		}
-		if rt.Opts.Verbose { // TODO: DebugGTE(RECV, 1)
+		if rt.Opts.DebugGTE(rsyncopts.DEBUG_RECV, 1) {
 			rt.Logger.Printf("receiving file idx=%d: %+v", idx, fileList[idx])
 		}
 		if err := rt.recvFile1(fileList[idx]); err != nil {
 			return err
 		}
 	}
-	if rt.Opts.Verbose { // TODO: DebugGTE(RECV, 1)
+	if rt.Opts.DebugGTE(rsyncopts.DEBUG_RECV, 1) {
 		rt.Logger.Printf("recvFiles finished")
 	}
 	return nil
@@ -100,7 +101,9 @@ func (rt *Transfer) receiveData(f *File, localFile *os.File) error {
 
 	local := filepath.Join(rt.Dest, f.Name)
 	// TODO: use rt.DestRoot once renameio supports it
-	rt.Logger.Printf("creating %s", local)
+	if rt.Opts.DebugGTE(rsyncopts.DEBUG_DELTASUM, 1) {
+		rt.Logger.Printf("creating %s", local)
+	}
 	out, err := newPendingFile(local)
 	if err != nil {
 		return err
@@ -152,7 +155,9 @@ func (rt *Transfer) receiveData(f *File, localFile *os.File) error {
 	if !bytes.Equal(localSum, remoteSum) {
 		return fmt.Errorf("file corruption in %s", f.Name)
 	}
-	rt.Logger.Printf("checksum %x matches!", localSum)
+	if rt.Opts.DebugGTE(rsyncopts.DEBUG_DELTASUM, 1) {
+		rt.Logger.Printf("checksum %x matches!", localSum)
+	}
 
 	if err := out.CloseAtomicallyReplace(); err != nil {
 		return err
