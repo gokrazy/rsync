@@ -60,12 +60,19 @@ var (
 
 func getRootStrip(requested, localDir string) (string, string) {
 	root := filepath.Clean(filepath.Join(localDir, requested))
-
 	sep := string(os.PathSeparator)
-	strip := filepath.Dir(filepath.Clean(root)) + sep
-	if strings.HasSuffix(requested, sep) {
+
+	isEndSep := strings.HasSuffix(requested, "\\") || strings.HasSuffix(requested, "/")
+	strip := ""
+	if !isEndSep {
+		strip = filepath.Dir(filepath.Clean(root)) + sep
+		if strings.HasSuffix(requested, sep) {
+			strip = filepath.Clean(root) + sep
+		}
+	} else {
 		strip = filepath.Clean(root) + sep
 	}
+
 	return root, strip
 }
 
@@ -373,12 +380,18 @@ func (st *Transfer) SendFileList(localDir string, paths []string, excl *filterRu
 		if st.Opts.DebugGTE(rsyncopts.DEBUG_FLIST, 1) {
 			st.Logger.Printf("  path %q (local dir %q)", requested, localDir)
 		}
+
 		// st.Logger.Printf("getRootStrip(requested=%q, localDir=%q", requested, localDir)
 		rootPath, strip := getRootStrip(requested, localDir)
 		// st.Logger.Printf("root=%q, strip=%q", root, strip)
 		prefix := strings.TrimPrefix(rootPath, filepath.Clean(strip))
 		if prefix != "" {
 			prefix = strings.TrimPrefix(prefix, "/")
+
+			// server directory have prefix \
+			prefix = strings.TrimPrefix(prefix, "\\")
+			//
+
 			prefix += "/"
 		}
 		if st.Opts.DebugGTE(rsyncopts.DEBUG_FLIST, 1) {
