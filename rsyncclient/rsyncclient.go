@@ -67,6 +67,7 @@ type Client struct {
 func New(args []string, opts ...Option) (*Client, error) {
 	c := &Client{
 		osenv: &rsyncos.Env{
+			Stdout: os.Stdout,
 			Stderr: os.Stderr,
 		},
 		negotiate: true,
