@@ -4,7 +4,9 @@ import (
 	"io"
 
 	"github.com/gokrazy/rsync/internal/log"
+	"github.com/gokrazy/rsync/internal/progress"
 	"github.com/gokrazy/rsync/internal/rsyncopts"
+	"github.com/gokrazy/rsync/internal/rsyncos"
 	"github.com/gokrazy/rsync/internal/rsyncwire"
 )
 
@@ -33,8 +35,10 @@ type TransferOpts struct {
 type Transfer struct {
 	// config
 	// Opts *Opts
-	Logger log.Logger
-	Opts   *rsyncopts.Options
+	Logger   log.Logger
+	Opts     *rsyncopts.Options
+	Env      *rsyncos.Env
+	Progress progress.Printer
 
 	// state
 	Conn      *rsyncwire.Conn

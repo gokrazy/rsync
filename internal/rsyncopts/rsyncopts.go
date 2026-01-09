@@ -730,6 +730,9 @@ func (o *Options) OutputMOTD() bool           { return o.output_motd != 0 }
 func (o *Options) RsyncPort() int             { return o.rsync_port }
 func (o *Options) XferDirs() int              { return o.xfer_dirs }
 func (o *Options) FilterRules() []string      { return o.filterRules }
+func (o *Options) Progress() bool {
+	return o.info[INFO_PROGRESS] > 0
+}
 
 func (o *Options) InfoGTE(flag InfoLevel, lvl uint16) bool {
 	return o.info[int(flag)] >= lvl
@@ -950,8 +953,8 @@ func (o *Options) gokrazyTable() []poptOption {
 		//{"zl", "", POPT_ARG_INT, &o.do_compression_level, 0},
 
 		//{"", "P", POPT_ARG_NONE, nil, 'P'},
-		//{"progress", "", POPT_ARG_VAL, &o.do_progress, 1},
-		//{"no-progress", "", POPT_ARG_VAL, &o.do_progress, 0},
+		{"progress", "", POPT_ARG_VAL, &o.do_progress, 1},
+		{"no-progress", "", POPT_ARG_VAL, &o.do_progress, 0},
 		//{"partial", "", POPT_ARG_VAL, &o.keep_partial, 1},
 		//{"no-partial", "", POPT_ARG_VAL, &o.keep_partial, 0},
 		//{"partial-dir", "", POPT_ARG_STRING, &o.partial_dir, 0},
@@ -1576,10 +1579,12 @@ func (pc *Context) ParseArguments(osenv *rsyncos.Env, args []string) error {
 		opts.make_backups = 1 // --backup-dir implies --backup
 	}
 
-	if opts.do_progress != 0 /* && !opts.am_server */ {
+	if opts.do_progress != 0 && opts.am_server == 0 {
 		if opts.info[INFO_NAME] == 0 {
 			opts.info[INFO_NAME] = 1
 		}
+		opts.info[INFO_FLIST] = 2
+		opts.info[INFO_PROGRESS] = 1
 	}
 
 	if opts.info[INFO_NAME] >= 1 && opts.stdout_format == "" {

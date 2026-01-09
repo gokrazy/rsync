@@ -188,6 +188,7 @@ func (s *scopedWalker) walkFn(path string, d fs.DirEntry, err error) error {
 		path:    path,
 		regular: info.Mode().IsRegular(),
 		Wpath:   name,
+		Length:  info.Size(),
 	})
 
 	s.fec.Reset()
@@ -355,6 +356,7 @@ func (st *Transfer) SendFileList(localDir string, paths []string, excl *filterRu
 	// TODO: handle info == nil case (permission denied?): should set an i/o
 	// error flag, but traversal should continue
 
+	st.Logger.Printf("building file list")
 	if st.Opts.DebugGTE(rsyncopts.DEBUG_FLIST, 1) {
 		st.Logger.Printf("sendFileList()")
 	}
@@ -401,6 +403,10 @@ func (st *Transfer) SendFileList(localDir string, paths []string, excl *filterRu
 		if err := sw.walk(); err != nil {
 			return nil, err
 		}
+	}
+
+	if st.Opts.InfoGTE(rsyncopts.INFO_PROGRESS, 1) {
+		st.Logger.Printf("%d files to consider", len(fileList.Files))
 	}
 
 	fec.Reset()

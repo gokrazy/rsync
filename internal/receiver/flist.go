@@ -193,6 +193,10 @@ func (rt *Transfer) receiveFileEntry(flags uint16, last *File) (*File, error) {
 
 // rsync/flist.c:recv_file_list
 func (rt *Transfer) ReceiveFileList() ([]*File, error) {
+	if rt.Opts.Progress {
+		fmt.Fprintln(rt.Env.Stdout, "receiving file list...")
+		fmt.Fprint(rt.Env.Stdout, "0 files to consider")
+	}
 	lastFileEntry := new(File)
 	var fileList []*File
 	for {
@@ -223,6 +227,12 @@ func (rt *Transfer) ReceiveFileList() ([]*File, error) {
 				f.Gid)
 		}
 		fileList = append(fileList, f)
+		if rt.Opts.Progress && len(fileList)%100 == 0 {
+			fmt.Fprintf(rt.Env.Stdout, "\r%d files to consider", len(fileList))
+		}
+	}
+	if rt.Opts.Progress {
+		fmt.Fprintf(rt.Env.Stdout, "\r%d files to consider\n", len(fileList))
 	}
 
 	sortFileList(fileList)

@@ -9,8 +9,10 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/gokrazy/rsync"
+	"github.com/gokrazy/rsync/internal/progress"
 	"github.com/gokrazy/rsync/internal/receiver"
 	"github.com/gokrazy/rsync/internal/restrict"
 	"github.com/gokrazy/rsync/internal/rsyncopts"
@@ -301,10 +303,12 @@ func ClientRun(osenv *rsyncos.Env, opts *rsyncopts.Options, conn io.ReadWriter, 
 
 	if opts.Sender() {
 		st := &sender.Transfer{
-			Logger: osenv.Logger(),
-			Opts:   opts,
-			Conn:   c,
-			Seed:   seed,
+			Logger:   osenv.Logger(),
+			Opts:     opts,
+			Conn:     c,
+			Seed:     seed,
+			Env:      osenv,
+			Progress: progress.NewPrinter(osenv.Stdout, time.Now),
 		}
 		if opts.Verbose() {
 			osenv.Logf("sender(paths=%q)", paths)
@@ -341,8 +345,9 @@ func ClientRun(osenv *rsyncos.Env, opts *rsyncopts.Options, conn io.ReadWriter, 
 	rt := &receiver.Transfer{
 		Logger: osenv.Logger(),
 		Opts: &receiver.TransferOpts{
-			Verbose: opts.Verbose(),
-			DryRun:  opts.DryRun(),
+			Verbose:  opts.Verbose(),
+			DryRun:   opts.DryRun(),
+			Progress: opts.Progress(),
 
 			DeleteMode:        opts.DeleteMode(),
 			PreserveGid:       opts.PreserveGid(),
@@ -358,10 +363,11 @@ func ClientRun(osenv *rsyncos.Env, opts *rsyncopts.Options, conn io.ReadWriter, 
 			InfoGTE:  opts.InfoGTE,
 			DebugGTE: opts.DebugGTE,
 		},
-		Dest: paths[0],
-		Env:  osenv,
-		Conn: c,
-		Seed: seed,
+		Dest:     paths[0],
+		Env:      osenv,
+		Conn:     c,
+		Seed:     seed,
+		Progress: progress.NewPrinter(osenv.Stdout, time.Now),
 	}
 	if opts.Verbose() {
 		osenv.Logf("receiving to dest=%s", rt.Dest)

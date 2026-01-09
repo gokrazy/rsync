@@ -18,6 +18,7 @@ import (
 
 	"github.com/gokrazy/rsync"
 	"github.com/gokrazy/rsync/internal/log"
+	"github.com/gokrazy/rsync/internal/progress"
 	"github.com/gokrazy/rsync/internal/receiver"
 	"github.com/gokrazy/rsync/internal/rsyncopts"
 	"github.com/gokrazy/rsync/internal/rsyncos"
@@ -425,9 +426,10 @@ func (s *Server) handleConnReceiver(module *Module, crd *rsyncwire.CountingReade
 	rt := &receiver.Transfer{
 		Logger: s.logger,
 		Opts: &receiver.TransferOpts{
-			DryRun:  opts.DryRun(),
-			Server:  opts.Server(),
-			Verbose: opts.Verbose(),
+			DryRun:   opts.DryRun(),
+			Server:   opts.Server(),
+			Verbose:  opts.Verbose(),
+			Progress: opts.Progress(),
 
 			DeleteMode:       opts.DeleteMode(),
 			PreserveGid:      opts.PreserveGid(),
@@ -447,8 +449,9 @@ func (s *Server) handleConnReceiver(module *Module, crd *rsyncwire.CountingReade
 		Env: &rsyncos.Env{
 			Stderr: s.stderr,
 		},
-		Conn: c,
-		Seed: sessionChecksumSeed,
+		Conn:     c,
+		Seed:     sessionChecksumSeed,
+		Progress: progress.NewPrinter(io.Discard, time.Now),
 	}
 	if err := os.MkdirAll(rt.Dest, 0755); err != nil {
 		return fmt.Errorf("MkdirAll(dest=%s): %v", rt.Dest, err)
@@ -542,6 +545,10 @@ func (s *Server) handleConnSender(module *Module, crd *rsyncwire.CountingReader,
 		Opts:   opts,
 		Conn:   c,
 		Seed:   sessionChecksumSeed,
+		Env: &rsyncos.Env{
+			Stderr: s.stderr,
+		},
+		Progress: progress.NewPrinter(io.Discard, time.Now),
 	}
 	// receive the exclusion list (openrsync’s is always empty)
 	exclusionList, err := sender.RecvFilterList(st.Conn)

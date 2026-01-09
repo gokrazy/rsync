@@ -8,6 +8,7 @@ import (
 
 	"github.com/gokrazy/rsync"
 	"github.com/gokrazy/rsync/internal/rsyncchecksum"
+	"github.com/gokrazy/rsync/internal/rsyncopts"
 	"github.com/mmcloughlin/md4"
 )
 
@@ -39,6 +40,12 @@ func (st *Transfer) hashSearch(targets []target, tagTable map[uint16]int, head r
 
 	if err := head.WriteTo(st.Conn); err != nil {
 		return err
+	}
+
+	if !st.Opts.Server() &&
+		st.Opts.InfoGTE(rsyncopts.INFO_NAME, 1) &&
+		st.Opts.InfoGTE(rsyncopts.INFO_PROGRESS, 1) {
+		fmt.Fprintln(st.Env.Stdout, fl.path)
 	}
 
 	// sum_init()
@@ -206,6 +213,10 @@ Outer:
 		return err
 	}
 
+	if st.Opts.InfoGTE(rsyncopts.INFO_PROGRESS, 1) {
+		st.Progress.Show(uint64(offset), true)
+	}
+
 	{
 		sum := h.Sum(nil)
 		st.Logger.Printf("sum: %x (len = %d)", sum, len(sum))
@@ -262,5 +273,10 @@ func (st *Transfer) matched(h hash.Hash, ms *mapStruct, head rsync.SumHead, offs
 	} else {
 		st.lastMatch = offset
 	}
+
+	if st.Opts.InfoGTE(rsyncopts.INFO_PROGRESS, 1) {
+		st.Progress.MaybeShow(uint64(offset), false)
+	}
+
 	return nil
 }

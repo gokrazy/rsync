@@ -2,6 +2,7 @@ package sender
 
 import (
 	"encoding/binary"
+	"fmt"
 	"io"
 	"os"
 	"sort"
@@ -9,6 +10,7 @@ import (
 	"github.com/gokrazy/rsync"
 	"github.com/gokrazy/rsync/internal/rsyncchecksum"
 	"github.com/gokrazy/rsync/internal/rsynccommon"
+	"github.com/gokrazy/rsync/internal/rsyncopts"
 	"github.com/mmcloughlin/md4"
 	"golang.org/x/sync/errgroup"
 )
@@ -42,6 +44,9 @@ func (st *Transfer) SendFiles(fileList *fileList) error {
 			}
 			continue
 		}
+
+		fl := fileList.Files[fileIndex]
+		st.Progress.Reset(uint64(fl.Length))
 
 		head, err := st.receiveSums()
 		if err != nil {
@@ -80,9 +85,9 @@ func (st *Transfer) SendFiles(fileList *fileList) error {
 		st.lastMatch = 0
 		if len(head.Sums) == 0 {
 			// fast path: send the whole file
-			err = st.sendFile(fileIndex, fileList.Files[fileIndex])
+			err = st.sendFile(fileIndex, fl)
 		} else {
-			err = st.hashSearch(targets, tagTable, head, fileIndex, fileList.Files[fileIndex])
+			err = st.hashSearch(targets, tagTable, head, fileIndex, fl)
 		}
 		if err != nil {
 			if _, ok := err.(*os.PathError); ok {
@@ -90,7 +95,7 @@ func (st *Transfer) SendFiles(fileList *fileList) error {
 				// proceed. Only starting with protocol 30, an I/O error flag is
 				// sent after the file transfer phase.
 				if os.IsNotExist(err) {
-					st.Logger.Printf("file has vanished: %s", fileList.Files[fileIndex].path)
+					st.Logger.Printf("file has vanished: %s", fl.path)
 				} else {
 					st.Logger.Printf("sendFiles: %v", err)
 				}
@@ -166,9 +171,14 @@ func (st *Transfer) sendFile(fileIndex int32, fl file) error {
 	}
 
 	sh := rsynccommon.SumSizesSqroot(fi.Size())
-	// st.logger.Printf("sh = %+v", sh)
 	if err := sh.WriteTo(st.Conn); err != nil {
 		return err
+	}
+
+	if !st.Opts.Server() &&
+		st.Opts.InfoGTE(rsyncopts.INFO_NAME, 1) &&
+		st.Opts.InfoGTE(rsyncopts.INFO_PROGRESS, 1) {
+		fmt.Fprintln(st.Env.Stdout, fl.path)
 	}
 
 	h := md4.New()
@@ -195,8 +205,12 @@ func (st *Transfer) sendFile(fileIndex int32, fl file) error {
 		return nil
 	})
 
+	offset := 0
 	buf := make([]byte, chunkSize)
 	for {
+		if st.Opts.InfoGTE(rsyncopts.INFO_PROGRESS, 1) {
+			st.Progress.MaybeShow(uint64(offset), false)
+		}
 		n, err := f.Read(buf)
 		if err != nil {
 			if err == io.EOF {
@@ -209,9 +223,14 @@ func (st *Transfer) sendFile(fileIndex int32, fl file) error {
 		if err := st.Conn.WriteInt32(int32(len(chunk))); err != nil {
 			return err
 		}
-		if _, err := st.Conn.Writer.Write(chunk); err != nil {
+		n, err = st.Conn.Writer.Write(chunk)
+		if err != nil {
 			return err
 		}
+		offset += n
+	}
+	if st.Opts.InfoGTE(rsyncopts.INFO_PROGRESS, 1) {
+		st.Progress.Show(uint64(offset), true)
 	}
 	// transfer finished:
 	if err := st.Conn.WriteInt32(0); err != nil {

@@ -4,6 +4,7 @@ import (
 	"os"
 
 	"github.com/gokrazy/rsync/internal/log"
+	"github.com/gokrazy/rsync/internal/progress"
 	"github.com/gokrazy/rsync/internal/rsyncopts"
 	"github.com/gokrazy/rsync/internal/rsyncos"
 	"github.com/gokrazy/rsync/internal/rsyncwire"
@@ -11,9 +12,10 @@ import (
 
 // TransferOpts is a subset of Opts which is required for implementing a receiver.
 type TransferOpts struct {
-	Verbose bool
-	DryRun  bool
-	Server  bool
+	Verbose  bool
+	DryRun   bool
+	Server   bool
+	Progress bool
 
 	DeleteMode        bool
 	PreserveGid       bool
@@ -37,6 +39,7 @@ type Transfer struct {
 	Dest     string
 	DestRoot *os.Root
 	Env      *rsyncos.Env
+	Progress progress.Printer
 
 	// state
 	Conn     *rsyncwire.Conn
