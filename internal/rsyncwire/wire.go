@@ -74,13 +74,16 @@ func (w *MultiplexReader) Read(p []byte) (n int, err error) {
 	if err != nil {
 		return 0, err
 	}
-	if tag == MsgError {
+	switch tag {
+	case MsgError:
 		return 0, fmt.Errorf("%s", payload)
-	}
-	if tag == MsgInfo {
+	case MsgInfo:
 		w.Env.Logf("info: %s", payload)
-	}
-	if tag != MsgData {
+		// io.ReadFull will call Read again
+		return 0, nil
+	case MsgData:
+		// continues below
+	default:
 		return 0, fmt.Errorf("unexpected tag: got %v, want %v", tag, MsgData)
 	}
 	if len(p) < len(payload) {
