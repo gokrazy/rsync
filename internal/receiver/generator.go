@@ -159,7 +159,7 @@ func (rt *Transfer) recvGenerator(idx int, f *File) error {
 		// TODO: safe_symlinks option
 		if err == nil {
 			// local file exists, verify target matches
-			if target, err := rt.DestRoot.Readlink(local); err == nil {
+			if target, err := rt.DestRoot.Readlink(f.Name); err == nil {
 				if rt.Opts.DebugGTE(rsyncopts.DEBUG_GENR, 1) {
 					rt.Logger.Printf("existing target: %q", target)
 				}
@@ -174,7 +174,7 @@ func (rt *Transfer) recvGenerator(idx int, f *File) error {
 			// fallthrough to create or replace the symlink
 		}
 		if rt.Opts.DebugGTE(rsyncopts.DEBUG_GENR, 1) {
-			rt.Logger.Printf("symlink %s -> %s", local, f.LinkTarget)
+			rt.Logger.Printf("symlink %s -> %s", f.Name, f.LinkTarget)
 		}
 		if err := symlink(rt.DestRoot, f.LinkTarget, f.Name); err != nil {
 			return err
