@@ -103,12 +103,11 @@ func (rt *Transfer) receiveData(f *File, localFile *os.File) error {
 		return err
 	}
 
-	local := filepath.Join(rt.Dest, f.Name)
-	// TODO: use rt.DestRoot once renameio supports it
 	if rt.Opts.DebugGTE(rsyncopts.DEBUG_DELTASUM, 1) {
+		local := filepath.Join(rt.Dest, f.Name)
 		rt.Logger.Printf("creating %s", local)
 	}
-	out, err := newPendingFile(local)
+	out, err := newPendingFile(rt.DestRoot, f.Name)
 	if err != nil {
 		return err
 	}
@@ -145,7 +144,7 @@ func (rt *Transfer) receiveData(f *File, localFile *os.File) error {
 			continue
 		}
 		if localFile == nil {
-			return fmt.Errorf("BUG: local file %s not open for copying chunk", local)
+			return fmt.Errorf("BUG: local file %s not open for copying chunk", out.Name())
 		}
 		token = -(token + 1)
 		offset2 := int64(token) * int64(sh.BlockLength)

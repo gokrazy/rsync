@@ -176,7 +176,7 @@ func (rt *Transfer) recvGenerator(idx int, f *File) error {
 		if rt.Opts.DebugGTE(rsyncopts.DEBUG_GENR, 1) {
 			rt.Logger.Printf("symlink %s -> %s", local, f.LinkTarget)
 		}
-		if err := symlink(rt.DestRoot, f.LinkTarget, local); err != nil {
+		if err := symlink(rt.DestRoot, f.LinkTarget, f.Name); err != nil {
 			return err
 		}
 		if err := rt.setPerms(f); err != nil {
