@@ -5,6 +5,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strconv"
 	"syscall"
 
 	"github.com/gokrazy/rsync"
@@ -45,7 +46,11 @@ func (rt *Transfer) createDevice(f *File, st fs.FileInfo) error {
 			return err
 		}
 
-		local := filepath.Join(rt.Dest, f.Name)
+		// The parent dir is safely resolved through *os.Root,
+		// so we skip path resolution by constructing a path
+		// from a known-safe prefix (/proc/self/fd/<parent-dir-fd>)
+		// and a basename (not a path!).
+		local := filepath.Join("/proc/self/fd", strconv.Itoa(int(parentDir.Fd())), base)
 		if err := unix.Bind(fd, &unix.SockaddrUnix{Name: local}); err != nil {
 			return err
 		}
