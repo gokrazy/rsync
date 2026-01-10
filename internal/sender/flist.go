@@ -1,12 +1,10 @@
 package sender
 
 import (
-	"fmt"
 	"io/fs"
 	"os"
 	"os/user"
 	"path/filepath"
-	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -58,39 +56,36 @@ var (
 	lookupGroupOnce sync.Once
 )
 
-func getRootStrip(requested, localDir string) (string, string) {
-	root := filepath.Clean(filepath.Join(localDir, requested))
-
+func getStrip(requested string) string {
 	sep := string(os.PathSeparator)
-	strip := filepath.Dir(filepath.Clean(root)) + sep
-	if strings.HasSuffix(requested, sep) {
-		strip = filepath.Clean(root) + sep
+	if requested == sep {
+		return ""
 	}
-	return root, strip
+	if strings.HasSuffix(requested, sep) {
+		return strings.TrimPrefix(filepath.Clean(requested), "/") + sep
+	}
+	return ""
 }
 
 type scopedWalker struct {
-	st       *Transfer
-	ioError  func(err error)
-	conn     *rsyncwire.Conn
-	fec      *rsyncwire.Buffer
-	excl     *filterRuleList
-	uidMap   map[int32]string
-	gidMap   map[int32]string
-	fileList *fileList
-	prefix   string
-	rootPath string
-	root     *os.Root
+	st        *Transfer
+	ioError   func(err error)
+	conn      *rsyncwire.Conn
+	fec       *rsyncwire.Buffer
+	excl      *filterRuleList
+	uidMap    map[int32]string
+	gidMap    map[int32]string
+	fileList  *fileList
+	root      *os.Root
+	localDir  string
+	requested string
+	strip     string
 }
 
 func (s *scopedWalker) walk() error {
-	root, err := os.OpenRoot(s.rootPath)
+	root, err := os.OpenRoot(s.localDir)
 	if err != nil {
-		if st, err := os.Stat(s.rootPath); err == nil && !st.IsDir() {
-			// Not a directory? Open the parent directory, stat the file and
-			// call the WalkFn directly for this entry.
-			return s.walkFile()
-		}
+		s.st.Logger.Printf("  OpenRoot(localDir=%q): %v", s.localDir, err)
 		// File does not exist or we cannot open the file?
 		// Set the I/O error flag, but keep going.
 		s.ioError(err)
@@ -98,42 +93,13 @@ func (s *scopedWalker) walk() error {
 	}
 	s.fileList.Roots = append(s.fileList.Roots, root)
 	s.root = root
-	if err := fs.WalkDir(root.FS(), ".", s.walkFn); err != nil {
-		return err
+	rootname := s.requested
+	// fs.WalkDir(root.FS(), …) does not accept absolute paths,
+	// so make them relative by prepending a .
+	if strings.HasPrefix(rootname, "/") {
+		rootname = "." + rootname
 	}
-	return nil
-}
-
-func (s *scopedWalker) walkFile() error {
-	dir, file := filepath.Split(s.rootPath)
-	if s.st.Opts.DebugGTE(rsyncopts.DEBUG_FLIST, 1) {
-		s.st.Logger.Printf("treating rootPath=%q as dir=%q + file=%q", s.rootPath, dir, file)
-	}
-	s.prefix = ""
-	root, err := os.OpenRoot(dir)
-	if err != nil {
-		// set the I/O error flag, but keep going
-		s.ioError(err)
-		return nil
-	}
-	f, err := root.Open(".")
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-	dirents, err := f.ReadDir(-1)
-	if err != nil {
-		return err
-	}
-	idx := slices.IndexFunc(dirents, func(dirent os.DirEntry) bool {
-		return dirent.Name() == file
-	})
-	if idx == -1 {
-		return fmt.Errorf("file %s not found in %s", file, dir)
-	}
-	s.fileList.Roots = append(s.fileList.Roots, root)
-	s.root = root
-	if err := s.walkFn(file, dirents[idx], nil); err != nil {
+	if err := fs.WalkDir(root.FS(), filepath.Clean(rootname), s.walkFn); err != nil {
 		return err
 	}
 	return nil
@@ -166,15 +132,14 @@ func (s *scopedWalker) walkFn(path string, d fs.DirEntry, err error) error {
 	// Only ever transmit long names, like openrsync
 	flags := byte(rsync.XMIT_LONG_NAME)
 
-	name := s.prefix + path
+	name := path
+	if s.strip != "" {
+		name = strings.TrimPrefix(name, s.strip)
+	}
 	if opts.DebugGTE(rsyncopts.DEBUG_FLIST, 1) {
 		logger.Printf("Trim(path=%q) = %q", path, name)
 	}
 	if path == "." {
-		name = s.prefix
-		if s.prefix == "" {
-			name = "."
-		}
 		flags |= rsync.XMIT_TOP_DIR
 	}
 	// st.logger.Printf("flags for %q: %v", name, flags)
@@ -372,33 +337,41 @@ func (st *Transfer) SendFileList(localDir string, paths []string, excl *filterRu
 	}
 
 	for _, requested := range paths {
+		local := localDir
+		if local == "/" {
+			// Implicit module (/) and absolute requested path (/tmp/foo/),
+			// turn the path into the local directory and request /.
+			local = requested
+			if strings.HasSuffix(requested, string(os.PathSeparator)) {
+				requested = "/"
+			} else {
+				local = filepath.Dir(requested)
+				requested = filepath.Base(requested)
+			}
+		}
+
 		if st.Opts.DebugGTE(rsyncopts.DEBUG_FLIST, 1) {
-			st.Logger.Printf("  path %q (local dir %q)", requested, localDir)
+			st.Logger.Printf("  path %q (local dir %q)", requested, local)
 		}
 		// st.Logger.Printf("getRootStrip(requested=%q, localDir=%q", requested, localDir)
-		rootPath, strip := getRootStrip(requested, localDir)
+		strip := getStrip(requested)
 		// st.Logger.Printf("root=%q, strip=%q", root, strip)
-		prefix := strings.TrimPrefix(rootPath, filepath.Clean(strip))
-		if prefix != "" {
-			prefix = strings.TrimPrefix(prefix, "/")
-			prefix += "/"
-		}
 		if st.Opts.DebugGTE(rsyncopts.DEBUG_FLIST, 1) {
-			st.Logger.Printf("  filepath.Walk(%q), strip=%q", rootPath, strip)
-			st.Logger.Printf("  prefix=%q", prefix)
+			st.Logger.Printf("  fs.Walk(%q, %q), strip=%q", local, requested)
 		}
 
 		sw := &scopedWalker{
-			st:       st,
-			conn:     st.Conn,
-			fec:      fec,
-			excl:     excl,
-			uidMap:   uidMap,
-			gidMap:   gidMap,
-			fileList: &fileList,
-			prefix:   prefix,
-			ioError:  ioError,
-			rootPath: rootPath,
+			st:        st,
+			conn:      st.Conn,
+			fec:       fec,
+			excl:      excl,
+			uidMap:    uidMap,
+			gidMap:    gidMap,
+			fileList:  &fileList,
+			ioError:   ioError,
+			localDir:  local,
+			requested: requested,
+			strip:     strip,
 		}
 		if err := sw.walk(); err != nil {
 			return nil, err

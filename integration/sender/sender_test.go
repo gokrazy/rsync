@@ -363,6 +363,44 @@ func TestSenderRelative(t *testing.T) {
 	}
 }
 
+func TestSenderTraversal(t *testing.T) {
+	tmp := t.TempDir()
+	source := filepath.Join(tmp, "source")
+	dest := filepath.Join(tmp, "dest")
+
+	if err := os.MkdirAll(source, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(source, "hello.txt"), []byte("hi"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(tmp, "passwd"), []byte("secret"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := os.MkdirAll(dest, 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	// start a server to sync from
+	srv := rsynctest.New(t, rsynctest.InteropModule(source))
+
+	args := []string{
+		"gokr-rsync",
+		"-aH",
+		"rsync://localhost:" + srv.Port + "/interop/../",
+		dest + "/",
+	}
+	rsynctest.Run(t, args...)
+
+	passwd := filepath.Join(dest, "passwd")
+
+	got, err := os.ReadFile(passwd)
+	if err == nil {
+		t.Fatalf("unexpectedly synced /etc/passwd: %s", string(got))
+	}
+}
+
 // like TestSender, but both source and dest are local directories
 func TestSenderBothLocal(t *testing.T) {
 	t.Parallel()
