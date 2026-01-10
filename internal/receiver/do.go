@@ -2,9 +2,8 @@ package receiver
 
 import (
 	"context"
+	"io/fs"
 	"os"
-	"path/filepath"
-	"strings"
 
 	"github.com/gokrazy/rsync/internal/rsyncopts"
 	"github.com/gokrazy/rsync/internal/rsyncstats"
@@ -34,33 +33,28 @@ func (rt *Transfer) deleteFiles(fileList []*File) error {
 			continue
 		}
 		rt.Logger.Printf("deleting in %s", f.Name)
-		root := filepath.Clean(rt.Dest)
-		strip := root + "/"
 		// Other rsync implementations generate a local file list and compare it
 		// with the remote file list, we re-implement the path→name mapping part
 		// of file list generation here. We could change it for consistency.
-		err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+		err := fs.WalkDir(rt.DestRoot.FS(), ".", func(path string, info fs.DirEntry, err error) error {
 			if err != nil {
 				return err
 			}
-			name := strings.TrimPrefix(path, strip)
-			if name == root {
-				name = "."
-			}
-			if findInFileList(fileList, name) {
+			rt.Logger.Printf("WalkDir(%q)", path)
+			if findInFileList(fileList, path) {
 				return nil
 			}
 			if rt.Opts.Verbose {
-				rt.Logger.Printf("  deleting %s", name)
+				rt.Logger.Printf("  deleting %s", path)
 			}
 			if rt.Opts.DryRun {
 				return nil
 			}
-			if err := os.RemoveAll(path); err != nil {
-				rt.Logger.Printf("  deleting %s failed: %v", name, err)
+			if err := rt.DestRoot.RemoveAll(path); err != nil {
+				rt.Logger.Printf("  deleting %s failed: %v", path, err)
 				// keep going
 			}
-			return filepath.SkipDir // skip the just-deleted directory
+			return fs.SkipDir // skip the just-deleted directory
 		})
 		if err != nil {
 			if os.IsNotExist(err) {
