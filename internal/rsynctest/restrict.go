@@ -12,6 +12,7 @@ func init() {
 		return []landlock.Rule{
 			// contains /usr/bin/rsync (and library deps)
 			landlock.RODirs("/usr"),
+			landlock.RODirs("/nix").IgnoreIfMissing(),
 
 			// for t.TempDir()
 			landlock.RWDirs(os.TempDir()).WithRefer(),

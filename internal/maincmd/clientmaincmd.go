@@ -103,11 +103,6 @@ func rsyncMain(ctx context.Context, osenv *rsyncos.Env, opts *rsyncopts.Options,
 			rwDirs = paths
 		}
 	}
-	if osenv.Restrict() {
-		if err := restrict.MaybeFileSystem(roDirs, rwDirs); err != nil {
-			return nil, err
-		}
-	}
 
 	module := path
 	if idx := strings.IndexByte(module, '/'); idx > -1 {
@@ -118,7 +113,7 @@ func rsyncMain(ctx context.Context, osenv *rsyncos.Env, opts *rsyncopts.Options,
 	}
 
 	if daemonConnection < 0 {
-		stats, err := socketClient(ctx, osenv, opts, host, path, port, paths)
+		stats, err := socketClient(ctx, osenv, opts, host, path, port, paths, roDirs, rwDirs)
 		if err != nil {
 			return nil, err
 		}
@@ -141,6 +136,13 @@ func rsyncMain(ctx context.Context, osenv *rsyncos.Env, opts *rsyncopts.Options,
 		r: rc,
 		w: wc,
 	}
+
+	if osenv.Restrict() {
+		if err := restrict.MaybeFileSystem(roDirs, rwDirs); err != nil {
+			return nil, err
+		}
+	}
+
 	negotiate := true
 	if daemonConnection != 0 {
 		done, err := startInbandExchange(osenv, opts, conn, module, path)

@@ -11,13 +11,14 @@ import (
 	"time"
 
 	"github.com/gokrazy/rsync"
+	"github.com/gokrazy/rsync/internal/restrict"
 	"github.com/gokrazy/rsync/internal/rsyncopts"
 	"github.com/gokrazy/rsync/internal/rsyncos"
 	"github.com/gokrazy/rsync/internal/rsyncstats"
 )
 
 // rsync/clientserver.c:start_socket_client
-func socketClient(ctx context.Context, osenv *rsyncos.Env, opts *rsyncopts.Options, host string, path string, port int, paths []string) (*rsyncstats.TransferStats, error) {
+func socketClient(ctx context.Context, osenv *rsyncos.Env, opts *rsyncopts.Options, host string, path string, port int, paths []string, roDirs, rwDirs []string) (*rsyncstats.TransferStats, error) {
 	if port < 0 {
 		if port := opts.RsyncPort(); port > 0 {
 			host += ":" + strconv.Itoa(port)
@@ -51,6 +52,11 @@ func socketClient(ctx context.Context, osenv *rsyncos.Env, opts *rsyncopts.Optio
 		module = module[:idx]
 	}
 	osenv.Logf("rsync module %q, path %q", module, path)
+	if osenv.Restrict() {
+		if err := restrict.MaybeFileSystem(roDirs, rwDirs); err != nil {
+			return nil, err
+		}
+	}
 	done, err := startInbandExchange(osenv, opts, conn, module, path)
 	if err != nil {
 		return nil, err

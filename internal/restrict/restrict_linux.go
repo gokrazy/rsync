@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"path/filepath"
 
 	"github.com/landlock-lsm/go-landlock/landlock"
 )
@@ -26,19 +25,6 @@ var dnsLookup = []string{
 var userLookup = []string{
 	"/etc/passwd", // user lookup
 	"/etc/group",  // group lookup
-}
-
-// ssh(1) needs to read its config and key files
-var sshConfigDirs = []string{
-	filepath.Join(os.Getenv("HOME"), ".ssh"), // user
-	"/etc/ssh",                               // system-wide
-}
-var sshDirs = []string{
-	"/usr", // for running ssh(1)
-	"/nix", // for running ssh(1) on NixOS
-}
-var sshDevices = []string{
-	"/dev/null",
 }
 
 func MaybeFileSystem(roDirsOrFiles []string, rwDirs []string) error {
@@ -65,9 +51,6 @@ func MaybeFileSystem(roDirsOrFiles []string, rwDirs []string) error {
 		append(re(), []landlock.Rule{
 			landlock.ROFiles(dnsLookup...).IgnoreIfMissing(),
 			landlock.ROFiles(userLookup...).IgnoreIfMissing(),
-			landlock.RODirs(sshConfigDirs...).IgnoreIfMissing(),
-			landlock.RODirs(sshDirs...).IgnoreIfMissing(),
-			landlock.RWFiles(sshDevices...).IgnoreIfMissing(),
 			landlock.RODirs(roDirs...).IgnoreIfMissing(),
 			landlock.ROFiles(roFiles...).IgnoreIfMissing(),
 			landlock.RWDirs(rwDirs...).WithRefer(),
