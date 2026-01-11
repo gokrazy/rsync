@@ -151,8 +151,9 @@ because it requires a config file to be present on the server in
 `~/.config/gokr-rsyncd.toml`.
 
 Note that this mode of operation is only implemented by the original “trigde”
-rsync, not in openrsync. Apple started shipping openrsync with macOS 15 Sequoia,
-so you might need to explicitly start /usr/libexec/rsync/rsync.samba on Macs.
+rsync, not in openrsync. Apple started shipping openrsync with macOS 15 Sequoia.
+For a while, `/usr/libexec/rsync/rsync.samba` was still available, but on more
+recent macOS versions you need to use homebrew or Nix to get tridge rsync.
 
 Example:
 * Server will be started via SSH
