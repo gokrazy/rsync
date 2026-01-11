@@ -232,7 +232,7 @@ Additional hardening recommendations:
 
 * Restrict which IP addresses are allowed to connect to your rsync server, for example:
   * using iptables or nftables on your host system
-  * using [`gokr-rsync`’s built-in IP allow/deny mechanism](https://github.com/gokrazy/rsync/issues/4) (once implemented)
+  * using [`gokr-rsync`’s built-in IP allow/deny mechanism](https://github.com/gokrazy/rsync/commit/322543c7c9ee5f9b2128b6f7ccc931d05ae21df1)
   * using [systemd’s `IPAddressDeny` and `IPAddressAllow`](https://manpages.debian.org/systemd.resource-control.5) in `gokr-rsyncd.socket`
 * To reduce the impact of Denial Of Service attacks, you can restrict resources
   with systemd, see [Managing
@@ -261,7 +261,7 @@ Additional hardening recommendations:
 
 * Restrict which IP addresses are allowed to connect to your rsync server, for example:
   * using iptables or nftables on your host system
-  * using [`gokr-rsync`’s built-in IP allow/deny mechanism](https://github.com/gokrazy/rsync/issues/4) (once implemented)
+  * using [`gokr-rsync`’s built-in IP allow/deny mechanism](https://github.com/gokrazy/rsync/commit/322543c7c9ee5f9b2128b6f7ccc931d05ae21df1)
 
 ### privileged non-Linux (e.g. Mac)
 
