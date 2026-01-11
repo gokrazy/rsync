@@ -178,7 +178,6 @@ recent choices.
 Supported environments:
 
 1. systemd (Linux)
-1. Docker (Linux)
 1. privileged Linux
 1. privileged non-Linux
 
@@ -246,27 +245,6 @@ Additional hardening recommendations:
   services](https://www.sherbers.de/use-temporaryfilesystem-to-hide-files-or-directories-from-systemd-services/). Note
   that you [may need to disable `ProtectSystem=strict` due to a
   bug](https://github.com/systemd/systemd/issues/18999).
-
-### Docker (unprivileged)
-
-We provide [a `Dockerfile` for
-`gokr-rsyncd`](https://github.com/gokrazy/rsync/tree/main/docker/).
-
-```shell
-docker run \
-  --read-only \
-  -p 127.0.0.1:8730:8730 \
-  -v /etc/tmpfiles.d:/srv/rsync:ro \
-  stapelberg/gokrazy-rsync:latest \
-    --gokr.modulemap=pwd=/srv/rsync
-```
-
-Additional hardening recommendations:
-
-* Restrict which IP addresses are allowed to connect to your rsync server, for example:
-  * using iptables or nftables on your host system
-  * using [`gokr-rsync`’s built-in IP allow/deny mechanism](https://github.com/gokrazy/rsync/issues/4) (once implemented)
-    * Be sure to set up Docker such that the remote IPv4 or IPv6 address is available inside the container, see https://michael.stapelberg.ch/posts/2018-12-12-docker-ipv6/
 
 ### privileged Linux (including gokrazy.org)
 
