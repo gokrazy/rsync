@@ -179,7 +179,7 @@ recent choices.
 Supported environments:
 
 1. systemd (Linux)
-1. privileged Linux (running as `root`)
+1. privileged Linux (running as `root`, or in a user namespace)
 1. privileged non-Linux
 1. unprivileged Linux, Mac or Windows
 
