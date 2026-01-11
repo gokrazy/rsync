@@ -179,20 +179,25 @@ recent choices.
 Supported environments:
 
 1. systemd (Linux)
-1. privileged Linux
+1. privileged Linux (running as `root`)
 1. privileged non-Linux
+1. unprivileged Linux, Mac or Windows
 
 In all environments, the default instructions will take care that:
 
-* (On Linux only) Only configured rsync modules from the host file system are
-  mounted **read-only** into a Linux mount namespace for `gokr-rsync`, to guard
-  against data modification and data exfiltration.
+* `gokr-rsync` uses Go’s [Traversal-resistant `os.Root` file
+  APIs](https://go.dev/blog/osroot) to restrict all file access to the specified
+  paths.
+* (On privileged Linux only) Only configured rsync modules from the host file
+  system are mounted (**read-only**, unless the module is `writable`) into a
+  Linux mount namespace for `gokr-rsync`, to guard against data modification and
+  data exfiltration.
 * (On Linux only) File system access is restricted using the
   [Landlock](https://docs.kernel.org/userspace-api/landlock.html) Linux kernel
   security module, which works similar to OpenBSD’s
   [`unveil(2)`](https://man.openbsd.org/unveil.2) API.
-* `gokr-rsync` is running without privileges, as user `nobody`, to limit the
-  scope of what an attacker can do when exploiting a vulnerability.
+* (On privileged environments) `gokr-rsync` drops privileges to user `nobody`,
+  to limit the scope of what an attacker can do when exploiting a vulnerability.
 
 Known gaps:
 
