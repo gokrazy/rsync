@@ -93,48 +93,10 @@ func (s *session) request(ctx context.Context, req *ssh.Request) error {
 			s.channel.Close()
 		}()
 
-		// stdout, err := cmd.StdoutPipe()
-		// if err != nil {
-		// 	return err
-		// }
-		// stdin, err := cmd.StdinPipe()
-		// if err != nil {
-		// 	return err
-		// }
-		// stderr, err := cmd.StderrPipe()
-		// if err != nil {
-		// 	return err
-		// }
-		// cmd.SysProcAttr.Setsid = true
+		if req.WantReply {
+			req.Reply(true, nil)
+		}
 
-		// if err := cmd.Start(); err != nil {
-		// 	return err
-		// }
-
-		// req.Reply(true, nil)
-
-		// go io.Copy(s.channel, stdout)
-		// go io.Copy(s.channel.Stderr(), stderr)
-		// go func() {
-		// 	io.Copy(stdin, s.channel)
-		// 	stdin.Close()
-		// }()
-
-		// go func() {
-		// 	if err := cmd.Wait(); err != nil {
-		// 		log.Printf("err: %v", err)
-		// 	}
-		// 	status := make([]byte, 4)
-		// 	if ws, ok := cmd.ProcessState.Sys().(syscall.WaitStatus); ok {
-		// 		binary.BigEndian.PutUint32(status, uint32(ws.ExitStatus()))
-		// 	}
-
-		// 	// See https://tools.ietf.org/html/rfc4254#section-6.10
-		// 	if _, err := s.channel.SendRequest("exit-status", false /* wantReply */, status); err != nil {
-		// 		log.Printf("err2: %v", err)
-		// 	}
-		// 	s.channel.Close()
-		// }()
 		return nil
 
 	default:
