@@ -27,6 +27,7 @@ type TransferOpts struct {
 	PreserveTimes     bool
 	PreserveHardlinks bool
 	IgnoreTimes       bool
+	AlwaysChecksum    bool
 
 	InfoGTE  func(rsyncopts.InfoLevel, uint16) bool
 	DebugGTE func(rsyncopts.DebugLevel, uint16) bool

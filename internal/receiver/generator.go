@@ -1,6 +1,7 @@
 package receiver
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"io/fs"
@@ -54,7 +55,13 @@ func (rt *Transfer) skipFile(f *File, st os.FileInfo) (bool, error) {
 		return false, nil
 	}
 
-	// TODO: always checksum flag
+	if rt.Opts.AlwaysChecksum {
+		checksum, err := rsyncchecksum.FileChecksum(rt.DestRoot, f.Name)
+		if err != nil {
+			return false, err
+		}
+		return bytes.Equal(f.Checksum[:], checksum[:]), nil
+	}
 
 	// TODO: size only
 

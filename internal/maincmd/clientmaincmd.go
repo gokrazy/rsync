@@ -353,6 +353,7 @@ func ClientRun(osenv *rsyncos.Env, opts *rsyncopts.Options, conn io.ReadWriter, 
 			PreserveTimes:     opts.PreserveMTimes(),
 			PreserveHardlinks: opts.PreserveHardLinks(),
 			IgnoreTimes:       opts.IgnoreTimes(),
+			AlwaysChecksum:    opts.AlwaysChecksum(),
 
 			InfoGTE:  opts.InfoGTE,
 			DebugGTE: opts.DebugGTE,

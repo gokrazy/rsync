@@ -72,8 +72,9 @@ func (o *Options) ServerOptions() []string {
 	if o.Recurse() {
 		argstr += "r"
 	}
-	// if (always_checksum)
-	// 	argstr[x++] = 'c';
+	if o.AlwaysChecksum() {
+		argstr += "c"
+	}
 	// if (cvs_exclude)
 	// 	argstr[x++] = 'C';
 	if o.IgnoreTimes() {

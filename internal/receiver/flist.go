@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/gokrazy/rsync"
+	"github.com/gokrazy/rsync/internal/rsyncchecksum"
 	"github.com/gokrazy/rsync/internal/rsyncopts"
 )
 
@@ -36,6 +37,7 @@ type File struct {
 	Gid        int32
 	LinkTarget string
 	Rdev       int32
+	Checksum   [rsyncchecksum.Size]byte
 }
 
 // FileMode converts from the Linux permission bits to Go’s permission bits.
@@ -186,6 +188,12 @@ func (rt *Transfer) receiveFileEntry(flags uint16, last *File) (*File, error) {
 			return nil, err
 		}
 		f.LinkTarget = string(b)
+	}
+
+	if rt.Opts.AlwaysChecksum {
+		if _, err := io.ReadFull(rt.Conn.Reader, f.Checksum[:]); err != nil {
+			return nil, err
+		}
 	}
 
 	return f, nil

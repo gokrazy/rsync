@@ -276,7 +276,6 @@ func (s *scopedWalker) walkFn(path string, d fs.DirEntry, err error) error {
 		var emptyChecksum [rsyncchecksum.Size]byte
 		checksum := emptyChecksum[:]
 		if info.Mode().IsRegular() {
-			// TODO: send md4 checksum of this file
 			checksum, err = rsyncchecksum.FileChecksum(s.root, path)
 			if err != nil {
 				return err

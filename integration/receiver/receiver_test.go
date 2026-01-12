@@ -6,6 +6,7 @@ import (
 	"os/user"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"syscall"
 	"testing"
 	"time"
@@ -303,6 +304,71 @@ func TestReceiverSyncDelete(t *testing.T) {
 		if _, err := os.Stat(gone); !os.IsNotExist(err) {
 			t.Errorf("expected %s to be deleted, but it still exists", gone)
 		}
+	}
+}
+
+func TestReceiverAlwaysChecksum(t *testing.T) {
+	t.Parallel()
+
+	tmp := t.TempDir()
+	source := filepath.Join(tmp, "source")
+	dest := filepath.Join(tmp, "dest")
+	if err := os.MkdirAll(source, 0755); err != nil {
+		t.Fatal(err)
+	}
+	hello := filepath.Join(source, "hello.txt")
+	if err := os.WriteFile(hello, []byte("world"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	mtime, err := time.Parse(time.RFC3339, "2009-11-10T23:00:00Z")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chtimes(hello, mtime, mtime); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chtimes(source, mtime, mtime); err != nil {
+		t.Fatal(err)
+	}
+
+	// start a server to sync from
+	srv := rsynctest.NewInMemory(t, rsyncd.Module{
+		Name: "interop",
+		Path: source,
+	})
+	args := []string{"-aH"}
+	srv.RunClient(t, args, []string{dest})
+
+	desthello := filepath.Join(dest, "hello.txt")
+	b, err := os.ReadFile(desthello)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := strings.TrimSpace(string(b)), "world"; got != want {
+		t.Fatalf("hello.txt: unexpected contents: got %q, want %q", got, want)
+	}
+
+	// Make a change that is invisible with our current settings:
+	// change the file contents without changing size and mtime.
+	if err := os.WriteFile(hello, []byte("moon!"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chtimes(hello, mtime, mtime); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chtimes(source, mtime, mtime); err != nil {
+		t.Fatal(err)
+	}
+
+	args = append(args, "--checksum")
+	srv.RunClient(t, args, []string{dest})
+
+	b, err = os.ReadFile(desthello)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := strings.TrimSpace(string(b)), "moon!"; got != want {
+		t.Fatalf("hello.txt: unexpected contents: got %q, want %q", got, want)
 	}
 }
 
