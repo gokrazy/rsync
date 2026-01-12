@@ -18,7 +18,7 @@ import (
 )
 
 // rsync/clientserver.c:start_socket_client
-func socketClient(ctx context.Context, osenv *rsyncos.Env, opts *rsyncopts.Options, host string, path string, port int, paths []string, roDirs, rwDirs []string) (*rsyncstats.TransferStats, error) {
+func socketClient(ctx context.Context, osenv *rsyncos.Env, opts *rsyncopts.Options, host string, remotePath string, port int, paths []string, roDirs, rwDirs []string) (*rsyncstats.TransferStats, error) {
 	if port < 0 {
 		if port := opts.RsyncPort(); port > 0 {
 			host += ":" + strconv.Itoa(port)
@@ -47,17 +47,12 @@ func socketClient(ctx context.Context, osenv *rsyncos.Env, opts *rsyncopts.Optio
 		return nil, err
 	}
 	defer conn.Close()
-	module := path
-	if idx := strings.IndexByte(module, '/'); idx > -1 {
-		module = module[:idx]
-	}
-	osenv.Logf("rsync module %q, path %q", module, path)
 	if osenv.Restrict() {
 		if err := restrict.MaybeFileSystem(roDirs, rwDirs); err != nil {
 			return nil, err
 		}
 	}
-	done, err := startInbandExchange(osenv, opts, conn, module, path)
+	done, err := startInbandExchange(osenv, opts, conn, remotePath)
 	if err != nil {
 		return nil, err
 	}
@@ -72,7 +67,13 @@ func socketClient(ctx context.Context, osenv *rsyncos.Env, opts *rsyncopts.Optio
 }
 
 // rsync/clientserver.c:start_inband_exchange
-func startInbandExchange(osenv *rsyncos.Env, opts *rsyncopts.Options, conn io.ReadWriter, module, path string) (done bool, _ error) {
+func startInbandExchange(osenv *rsyncos.Env, opts *rsyncopts.Options, conn io.ReadWriter, remotePath string) (done bool, _ error) {
+	module := remotePath
+	if idx := strings.IndexByte(module, '/'); idx > -1 {
+		module = module[:idx]
+	}
+	osenv.Logf("rsync module %q, path %q", module, remotePath)
+
 	rd := bufio.NewReader(conn)
 
 	// send client greeting
@@ -143,9 +144,7 @@ func startInbandExchange(osenv *rsyncos.Env, opts *rsyncopts.Options, conn io.Re
 
 	sargv := opts.ServerOptions()
 	sargv = append(sargv, ".")
-	if path != "" {
-		sargv = append(sargv, path)
-	}
+	sargv = append(sargv, remotePath)
 	if opts.Verbose() {
 		osenv.Logf("sending daemon args: %s", sargv)
 	}

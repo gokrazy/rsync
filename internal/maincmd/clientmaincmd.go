@@ -104,14 +104,6 @@ func rsyncMain(ctx context.Context, osenv *rsyncos.Env, opts *rsyncopts.Options,
 		}
 	}
 
-	module := path
-	if idx := strings.IndexByte(module, '/'); idx > -1 {
-		module = module[:idx]
-	}
-	if opts.Verbose() {
-		osenv.Logf("module=%q, path=%q, other=%q", module, path, other)
-	}
-
 	if daemonConnection < 0 {
 		stats, err := socketClient(ctx, osenv, opts, host, path, port, paths, roDirs, rwDirs)
 		if err != nil {
@@ -145,7 +137,7 @@ func rsyncMain(ctx context.Context, osenv *rsyncos.Env, opts *rsyncopts.Options,
 
 	negotiate := true
 	if daemonConnection != 0 {
-		done, err := startInbandExchange(osenv, opts, conn, module, path)
+		done, err := startInbandExchange(osenv, opts, conn, path)
 		if err != nil {
 			return nil, err
 		}
