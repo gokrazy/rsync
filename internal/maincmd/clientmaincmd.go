@@ -91,7 +91,7 @@ func rsyncMain(ctx context.Context, osenv *rsyncos.Env, opts *rsyncopts.Options,
 	paths := []string{other}
 	if opts.Sender() {
 		// source is local
-		other = src
+		// other = src
 		paths = sources
 		roDirs = sources
 		if opts.LocalServer() {
@@ -137,7 +137,7 @@ func rsyncMain(ctx context.Context, osenv *rsyncos.Env, opts *rsyncopts.Options,
 
 	negotiate := true
 	if daemonConnection != 0 {
-		done, err := startInbandExchange(osenv, opts, conn, path)
+		done, err := StartInbandExchange(osenv, opts, conn, path)
 		if err != nil {
 			return nil, err
 		}

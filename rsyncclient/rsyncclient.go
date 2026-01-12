@@ -127,3 +127,22 @@ func (c *Client) Run(ctx context.Context, conn io.ReadWriter, paths []string) (*
 	}
 	return &Result{Stats: stats}, nil
 }
+
+// RunDaemon starts one run of the rsync daemon protocol, meaning it performs
+// the daemon protocol inband exchange (to negotiate the protocol version and
+// select an rsync module) and then calls [Client.Run].
+//
+// This method is useful when you want to connect to an rsync daemon, but
+// establish the connection yourself, e.g. via the [golang.org/x/crypto/ssh]
+// package.
+func (c *Client) RunDaemon(ctx context.Context, conn io.ReadWriter, remotePath string, paths []string) (*Result, error) {
+	done, err := maincmd.StartInbandExchange(c.osenv, c.opts, conn, remotePath)
+	if err != nil {
+		return nil, err
+	}
+	if done { // Server sent EXIT
+		return &Result{Stats: &rsyncstats.TransferStats{}}, nil
+	}
+	c.negotiate = false // done as part of the inband exchange
+	return c.Run(ctx, conn, paths)
+}

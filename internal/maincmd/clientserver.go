@@ -52,7 +52,7 @@ func socketClient(ctx context.Context, osenv *rsyncos.Env, opts *rsyncopts.Optio
 			return nil, err
 		}
 	}
-	done, err := startInbandExchange(osenv, opts, conn, remotePath)
+	done, err := StartInbandExchange(osenv, opts, conn, remotePath)
 	if err != nil {
 		return nil, err
 	}
@@ -67,7 +67,7 @@ func socketClient(ctx context.Context, osenv *rsyncos.Env, opts *rsyncopts.Optio
 }
 
 // rsync/clientserver.c:start_inband_exchange
-func startInbandExchange(osenv *rsyncos.Env, opts *rsyncopts.Options, conn io.ReadWriter, remotePath string) (done bool, _ error) {
+func StartInbandExchange(osenv *rsyncos.Env, opts *rsyncopts.Options, conn io.ReadWriter, remotePath string) (done bool, _ error) {
 	module := remotePath
 	if idx := strings.IndexByte(module, '/'); idx > -1 {
 		module = module[:idx]
