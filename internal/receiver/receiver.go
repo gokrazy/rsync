@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 
@@ -179,7 +180,7 @@ func (rt *Transfer) receiveData(f *File, localFile *os.File) error {
 		return err
 	}
 
-	if err := rt.setPerms(f); err != nil {
+	if err := rt.setPerms(f, fs.FileMode(f.Mode)); err != nil {
 		return err
 	}
 

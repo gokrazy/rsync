@@ -43,11 +43,12 @@ type Transfer struct {
 	Progress progress.Printer
 
 	// state
-	Conn     *rsyncwire.Conn
-	Seed     int32
-	IOErrors int32
-	Users    map[int32]mapping
-	Groups   map[int32]mapping
+	Conn            *rsyncwire.Conn
+	Seed            int32
+	IOErrors        int32
+	Users           map[int32]mapping
+	Groups          map[int32]mapping
+	retouchDirPerms bool
 }
 
 func (rt *Transfer) listOnly() bool { return rt.Dest == "" }
