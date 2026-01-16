@@ -16,6 +16,7 @@ import (
 	"sync"
 	"syscall"
 	"testing"
+	"time"
 
 	"github.com/gokrazy/rsync/internal/anonssh"
 	"github.com/gokrazy/rsync/internal/maincmd"
@@ -31,6 +32,18 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"golang.org/x/sys/unix"
 )
+
+// GosPublicRelease is the time when Go was publicly released:
+// https://opensource.googleblog.com/2009/11/hey-ho-lets-go.html
+//
+// It’s as good a time stamp as any, e.g. for setting an mtime.
+var GosPublicRelease = func() time.Time {
+	t, err := time.Parse(time.RFC3339, "2009-11-10T23:00:00Z")
+	if err != nil {
+		panic(err)
+	}
+	return t
+}()
 
 type TestServer struct {
 	// config
