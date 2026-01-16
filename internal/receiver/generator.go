@@ -41,11 +41,9 @@ func (rt *Transfer) GenerateFiles(fileList []*File) error {
 		return err
 	}
 
-	if rt.retouchDirPerms /* || rt.retouchDirTimes */ {
-		if err := rt.touchUpDirs(fileList); err != nil {
-			return err
-		}
-	}
+	// NOTE: touchUpDirs is called from [Transfer.Do]
+	// so that both goroutines (generator and receiver)
+	// have finished before we set final permissions.
 
 	if rt.Opts.DebugGTE(rsyncopts.DEBUG_GENR, 1) {
 		rt.Logger.Printf("generateFiles finished")
