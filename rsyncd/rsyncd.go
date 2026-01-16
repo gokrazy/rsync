@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"net"
 	"os"
 	"path/filepath"
@@ -28,9 +29,10 @@ import (
 
 type Module struct {
 	Name     string   `toml:"name"`
-	Path     string   `toml:"path"`
+	Path     string   `toml:"path"` // If empty, FS must be non-nil
+	FS       fs.FS    `toml:"-"`    // If set, serve from this instead of Path
 	ACL      []string `toml:"acl"`
-	Writable bool     `toml:"writable"`
+	Writable bool     `toml:"writable"` // Must be false if FS is set
 }
 
 // Option specifies the server options.
@@ -552,6 +554,11 @@ func (s *Server) handleConnSender(module *Module, crd *rsyncwire.CountingReader,
 		Progress: progress.NewPrinter(io.Discard, time.Now),
 	}
 	// receive the exclusion list (openrsync’s is always empty)
+
+	if module.FS != nil {
+		st.Source = sender.NewFSSource(module.FS)
+	}
+
 	exclusionList, err := sender.RecvFilterList(st.Conn)
 	if err != nil {
 		return err
@@ -600,8 +607,17 @@ func validateModule(mod Module) error {
 	if mod.Name == "" {
 		return errors.New("module has no name")
 	}
-	if mod.Path == "" {
-		return fmt.Errorf("module %q has empty path", mod.Name)
+	if mod.FS != nil {
+		if mod.Writable {
+			return fmt.Errorf("module %q: FS modules cannot be writable", mod.Name)
+		}
+		if mod.Path != "" {
+			return fmt.Errorf("module %q: cannot specify both Path and FS", mod.Name)
+		}
+	} else {
+		if mod.Path == "" {
+			return fmt.Errorf("module %q has empty path", mod.Name)
+		}
 	}
 
 	return nil

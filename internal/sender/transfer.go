@@ -39,6 +39,7 @@ type Transfer struct {
 	Opts     *rsyncopts.Options
 	Env      *rsyncos.Env
 	Progress progress.Printer
+	Source   FileSource // for modules specifying a fs.FS
 
 	// state
 	Conn      *rsyncwire.Conn

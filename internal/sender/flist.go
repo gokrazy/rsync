@@ -17,7 +17,7 @@ import (
 )
 
 type file struct {
-	root    *os.Root
+	source  FileSource
 	path    string
 	Wpath   string
 	regular bool
@@ -36,15 +36,15 @@ type file struct {
 type fileList struct {
 	TotalSize int64
 	Files     []file
-	Roots     []*os.Root
+	Sources   []FileSource
 }
 
 // A fileList must not be used after calling Close().
 func (fl *fileList) Close() {
-	for _, root := range fl.Roots {
-		root.Close()
+	for _, source := range fl.Sources {
+		source.Close()
 	}
-	fl.Roots = nil
+	fl.Sources = nil
 }
 
 // rsync/rsync.h defines chunkSize as 32 * 1024, but increasing it to 256K
@@ -76,30 +76,31 @@ type scopedWalker struct {
 	uidMap    map[int32]string
 	gidMap    map[int32]string
 	fileList  *fileList
-	root      *os.Root
+	source    FileSource
 	localDir  string
 	requested string
 	strip     string
 }
 
 func (s *scopedWalker) walk() error {
-	root, err := os.OpenRoot(s.localDir)
-	if err != nil {
-		s.st.Logger.Printf("  OpenRoot(localDir=%q): %v", s.localDir, err)
-		// File does not exist or we cannot open the file?
-		// Set the I/O error flag, but keep going.
-		s.ioError(err)
-		return nil
+	if s.source == nil {
+		root, err := os.OpenRoot(s.localDir)
+		if err != nil {
+			s.st.Logger.Printf("  OpenRoot(localDir=%q): %v", s.localDir, err)
+			s.ioError(err)
+			return nil
+		}
+		s.source = newOSRootSource(root)
+		s.fileList.Sources = append(s.fileList.Sources, s.source)
 	}
-	s.fileList.Roots = append(s.fileList.Roots, root)
-	s.root = root
+
 	rootname := s.requested
 	// fs.WalkDir(root.FS(), …) does not accept absolute paths,
 	// so make them relative by prepending a .
 	if strings.HasPrefix(rootname, "/") {
 		rootname = "." + rootname
 	}
-	if err := fs.WalkDir(root.FS(), filepath.Clean(rootname), s.walkFn); err != nil {
+	if err := fs.WalkDir(s.source.FS(), filepath.Clean(rootname), s.walkFn); err != nil {
 		return err
 	}
 	return nil
@@ -149,7 +150,7 @@ func (s *scopedWalker) walkFn(path string, d fs.DirEntry, err error) error {
 	}
 
 	s.fileList.Files = append(s.fileList.Files, file{
-		root:    s.root,
+		source:  s.source,
 		path:    path,
 		regular: info.Mode().IsRegular(),
 		Wpath:   name,
@@ -264,7 +265,7 @@ func (s *scopedWalker) walkFn(path string, d fs.DirEntry, err error) error {
 		// 11.  if a symbolic link and -l, the link target's length (integer)
 		// 12.  if a symbolic link and -l, the link target (byte array)
 
-		target, err := s.root.Readlink(path)
+		target, err := s.source.Readlink(path)
 		if err != nil {
 			return err // TODO
 		}
@@ -276,7 +277,12 @@ func (s *scopedWalker) walkFn(path string, d fs.DirEntry, err error) error {
 		var emptyChecksum [rsyncchecksum.Size]byte
 		checksum := emptyChecksum[:]
 		if info.Mode().IsRegular() {
-			checksum, err = rsyncchecksum.FileChecksum(s.root, path)
+			f, err := s.source.Open(path)
+			if err != nil {
+				return err
+			}
+			checksum, err = rsyncchecksum.ReaderChecksum(f)
+			f.Close()
 			if err != nil {
 				return err
 			}
@@ -367,6 +373,7 @@ func (st *Transfer) SendFileList(localDir string, paths []string, excl *filterRu
 			uidMap:    uidMap,
 			gidMap:    gidMap,
 			fileList:  &fileList,
+			source:    st.Source,
 			ioError:   ioError,
 			localDir:  local,
 			requested: requested,

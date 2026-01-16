@@ -57,17 +57,21 @@ func Checksum2(seed int32, buf []byte) []byte {
 	return h.Sum(nil)
 }
 
-func FileChecksum(root *os.Root, fn string) ([]byte, error) {
+func ReaderChecksum(r io.Reader) ([]byte, error) {
+	h := md4.New()
+	if _, err := io.Copy(h, r); err != nil {
+		return nil, err
+	}
+	return h.Sum(nil), nil
+}
+
+func RootChecksum(root *os.Root, fn string) ([]byte, error) {
 	f, err := root.Open(fn)
 	if err != nil {
 		return nil, err
 	}
 	defer f.Close()
-	h := md4.New()
-	if _, err := io.Copy(h, f); err != nil {
-		return nil, err
-	}
-	return h.Sum(nil), nil
+	return ReaderChecksum(f)
 }
 
 const Size = md4.Size

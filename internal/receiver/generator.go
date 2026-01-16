@@ -80,7 +80,7 @@ func (rt *Transfer) skipFile(f *File, st os.FileInfo) (bool, error) {
 	}
 
 	if rt.Opts.AlwaysChecksum {
-		checksum, err := rsyncchecksum.FileChecksum(rt.DestRoot, f.Name)
+		checksum, err := rsyncchecksum.RootChecksum(rt.DestRoot, f.Name)
 		if err != nil {
 			return false, err
 		}

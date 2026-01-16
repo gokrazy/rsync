@@ -20,7 +20,7 @@ type target struct {
 // rsync/match.c:hash_search
 func (st *Transfer) hashSearch(targets []target, tagTable map[uint16]int, head rsync.SumHead, fileIndex int32, fl file) error {
 	st.Logger.Printf("hashSearch(path=%s, len(sums)=%d)", fl.path, len(head.Sums))
-	f, err := fl.root.Open(fl.path)
+	f, err := fl.source.Open(fl.path)
 	if err != nil {
 		return err
 	}

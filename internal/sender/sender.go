@@ -155,7 +155,7 @@ func (st *Transfer) sendFile(fileIndex int32, fl file) error {
 	// increases throughput with “tridge” rsync as client by 50 Mbit/s.
 	const chunkSize = 256 * 1024
 
-	f, err := fl.root.Open(fl.path)
+	f, err := fl.source.Open(fl.path)
 	if err != nil {
 		return err
 	}
@@ -193,7 +193,7 @@ func (st *Transfer) sendFile(fileIndex int32, fl file) error {
 	// into the network socket as quickly as possible.
 	var eg errgroup.Group
 	eg.Go(func() error {
-		f, err := fl.root.Open(fl.path)
+		f, err := fl.source.Open(fl.path)
 		if err != nil {
 			return err
 		}
