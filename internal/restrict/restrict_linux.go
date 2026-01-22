@@ -13,20 +13,6 @@ import (
 // ExtraHook is set when testing to make the landlock rule set more permissive.
 var ExtraHook func() []landlock.Rule
 
-// As of Go 1.24, the net package Go resolver reads
-// the following DNS configurations files:
-var dnsLookup = []string{
-	"/etc/resolv.conf",
-	"/etc/hosts",
-	"/etc/services",
-	"/etc/nsswitch.conf",
-}
-
-var userLookup = []string{
-	"/etc/passwd", // user lookup
-	"/etc/group",  // group lookup
-}
-
 func MaybeFileSystem(roDirsOrFiles []string, rwDirs []string) error {
 	re := ExtraHook
 	if re == nil {
@@ -49,8 +35,22 @@ func MaybeFileSystem(roDirsOrFiles []string, rwDirs []string) error {
 	log.Printf("setting up landlock ACL (paths ro: %q, paths rw: %q)", roDirs, rwDirs)
 	err := landlock.V3.BestEffort().RestrictPaths(
 		append(re(), []landlock.Rule{
-			landlock.ROFiles(dnsLookup...).IgnoreIfMissing(),
-			landlock.ROFiles(userLookup...).IgnoreIfMissing(),
+			// rsync needs /etc/passwd and /etc/group for user/group lookup.
+			//
+			// As of Go 1.24, the net package Go resolver reads
+			// the following DNS configurations files:
+			//
+			// - /etc/resolv.conf
+			// - /etc/hosts
+			// - /etc/services
+			// - /etc/nsswitch.conf
+			//
+			// Because the /etc/resolv.conf file might be re-created (by DHCP
+			// clients, Tailscale, or similar), we need to provide the entire
+			// /etc directory instead of individual files. Otherwise, the
+			// program seems to work at first and then fails DNS resolution
+			// after a while.
+			landlock.RODirs("/etc").IgnoreIfMissing(),
 			landlock.RODirs(roDirs...).IgnoreIfMissing(),
 			landlock.ROFiles(roFiles...).IgnoreIfMissing(),
 			landlock.RWDirs(rwDirs...).WithRefer(),
