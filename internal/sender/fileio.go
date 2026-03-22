@@ -59,11 +59,11 @@ func (ms *mapStruct) ptr(offset int64, l int32) ([]byte, error) {
 	alignFudge := alignedOvershoot(offset)
 	windowStart := offset - alignFudge
 	windowSize := int64(ms.defWindowSize)
-	if windowStart+windowSize > ms.fileSize {
-		windowSize = ms.fileSize - windowStart
-	}
 	if windowSize < len+alignFudge {
 		windowSize = alignedLength(len + alignFudge)
+	}
+	if windowStart+windowSize > ms.fileSize {
+		windowSize = ms.fileSize - windowStart
 	}
 	if windowSize > ms.pSize {
 		win := make([]byte, windowSize)
