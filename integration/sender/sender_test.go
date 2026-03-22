@@ -652,3 +652,42 @@ func TestReceiverCommandDryRun(t *testing.T) {
 		t.Fatalf("rsync error, output:\n%s", buf.String())
 	}
 }
+
+// Test for issue #53 Partial sync of static files sometimes failed with error
+// "file has changed mid-transfer"
+func TestSenderPartial257kb(t *testing.T) {
+	t.Parallel()
+
+	tmp := t.TempDir()
+	source := filepath.Join(tmp, "source")
+	dest := filepath.Join(tmp, "dest")
+	destFile := filepath.Join(dest, "source")
+	want := make([]byte, 1024*257+1)
+
+	if err := os.WriteFile(source, want, 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(dest, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(destFile, []byte{0}, 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	args := []string{
+		"gokr-rsync",
+		source,
+		dest,
+	}
+	rsynctest.Run(t, args...)
+
+	{
+		got, err := os.ReadFile(destFile)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if diff := cmp.Diff(want, got); diff != "" {
+			t.Fatalf("unexpected file contents: diff (-want +got):\n%s", diff)
+		}
+	}
+}
