@@ -7,6 +7,8 @@ package rsyncd
 import (
 	"bufio"
 	"context"
+	"crypto/rand"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"io"
@@ -25,14 +27,17 @@ import (
 	"github.com/gokrazy/rsync/internal/rsyncos"
 	"github.com/gokrazy/rsync/internal/rsyncwire"
 	"github.com/gokrazy/rsync/internal/sender"
+	"github.com/mmcloughlin/md4"
 )
 
 type Module struct {
-	Name     string   `toml:"name"`
-	Path     string   `toml:"path"` // If empty, FS must be non-nil
-	FS       fs.FS    `toml:"-"`    // If set, serve from this instead of Path
-	ACL      []string `toml:"acl"`
-	Writable bool     `toml:"writable"` // Must be false if FS is set
+	Name        string   `toml:"name"`
+	Path        string   `toml:"path"` // If empty, FS must be non-nil
+	FS          fs.FS    `toml:"-"`    // If set, serve from this instead of Path
+	ACL         []string `toml:"acl"`
+	Writable    bool     `toml:"writable"`     // Must be false if FS is set
+	AuthUsers   []string `toml:"auth_users"`   // Usernames allowed to connect; empty means no auth
+	SecretsFile string   `toml:"secrets_file"` // Path to file with user:password lines
 }
 
 // Option specifies the server options.
@@ -227,6 +232,13 @@ func (s *Server) HandleDaemonConn(ctx context.Context, conn *Conn) (err error) {
 	if err := checkACL(module.ACL, conn.name); err != nil {
 		fmt.Fprintf(cwr, "@ERROR: %v\n", err)
 		return err
+	}
+
+	if len(module.AuthUsers) > 0 {
+		if err := s.authServer(rd, cwr, &module, conn.name); err != nil {
+			fmt.Fprintf(cwr, "@ERROR: auth failed on module %s\n", module.Name)
+			return err
+		}
 	}
 
 	io.WriteString(cwr, terminationCommand)
@@ -601,6 +613,91 @@ func (s *Server) Serve(ctx context.Context, ln net.Listener) error {
 			}
 		}()
 	}
+}
+
+func (s *Server) authServer(rd *bufio.Reader, cwr io.Writer, module *Module, remoteAddr string) error {
+	challenge := genChallenge()
+	fmt.Fprintf(cwr, "@RSYNCD: AUTHREQD %s\n", challenge)
+
+	line, err := rd.ReadString('\n')
+	if err != nil {
+		return fmt.Errorf("reading auth response: %v", err)
+	}
+	line = strings.TrimSpace(line)
+	sp := strings.IndexByte(line, ' ')
+	if sp < 0 {
+		s.logger.Printf("auth failed on module %s from %s: invalid response", module.Name, remoteAddr)
+		return fmt.Errorf("invalid auth response")
+	}
+	user, response := line[:sp], line[sp+1:]
+
+	matched := false
+	for _, allowed := range module.AuthUsers {
+		if allowed == user {
+			matched = true
+			break
+		}
+	}
+	if !matched {
+		s.logger.Printf("auth failed on module %s from %s for %s: unknown user", module.Name, remoteAddr, user)
+		return fmt.Errorf("auth failed")
+	}
+
+	secret, err := lookupSecret(module.SecretsFile, user)
+	if err != nil {
+		s.logger.Printf("auth failed on module %s from %s for %s: %v", module.Name, remoteAddr, user, err)
+		return fmt.Errorf("auth failed")
+	}
+
+	expected := authHash(secret, challenge)
+	if response != expected {
+		s.logger.Printf("auth failed on module %s from %s for %s: password mismatch", module.Name, remoteAddr, user)
+		return fmt.Errorf("auth failed")
+	}
+
+	s.logger.Printf("auth ok on module %s from %s for %s", module.Name, remoteAddr, user)
+	return nil
+}
+
+func genChallenge() string {
+	var buf [16]byte
+	rand.Read(buf[:])
+	h := md4.New()
+	h.Write([]byte{0, 0, 0, 0})
+	h.Write(buf[:])
+	return base64.StdEncoding.WithPadding(base64.NoPadding).EncodeToString(h.Sum(nil))
+}
+
+func authHash(password, challenge string) string {
+	h := md4.New()
+	h.Write([]byte{0, 0, 0, 0})
+	h.Write([]byte(password))
+	h.Write([]byte(challenge))
+	return base64.StdEncoding.WithPadding(base64.NoPadding).EncodeToString(h.Sum(nil))
+}
+
+func lookupSecret(path, user string) (string, error) {
+	if path == "" {
+		return "", fmt.Errorf("no secrets file configured")
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return "", fmt.Errorf("reading secrets file: %v", err)
+	}
+	for _, line := range strings.Split(string(data), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" || line[0] == '#' {
+			continue
+		}
+		parts := strings.SplitN(line, ":", 2)
+		if len(parts) != 2 {
+			continue
+		}
+		if parts[0] == user {
+			return parts[1], nil
+		}
+	}
+	return "", fmt.Errorf("user not found in secrets file")
 }
 
 func validateModule(mod Module) error {
