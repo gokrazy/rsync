@@ -728,6 +728,7 @@ func (o *Options) AlwaysChecksum() bool       { return o.always_checksum != 0 }
 func (o *Options) IgnoreTimes() bool          { return o.ignore_times != 0 }
 func (o *Options) OutputMOTD() bool           { return o.output_motd != 0 }
 func (o *Options) RsyncPort() int             { return o.rsync_port }
+func (o *Options) PasswordFile() string       { return o.password_file }
 func (o *Options) XferDirs() int              { return o.xfer_dirs }
 func (o *Options) FilterRules() []string      { return o.filterRules }
 func (o *Options) Progress() bool {
@@ -1021,7 +1022,7 @@ func (o *Options) gokrazyTable() []poptOption {
 		//{"address", "", POPT_ARG_STRING, &o.bind_address, 0},
 		{"port", "", POPT_ARG_INT, &o.rsync_port, 0},
 		//{"sockopts", "", POPT_ARG_STRING, &o.sockopts, 0},
-		//{"password-file", "", POPT_ARG_STRING, &o.password_file, 0},
+		{"password-file", "", POPT_ARG_STRING, &o.password_file, 0},
 		//{"early-input", "", POPT_ARG_STRING, &o.early_input_file, 0},
 		//{"blocking-io", "", POPT_ARG_VAL, &o.blocking_io, 1},
 		//{"no-blocking-io", "", POPT_ARG_VAL, &o.blocking_io, 0},

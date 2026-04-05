@@ -2,6 +2,7 @@ package maincmd
 
 import (
 	"fmt"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -104,10 +105,18 @@ func parseHostspec(src string, parsingURL bool) (host, path string, port int, _ 
 // rsync/options.c:check_for_hostspec
 func checkForHostspec(src string) (host, path string, port int, _ error) {
 	if strings.HasPrefix(src, "rsync://") {
-		var err error
-		if host, path, port, err = parseHostspec(strings.TrimPrefix(src, "rsync://"), true); err == nil {
-			if port == 0 {
-				port = -1
+		u, err := url.Parse(src)
+		if err == nil && u.Hostname() != "" {
+			host = u.Hostname()
+			if u.User != nil {
+				host = u.User.String() + "@" + host
+			}
+			path = strings.TrimPrefix(u.Path, "/")
+			port = -1
+			if u.Port() != "" {
+				if p, err := strconv.Atoi(u.Port()); err == nil {
+					port = p
+				}
 			}
 			return host, path, port, nil
 		}
