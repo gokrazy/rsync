@@ -5,14 +5,23 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"strings"
 
 	"github.com/gokrazy/rsync/internal/rsyncos"
 )
 
+// Multiplex message tags, mirroring rsync.h's MSG_* constants. MSG_ERROR_XFER
+// (1) and MSG_ERROR (3) are non-fatal logging messages from the peer in real
+// rsync — losing one file's stat is not a reason to abort the whole transfer.
+// MSG_ERROR_SOCKET (5) is a peer-side socket-level error and is fatal.
 const (
-	MsgData  uint8 = 0
-	MsgInfo  uint8 = 2
-	MsgError uint8 = 1
+	MsgData         uint8 = 0
+	MsgErrorXfer    uint8 = 1
+	MsgInfo         uint8 = 2
+	MsgError        uint8 = 3
+	MsgWarning      uint8 = 4
+	MsgErrorSocket  uint8 = 5
+	MsgLog          uint8 = 6
 )
 
 const mplexBase = 7
@@ -75,12 +84,15 @@ func (w *MultiplexReader) Read(p []byte) (n int, err error) {
 		return 0, err
 	}
 	switch tag {
-	case MsgError:
-		return 0, fmt.Errorf("%s", payload)
-	case MsgInfo:
-		w.Env.Logf("info: %s", payload)
+	case MsgErrorXfer, MsgError, MsgWarning, MsgLog:
+		w.Env.Logf("rsync: %s", strings.TrimRight(string(payload), "\n"))
 		// io.ReadFull will call Read again
 		return 0, nil
+	case MsgInfo:
+		w.Env.Logf("info: %s", payload)
+		return 0, nil
+	case MsgErrorSocket:
+		return 0, fmt.Errorf("rsync socket error: %s", strings.TrimRight(string(payload), "\n"))
 	case MsgData:
 		// continues below
 	default:
