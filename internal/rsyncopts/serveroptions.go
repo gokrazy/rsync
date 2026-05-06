@@ -46,8 +46,9 @@ func (o *Options) ServerOptions() []string {
 	// if (copy_links)
 	// 	argstr[x++] = 'L';
 
-	// if (whole_file > 0)
-	// 	argstr[x++] = 'W';
+	if o.whole_file > 0 {
+		argstr += "W"
+	}
 	// /* We don't need to send --no-whole-file, because it's the
 	//  * default for remote transfers, and in any case old versions
 	//  * of rsync will not understand it. */

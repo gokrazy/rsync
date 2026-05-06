@@ -302,7 +302,9 @@ func (rt *Transfer) recvGenerator(idx int, f *File) error {
 		return nil
 	}
 
-	// TODO: if deltas are disabled, request the file in full
+	if rt.Opts.WholeFile {
+		return requestFullFile()
+	}
 
 	in, err := rt.DestRoot.Open(f.Name)
 	if err != nil {

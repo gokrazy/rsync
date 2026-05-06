@@ -725,6 +725,7 @@ func (o *Options) Server() bool               { return o.am_server != 0 }
 func (o *Options) Daemon() bool               { return o.am_daemon != 0 }
 func (o *Options) ConnectTimeoutSeconds() int { return o.connect_timeout }
 func (o *Options) AlwaysChecksum() bool       { return o.always_checksum != 0 }
+func (o *Options) WholeFile() bool             { return o.whole_file > 0 }
 func (o *Options) IgnoreTimes() bool          { return o.ignore_times != 0 }
 func (o *Options) OutputMOTD() bool           { return o.output_motd != 0 }
 func (o *Options) RsyncPort() int             { return o.rsync_port }
@@ -922,9 +923,9 @@ func (o *Options) gokrazyTable() []poptOption {
 		//{"exclude-from", "", POPT_ARG_STRING, nil, OPT_EXCLUDE_FROM},
 		//{"include-from", "", POPT_ARG_STRING, nil, OPT_INCLUDE_FROM},
 		//{"cvs-exclude", "C", POPT_ARG_NONE, &o.cvs_exclude, 0},
-		//{"whole-file", "W", POPT_ARG_VAL, &o.whole_file, 1},
-		//{"no-whole-file", "", POPT_ARG_VAL, &o.whole_file, 0},
-		//{"no-W", "", POPT_ARG_VAL, &o.whole_file, 0},
+		{"whole-file", "W", POPT_ARG_VAL, &o.whole_file, 1},
+		{"no-whole-file", "", POPT_ARG_VAL, &o.whole_file, 0},
+		{"no-W", "", POPT_ARG_VAL, &o.whole_file, 0},
 		{"checksum", "c", POPT_ARG_VAL, &o.always_checksum, 1},
 		{"no-checksum", "", POPT_ARG_VAL, &o.always_checksum, 0},
 		{"no-c", "", POPT_ARG_VAL, &o.always_checksum, 0},
