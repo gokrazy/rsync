@@ -1,7 +1,9 @@
 package rsyncos
 
 import (
+	"context"
 	"io"
+	"net"
 
 	"github.com/gokrazy/rsync/internal/log"
 )
@@ -12,6 +14,8 @@ type Env struct {
 	Stderr io.Writer
 
 	DontRestrict bool
+
+	DialContext func(ctx context.Context, network, addr string) (net.Conn, error)
 
 	logger log.Logger
 }

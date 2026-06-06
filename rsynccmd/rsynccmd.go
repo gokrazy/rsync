@@ -21,6 +21,7 @@ package rsynccmd
 import (
 	"context"
 	"io"
+	"net"
 
 	"github.com/gokrazy/rsync/internal/maincmd"
 	"github.com/gokrazy/rsync/internal/rsyncos"
@@ -34,6 +35,8 @@ type Cmd struct {
 	Stdout       io.Writer
 	Stderr       io.Writer
 	DontRestrict bool
+
+	DialContext func(ctx context.Context, network, addr string) (net.Conn, error)
 }
 
 // Command returns the [Cmd] struct to execute rsync with the given arguments.
@@ -58,6 +61,7 @@ func (c *Cmd) Run(ctx context.Context) (*Result, error) {
 		Stdout:       c.Stdout,
 		Stderr:       c.Stderr,
 		DontRestrict: c.DontRestrict,
+		DialContext:  c.DialContext,
 	}
 	stats, err := maincmd.Main(ctx, osenv, c.Args, nil)
 	if err != nil {

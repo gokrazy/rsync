@@ -41,12 +41,19 @@ func socketClient(ctx context.Context, osenv *rsyncos.Env, opts *rsyncopts.Optio
 		dialer.Timeout = time.Duration(timeout) * time.Second
 		timeoutStr = fmt.Sprintf(" (timeout: %d seconds)", timeout)
 	}
-	osenv.Logf("Opening TCP connection to %s%s", host, timeoutStr)
-	conn, err := dialer.DialContext(ctx, "tcp", host)
+	dialFn := dialer.DialContext
+	if osenv.DialContext != nil {
+		dialFn = osenv.DialContext
+		osenv.Logf("Opening TCP connection to %s%s (via custom DialContext)", host, timeoutStr)
+	} else {
+		osenv.Logf("Opening TCP connection to %s%s", host, timeoutStr)
+	}
+	conn, err := dialFn(ctx, "tcp", host)
 	if err != nil {
 		return nil, err
 	}
 	defer conn.Close()
+
 	if osenv.Restrict() {
 		if err := restrict.MaybeFileSystem(roDirs, rwDirs); err != nil {
 			return nil, err
