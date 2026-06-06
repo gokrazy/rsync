@@ -47,6 +47,12 @@ func socketClient(ctx context.Context, osenv *rsyncos.Env, opts *rsyncopts.Optio
 		return nil, err
 	}
 	defer conn.Close()
+
+	// Wrap the connection with a sliding deadline so that I/O unblocks
+	// if the remote server hangs (no data for ioTimeout). The deadline is
+	// extended on every successful Read/Write, so long-running transfers
+	// that are making progress are never interrupted.
+	conn = newDeadlineConn(conn, ctx, 30*time.Second)
 	if osenv.Restrict() {
 		if err := restrict.MaybeFileSystem(roDirs, rwDirs); err != nil {
 			return nil, err
@@ -154,4 +160,61 @@ func StartInbandExchange(osenv *rsyncos.Env, opts *rsyncopts.Options, conn io.Re
 	fmt.Fprintf(conn, "\n")
 
 	return false, nil
+}
+
+// deadlineConn wraps a net.Conn and slides the I/O deadline forward
+// on every successful Read/Write. This ensures that actively progressing
+// transfers are never interrupted, while a connection that has gone
+// idle (remote server hung) will time out after idleTimeout.
+type deadlineConn struct {
+	net.Conn
+	ctx         context.Context
+	idleTimeout time.Duration
+}
+
+func newDeadlineConn(c net.Conn, ctx context.Context, idleTimeout time.Duration) *deadlineConn {
+	d := &deadlineConn{Conn: c, ctx: ctx, idleTimeout: idleTimeout}
+	d.extendDeadline()
+
+	// Watch for context cancellation or deadline expiry. When ctx.Done()
+	// fires, immediately expire the connection deadline so that any
+	// blocked Read/Write unblocks and returns a timeout error, rather
+	// than hanging forever. This handles both WithCancel (Abort) and
+	// WithTimeout/WithDeadline contexts.
+	go func() {
+		<-ctx.Done()
+		c.SetDeadline(time.Now())
+	}()
+
+	return d
+}
+
+func (d *deadlineConn) extendDeadline() {
+	// If the context has been cancelled, expire immediately.
+	select {
+	case <-d.ctx.Done():
+		d.Conn.SetDeadline(time.Now())
+		return
+	default:
+	}
+
+	// Slide the deadline forward by the idle timeout,
+	// clamped to the context's absolute deadline when present.
+	dl := time.Now().Add(d.idleTimeout)
+	if ctxDL, ok := d.ctx.Deadline(); ok && ctxDL.Before(dl) {
+		dl = ctxDL
+	}
+	d.Conn.SetDeadline(dl)
+}
+
+func (d *deadlineConn) Read(b []byte) (int, error) {
+	n, err := d.Conn.Read(b)
+	d.extendDeadline()
+	return n, err
+}
+
+func (d *deadlineConn) Write(b []byte) (int, error) {
+	n, err := d.Conn.Write(b)
+	d.extendDeadline()
+	return n, err
 }
