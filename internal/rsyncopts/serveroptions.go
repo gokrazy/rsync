@@ -146,10 +146,13 @@ func (o *Options) ServerOptions() []string {
 	// 	args[ac++] = arg;
 	// }
 
-	// if (delete_excluded)
-	// 	args[ac++] = "--delete-excluded";
-	// else if (delete_mode)
-	// 	args[ac++] = "--delete";
+	// Tell the server (when it is the receiver) to delete extraneous files.
+	// Only a receiving server acts on this; a sending server ignores it.
+	if o.delete_excluded != 0 {
+		sargv = append(sargv, "--delete-excluded")
+	} else if o.delete_mode != 0 {
+		sargv = append(sargv, "--delete")
+	}
 
 	// if (size_only)
 	// 	args[ac++] = "--size-only";
