@@ -325,7 +325,32 @@ func ClientRun(osenv *rsyncos.Env, opts *rsyncopts.Options, conn io.ReadWriter, 
 			}
 		}
 
-		stats, err := st.Do(crd, cwr, FileSystemRoot, paths, nil)
+		// In delete mode the receiving server reads our filter list (so it knows
+		// which extraneous files are protected from deletion), exactly mirroring
+		// rsyncd's handleConnReceiver, which reads it iff DeleteMode. Sending it
+		// unconditionally would desync a non-delete receiver, which never reads it.
+		if opts.DeleteMode() {
+			for _, rule := range opts.FilterRules() {
+				if err := c.WriteInt32(int32(len(rule))); err != nil {
+					return nil, err
+				}
+				if err := c.WriteString(rule); err != nil {
+					return nil, err
+				}
+			}
+			const exclusionListEnd = 0
+			if err := c.WriteInt32(exclusionListEnd); err != nil {
+				return nil, err
+			}
+		}
+
+		// As the sender we also build the file list ourselves, so apply the
+		// include/exclude filters locally (skip excluded files entirely).
+		excl, err := sender.ParseFilterRules(opts.FilterRules())
+		if err != nil {
+			return nil, err
+		}
+		stats, err := st.Do(crd, cwr, FileSystemRoot, paths, excl)
 		if err != nil {
 			return nil, err
 		}

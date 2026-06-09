@@ -26,11 +26,30 @@ func (l *filterRuleList) addRule(fr *filterRule) {
 	l.Filters = append(l.Filters, fr)
 }
 
-// exclude.c:check_filter
+// ParseFilterRules builds a filter rule list from textual rules (as produced by
+// Options.FilterRules(), e.g. "- *.log" / "+ keep.txt"). It is used by the
+// client when it is the sender, so that excluded files are not even put into the
+// file list (rsync/exclude.c:parse_filter_str + add_rule).
+func ParseFilterRules(rules []string) (*filterRuleList, error) {
+	var l filterRuleList
+	for _, rule := range rules {
+		fr, err := parseFilter(rule)
+		if err != nil {
+			return nil, err
+		}
+		l.addRule(fr)
+	}
+	return &l, nil
+}
+
+// matches reports whether name should be excluded. Rules are evaluated in order
+// and the first one that matches decides: an exclude rule excludes (true), an
+// include rule protects the file from exclusion (false). This mirrors
+// rsync/exclude.c:check_filter.
 func (l *filterRuleList) matches(name string) bool {
 	for _, fr := range l.Filters {
 		if fr.matches(name) {
-			return true
+			return fr.flag&filtruleInclude == 0
 		}
 	}
 	return false
@@ -75,14 +94,101 @@ type filterRule struct {
 
 // exclude.c:rule_matches
 func (fr *filterRule) matches(name string) bool {
-	if fr.flag&filtruleWild != 0 {
-		panic("wildcard filter rules not yet implemented")
-	}
-	if !strings.ContainsRune(fr.pattern, '/') &&
-		fr.flag&filtruleWild == 0 {
+	pattern := fr.pattern
+	// A pattern with no slash matches against the basename only; a pattern with
+	// a slash is anchored and matches against the whole (relative) path.
+	if !strings.ContainsRune(pattern, '/') {
 		name = filepath.Base(name)
 	}
-	return fr.pattern == name
+	if fr.flag&filtruleWild != 0 {
+		return wildmatch(pattern, name)
+	}
+	return pattern == name
+}
+
+// wildmatch implements the subset of rsync's lib/wildmatch.c that rsync filter
+// patterns use: '*' matches any run of characters except '/', '**' matches across
+// '/' too, '?' matches any single character except '/', and '[...]' is a
+// character class (with '!'/'^' negation and 'a-z' ranges).
+func wildmatch(pattern, text string) bool {
+	return dowild([]byte(pattern), []byte(text))
+}
+
+func dowild(p, t []byte) bool {
+	ti := 0
+	for pi := 0; pi < len(p); pi++ {
+		pc := p[pi]
+		if ti >= len(t) && pc != '*' {
+			return false
+		}
+		switch pc {
+		case '?':
+			if t[ti] == '/' {
+				return false
+			}
+			ti++
+		case '*':
+			doubleStar := pi+1 < len(p) && p[pi+1] == '*'
+			for pi+1 < len(p) && p[pi+1] == '*' {
+				pi++
+			}
+			if pi == len(p)-1 {
+				// Trailing star: '**' matches the rest unconditionally, a single
+				// '*' matches the rest only if it contains no '/'.
+				return doubleStar || !bytesContainsSlash(t[ti:])
+			}
+			for ; ti <= len(t); ti++ {
+				if dowild(p[pi+1:], t[ti:]) {
+					return true
+				}
+				if ti < len(t) && t[ti] == '/' && !doubleStar {
+					return false
+				}
+			}
+			return false
+		case '[':
+			pi++
+			negate := pi < len(p) && (p[pi] == '!' || p[pi] == '^')
+			if negate {
+				pi++
+			}
+			matched := false
+			first := true
+			for pi < len(p) && (p[pi] != ']' || first) {
+				if pi+2 < len(p) && p[pi+1] == '-' && p[pi+2] != ']' {
+					if t[ti] >= p[pi] && t[ti] <= p[pi+2] {
+						matched = true
+					}
+					pi += 3
+				} else {
+					if t[ti] == p[pi] {
+						matched = true
+					}
+					pi++
+				}
+				first = false
+			}
+			if matched == negate {
+				return false
+			}
+			ti++
+		default:
+			if t[ti] != pc {
+				return false
+			}
+			ti++
+		}
+	}
+	return ti == len(t)
+}
+
+func bytesContainsSlash(b []byte) bool {
+	for _, c := range b {
+		if c == '/' {
+			return true
+		}
+	}
+	return false
 }
 
 // exclude.c:parse_filter_str / exclude.c:parse_rule_tok

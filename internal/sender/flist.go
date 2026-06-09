@@ -146,7 +146,12 @@ func (s *scopedWalker) walkFn(path string, d fs.DirEntry, err error) error {
 	// st.logger.Printf("flags for %q: %v", name, flags)
 
 	if s.excl.matches(name) {
-		return filepath.SkipDir
+		// Skip the whole subtree for a directory, but for a regular file only
+		// skip that one file — returning SkipDir there would drop its siblings.
+		if info.IsDir() {
+			return filepath.SkipDir
+		}
+		return nil
 	}
 
 	s.fileList.Files = append(s.fileList.Files, file{
