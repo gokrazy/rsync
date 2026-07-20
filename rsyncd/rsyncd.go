@@ -472,7 +472,10 @@ func (s *Server) handleConnReceiver(module *Module, crd *rsyncwire.CountingReade
 		// Descend into subdirectory (if requested),
 		// using the os.OpenRoot traversal-safe API.
 		if len(paths) == 1 && paths[0] != "/" {
-			subdir := strings.TrimPrefix(paths[0], "/")
+			// Trim leading and trailing slash:
+			// (*os.Root).MkdirAll("foo/") was a security issue:
+			// https://go.dev/issue/79005, so no longer works.
+			subdir := strings.Trim(paths[0], "/")
 			subRoot, err := rt.DestRoot.OpenRoot(subdir)
 			if err != nil {
 				if os.IsNotExist(err) {
