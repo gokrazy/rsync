@@ -89,16 +89,26 @@ type scopedWalker struct {
 	requested string
 	strip     string
 	subdir    string
+	prefix    string
 }
 
 func (s *scopedWalker) walk() error {
 	if s.source == nil {
-		root, err := os.OpenRoot(s.localDir)
+		fi, err := os.Lstat(s.localDir)
 		if err != nil {
-			s.st.Logger.Printf("  OpenRoot(localDir=%q): %v", s.localDir, err)
+			s.st.Logger.Printf("  Lstat(localDir=%q): %v", s.localDir, err)
 			return fmt.Errorf("i/o error: requested module path is not accessible")
 		}
-		s.source = newOSRootSource(root)
+		if fi.IsDir() {
+			root, err := os.OpenRoot(s.localDir)
+			if err != nil {
+				s.st.Logger.Printf("  OpenRoot(localDir=%q): %v", s.localDir, err)
+				return fmt.Errorf("i/o error: requested module path is not accessible")
+			}
+			s.source = newOSRootSource(root)
+		} else {
+			s.source = newSingleFileSource(s.localDir, fi)
+		}
 		s.fileList.Sources = append(s.fileList.Sources, s.source)
 	}
 	if s.subdir != "." {
@@ -158,10 +168,17 @@ func (s *scopedWalker) walkFn(path string, d fs.DirEntry, err error) error {
 			name = strings.TrimPrefix(name, s.strip)
 		}
 	}
+	if s.prefix != "" {
+		if path == "." {
+			name = s.prefix
+		} else {
+			name = s.prefix + "/" + path
+		}
+	}
 	if opts.DebugGTE(rsyncopts.DEBUG_FLIST, 1) {
 		logger.Printf("Trim(path=%q) = %q", path, name)
 	}
-	if path == "." {
+	if path == "." && s.prefix == "" {
 		flags |= rsync.XMIT_TOP_DIR
 	}
 	// st.logger.Printf("flags for %q: %v", name, flags)
@@ -364,18 +381,18 @@ func (st *Transfer) SendFileList(localDir string, paths []string, excl *filterRu
 
 	for _, requested := range paths {
 		subdir := "."
+		prefix := ""
 		local := localDir
 		if local == rsync.FileSystemRoot {
 			// Implicit module (/) and absolute requested path (/tmp/foo/),
 			// turn the path into the local directory and request /.
-			local = requested
+			local = filepath.Clean(requested)
 			if strings.HasSuffix(requested, "/") {
-				local = filepath.Clean(requested)
-				requested = "/"
+
 			} else {
-				local = filepath.Dir(requested)
-				requested = filepath.Base(requested)
+				prefix = filepath.Base(requested)
 			}
+			requested = "/"
 		} else if !strings.HasSuffix(requested, "/") {
 			st.Logger.Printf("  handling requested=%q", requested)
 			clean := path.Clean(strings.TrimPrefix(requested, "/"))
@@ -408,6 +425,7 @@ func (st *Transfer) SendFileList(localDir string, paths []string, excl *filterRu
 			requested: requested,
 			strip:     strip,
 			subdir:    subdir,
+			prefix:    prefix,
 		}
 		if err := sw.walk(); err != nil {
 			return nil, err
