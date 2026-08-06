@@ -5,6 +5,7 @@ import (
 	"io"
 	"io/fs"
 	"os"
+	"path"
 )
 
 // FileSource is the interface which the gokrazy rsync sender uses
@@ -80,3 +81,35 @@ func (s *fsSource) Readlink(name string) (string, error) {
 }
 
 func (s *fsSource) Close() error { return nil }
+
+// subSource wraps a FileSource and serves the specified subtree,
+// like fs.Sub() does for fs.FS.
+type subSource struct {
+	underlying FileSource
+	subdir     string
+	fsys       fs.FS
+}
+
+func newSubSource(underlying FileSource, subdir string) (FileSource, error) {
+	fsys, err := fs.Sub(underlying.FS(), subdir)
+	if err != nil {
+		return nil, err
+	}
+	return &subSource{
+		underlying: underlying,
+		subdir:     subdir,
+		fsys:       fsys,
+	}, nil
+}
+
+func (s *subSource) FS() fs.FS { return s.fsys }
+
+func (s *subSource) Open(name string) (File, error) {
+	return s.underlying.Open(path.Join(s.subdir, name))
+}
+
+func (s *subSource) Readlink(name string) (string, error) {
+	return s.underlying.Readlink(path.Join(s.subdir, name))
+}
+
+func (s *subSource) Close() error { return nil }

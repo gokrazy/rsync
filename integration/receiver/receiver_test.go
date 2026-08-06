@@ -117,7 +117,7 @@ func TestReceiver(t *testing.T) {
 		Path: source,
 	})
 	args := []string{"-aH"}
-	firstStats := srv.RunClient(t, args, []string{dest})
+	firstStats := srv.RunClient(t, args, "./", []string{dest})
 
 	{
 		want := []byte("world")
@@ -174,7 +174,7 @@ func TestReceiver(t *testing.T) {
 		rsynctest.VerifyDummyDeviceFiles(t, devices, filepath.Join(dest, "devices"))
 	}
 
-	incrementalStats := srv.RunClient(t, args, []string{dest})
+	incrementalStats := srv.RunClient(t, args, "./", []string{dest})
 	if incrementalStats.Written >= firstStats.Written {
 		t.Fatalf("incremental run unexpectedly not more efficient than first run: incremental wrote %d bytes, first wrote %d bytes", incrementalStats.Written, firstStats.Written)
 	}
@@ -193,7 +193,7 @@ func TestReceiver(t *testing.T) {
 	// Replace the dest symlink to see if it will be restored
 	rsynctest.ReplaceSymlink(t, "wrong", filepath.Join(dest, "hey"))
 
-	srv.RunClient(t, args, []string{dest})
+	srv.RunClient(t, args, "./", []string{dest})
 
 	{
 		want := []byte("world")
@@ -236,7 +236,7 @@ func TestReceiverSync(t *testing.T) {
 		Path: source,
 	})
 	args := []string{"-aH"}
-	firstStats := srv.RunClient(t, args, []string{dest})
+	firstStats := srv.RunClient(t, args, "./", []string{dest})
 	t.Logf("firstStats: %+v", firstStats)
 	//     receiver_test.go:211: firstStats: &{Read:91 Written:3146087 Size:3149824}
 
@@ -249,7 +249,7 @@ func TestReceiverSync(t *testing.T) {
 	// modify the large data file
 	rsynctest.WriteLargeDataFile(t, source, headPattern, bodyPattern, endPattern)
 
-	incrementalStats := srv.RunClient(t, args, []string{dest})
+	incrementalStats := srv.RunClient(t, args, "./", []string{dest})
 	t.Logf("incrementalStats: %+v", incrementalStats)
 	if got, want := incrementalStats.Written, int64(2*1024*1024); got >= want {
 		t.Fatalf("rsync unexpectedly transferred more data than needed: got %d, want < %d", got, want)
@@ -275,7 +275,7 @@ func TestReceiverSyncDelete(t *testing.T) {
 		Path: source,
 	})
 	args := []string{"-aH", "--delete"}
-	firstStats := srv.RunClient(t, args, []string{dest})
+	firstStats := srv.RunClient(t, args, "./", []string{dest})
 	t.Logf("firstStats: %+v", firstStats)
 	//     receiver_test.go:211: firstStats: &{Read:91 Written:3146087 Size:3149824}
 
@@ -297,7 +297,7 @@ func TestReceiverSyncDelete(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	srv.RunClient(t, args, []string{dest})
+	srv.RunClient(t, args, "./", []string{dest})
 	for _, gone := range []string{extra, extraDir, extra2} {
 		if _, err := os.Stat(gone); !os.IsNotExist(err) {
 			t.Errorf("expected %s to be deleted, but it still exists", gone)
@@ -335,7 +335,7 @@ func TestReceiverAlwaysChecksum(t *testing.T) {
 		Path: source,
 	})
 	args := []string{"-aH"}
-	srv.RunClient(t, args, []string{dest})
+	srv.RunClient(t, args, "./", []string{dest})
 
 	desthello := filepath.Join(dest, "hello.txt")
 	b, err := os.ReadFile(desthello)
@@ -359,7 +359,7 @@ func TestReceiverAlwaysChecksum(t *testing.T) {
 	}
 
 	args = append(args, "--checksum")
-	srv.RunClient(t, args, []string{dest})
+	srv.RunClient(t, args, "./", []string{dest})
 
 	b, err = os.ReadFile(desthello)
 	if err != nil {
@@ -403,7 +403,7 @@ func TestReceiverReadOnlyDir(t *testing.T) {
 		Path: source,
 	})
 	args := []string{"-aH"}
-	srv.RunClient(t, args, []string{dest})
+	srv.RunClient(t, args, "./", []string{dest})
 
 	desthello := filepath.Join(dest, "hello.txt")
 	b, err := os.ReadFile(desthello)
@@ -434,7 +434,7 @@ func TestReceiverReadOnlyDir(t *testing.T) {
 	}
 
 	args = append(args, "--checksum")
-	srv.RunClient(t, args, []string{dest})
+	srv.RunClient(t, args, "./", []string{dest})
 
 	b, err = os.ReadFile(desthello)
 	if err != nil {

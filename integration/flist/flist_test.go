@@ -33,5 +33,5 @@ func TestLargeFileList(t *testing.T) {
 		Name: "interop",
 		Path: source,
 	})
-	srv.RunClient(t, []string{"-aH"}, []string{dest})
+	srv.RunClient(t, []string{"-aH"}, "./", []string{dest})
 }

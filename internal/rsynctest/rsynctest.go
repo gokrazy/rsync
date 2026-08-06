@@ -281,13 +281,13 @@ func (ts *TestServer) pipe(t *testing.T, args []string) (*sync.WaitGroup, io.Rea
 	return &wg, rw
 }
 
-func (ts *TestServer) RunClient(t *testing.T, args []string, remaining []string) *rsyncstats.TransferStats {
+func (ts *TestServer) RunClient(t *testing.T, args []string, src string, remaining []string) *rsyncstats.TransferStats {
 	stderr := testlogger.New(t)
 	cl, err := rsyncclient.New(args, rsyncclient.WithStderr(stderr), rsyncclient.DontRestrict())
 	if err != nil {
 		t.Fatal(err)
 	}
-	wg, rw := ts.pipe(t, cl.ServerCommandOptions("./"))
+	wg, rw := ts.pipe(t, cl.ServerCommandOptions(src))
 	res, err := cl.Run(t.Context(), rw, remaining)
 	if err != nil {
 		t.Fatal(err)

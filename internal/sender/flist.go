@@ -98,17 +98,16 @@ func (s *scopedWalker) walk() error {
 			s.st.Logger.Printf("  OpenRoot(localDir=%q): %v", s.localDir, err)
 			return fmt.Errorf("i/o error: requested module path is not accessible")
 		}
-		// TODO: what about the s.source!=nil case?
-		if s.subdir != "." {
-			sub, err := root.OpenRoot(s.subdir)
-			if err != nil {
-				s.st.Logger.Printf("  root.OpenRoot(subdir=%q): %v", s.subdir, err)
-				return fmt.Errorf("i/o error: requested module path is not accessible")
-			}
-			root = sub
-		}
 		s.source = newOSRootSource(root)
 		s.fileList.Sources = append(s.fileList.Sources, s.source)
+	}
+	if s.subdir != "." {
+		sub, err := newSubSource(s.source, s.subdir)
+		if err != nil {
+			s.st.Logger.Printf("  newSubSource(subdir=%q): %v", s.subdir, err)
+			return fmt.Errorf("i/o error: requested module path is not accessible")
+		}
+		s.source = sub
 	}
 
 	rootname := s.requested

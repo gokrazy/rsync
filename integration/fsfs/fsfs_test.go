@@ -3,11 +3,13 @@ package fsfs_test
 import (
 	"log"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"testing"
 	"testing/fstest"
 
 	"github.com/gokrazy/rsync/internal/rsynctest"
+	"github.com/gokrazy/rsync/internal/testlogger"
 	"github.com/gokrazy/rsync/rsyncd"
 	"github.com/google/go-cmp/cmp"
 )
@@ -42,7 +44,7 @@ func TestMapFS(t *testing.T) {
 		FS:   memfs,
 	})
 	args := []string{"-av"}
-	srv.RunClient(t, args, []string{dest + "/"})
+	srv.RunClient(t, args, "./", []string{dest + "/"})
 
 	{
 		want := []byte("world")
@@ -62,6 +64,157 @@ func TestMapFS(t *testing.T) {
 		}
 		if diff := cmp.Diff(want, got); diff != "" {
 			t.Fatalf("world.txt: unexpected file contents: diff (-want +got):\n%s", diff)
+		}
+	}
+
+	// Restore write permission so that t.TempDir() cleanup succeeds
+	if err := os.Chmod(dest, 0755); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestMapFSSubdirNested(t *testing.T) {
+	t.Parallel()
+
+	tmp := t.TempDir()
+	dest := filepath.Join(tmp, "dest")
+
+	memfs := fstest.MapFS{
+		"treasure/expensive/hello.txt": &fstest.MapFile{
+			Data:    []byte("world"),
+			Mode:    0o644,
+			ModTime: rsynctest.GosPublicRelease,
+		},
+	}
+
+	srv := rsynctest.New(t, []rsyncd.Module{
+		{
+			Name: "memfs",
+			FS:   memfs,
+		},
+	})
+	// sync into dest dir
+	rsync := exec.Command(rsynctest.AnyRsync(t),
+		append(
+			[]string{
+				//		"--debug=all4",
+				"--archive",
+				"-v", "-v", "-v", "-v",
+				"--port=" + srv.Port,
+				"rsync://localhost/memfs/treasure/expensive/", // copy contents of expensive
+			},
+			filepath.Base(dest))...)
+	rsync.Dir = filepath.Dir(dest)
+	rsync.Stdout = testlogger.New(t)
+	rsync.Stderr = testlogger.New(t)
+	if err := rsync.Run(); err != nil {
+		t.Fatalf("%v: %v", rsync.Args, err)
+	}
+
+	{
+		want := []byte("world")
+		got, err := os.ReadFile(filepath.Join(dest, "hello.txt"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if diff := cmp.Diff(want, got); diff != "" {
+			t.Fatalf("hello.txt: unexpected file contents: diff (-want +got):\n%s", diff)
+		}
+	}
+
+	// Restore write permission so that t.TempDir() cleanup succeeds
+	if err := os.Chmod(dest, 0755); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestMapFSSubdirNestedNoSlash(t *testing.T) {
+	t.Parallel()
+
+	tmp := t.TempDir()
+	dest := filepath.Join(tmp, "dest")
+
+	memfs := fstest.MapFS{
+		"treasure/expensive/hello.txt": &fstest.MapFile{
+			Data:    []byte("world"),
+			Mode:    0o644,
+			ModTime: rsynctest.GosPublicRelease,
+		},
+	}
+
+	srv := rsynctest.New(t, []rsyncd.Module{
+		{
+			Name: "memfs",
+			FS:   memfs,
+		},
+	})
+	// sync into dest dir
+	rsync := exec.Command(rsynctest.AnyRsync(t),
+		append(
+			[]string{
+				//		"--debug=all4",
+				"--archive",
+				"-v", "-v", "-v", "-v",
+				"--port=" + srv.Port,
+				"rsync://localhost/memfs/treasure/expensive", // copy expensive
+			},
+			filepath.Base(dest))...)
+	rsync.Dir = filepath.Dir(dest)
+	rsync.Stdout = testlogger.New(t)
+	rsync.Stderr = testlogger.New(t)
+	if err := rsync.Run(); err != nil {
+		t.Fatalf("%v: %v", rsync.Args, err)
+	}
+
+	{
+		want := []byte("world")
+		got, err := os.ReadFile(filepath.Join(dest, "expensive", "hello.txt"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if diff := cmp.Diff(want, got); diff != "" {
+			t.Fatalf("hello.txt: unexpected file contents: diff (-want +got):\n%s", diff)
+		}
+	}
+
+	// Restore write permission so that t.TempDir() cleanup succeeds
+	if err := os.Chmod(dest, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(filepath.Join(dest, "expensive"), 0755); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestMapFSSingleFile(t *testing.T) {
+	t.Parallel()
+
+	tmp := t.TempDir()
+	dest := filepath.Join(tmp, "dest")
+
+	memfs := fstest.MapFS{
+		"expensive/hello.txt": &fstest.MapFile{
+			Data:    []byte("world"),
+			Mode:    0o644,
+			ModTime: rsynctest.GosPublicRelease,
+		},
+	}
+
+	srv := rsynctest.NewInMemory(t, rsyncd.Module{
+		Name: "memfs",
+		FS:   memfs,
+	})
+	args := []string{"-av"}
+	srv.RunClient(t, args, "./expensive/hello.txt", []string{dest + "/"})
+
+	{
+		want := []byte("world")
+		got, err := os.ReadFile(filepath.Join(dest, "hello.txt"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if diff := cmp.Diff(want, got); diff != "" {
+			t.Fatalf("hello.txt: unexpected file contents: diff (-want +got):\n%s", diff)
 		}
 	}
 
@@ -134,7 +287,7 @@ func TestMapFSLargeFile(t *testing.T) {
 		FS:   memfs,
 	})
 	args := []string{"-av"}
-	firstStats := srv.RunClient(t, args, []string{dest})
+	firstStats := srv.RunClient(t, args, "./", []string{dest})
 	t.Logf("firstStats: %+v", firstStats)
 
 	{
@@ -158,7 +311,7 @@ func TestMapFSLargeFile(t *testing.T) {
 	large = rsynctest.ConstructLargeDataFile(headPattern, bodyPattern, endPattern)
 	memfs["large.bin"].Data = large
 
-	incrementalStats := srv.RunClient(t, args, []string{dest})
+	incrementalStats := srv.RunClient(t, args, "./", []string{dest})
 	t.Logf("incrementalStats: %+v", incrementalStats)
 	if got, want := incrementalStats.Written, int64(2*1024*1024); got >= want {
 		t.Fatalf("rsync unexpectedly transferred more data than needed: got %d, want < %d", got, want)
