@@ -142,7 +142,12 @@ func (s *scopedWalker) walkFn(path string, d fs.DirEntry, err error) error {
 
 	name := path
 	if s.strip != "" {
-		name = strings.TrimPrefix(name, s.strip)
+		if path+"/" == s.strip {
+			// Transmit the top directory as ., like tridge rsync.
+			name = "."
+		} else {
+			name = strings.TrimPrefix(name, s.strip)
+		}
 	}
 	if opts.DebugGTE(rsyncopts.DEBUG_FLIST, 1) {
 		logger.Printf("Trim(path=%q) = %q", path, name)
