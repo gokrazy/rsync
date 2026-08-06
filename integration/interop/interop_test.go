@@ -372,6 +372,84 @@ func sourceFullySyncedTo(t *testing.T, dest string) error {
 	return nil
 }
 
+func TestInteropSingleFile(t *testing.T) {
+	t.Parallel()
+
+	_, source, dest := createSourceFiles(t)
+
+	// start a server to sync from
+	srv := rsynctest.New(t, rsynctest.InteropModule(source))
+
+	// sync into dest dir
+	rsync := exec.Command(rsynctest.AnyRsync(t),
+		append(
+			[]string{
+				//		"--debug=all4",
+				"--archive",
+				"-v", "-v", "-v", "-v",
+				"--port=" + srv.Port,
+				"rsync://localhost/interop/expensive/dummy",
+			},
+			filepath.Base(dest)+"/")...)
+	rsync.Dir = filepath.Dir(dest)
+	rsync.Stdout = testlogger.New(t)
+	rsync.Stderr = testlogger.New(t)
+	if err := rsync.Run(); err != nil {
+		t.Fatalf("%v: %v", rsync.Args, err)
+	}
+
+	{
+		want := []byte("expensive")
+		got, err := os.ReadFile(filepath.Join(dest, "dummy"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if diff := cmp.Diff(want, got); diff != "" {
+			t.Fatalf("unexpected file contents: diff (-want +got):\n%s", diff)
+		}
+	}
+}
+
+// Like TestInteropSingleFile, but without a trailing slash
+// in the dest argument (no subdirectory to create).
+func TestInteropSingleFileNoSlash(t *testing.T) {
+	t.Parallel()
+
+	_, source, dest := createSourceFiles(t)
+
+	// start a server to sync from
+	srv := rsynctest.New(t, rsynctest.InteropModule(source))
+
+	// sync into dest dir
+	rsync := exec.Command(rsynctest.AnyRsync(t),
+		append(
+			[]string{
+				//		"--debug=all4",
+				"--archive",
+				"-v", "-v", "-v", "-v",
+				"--port=" + srv.Port,
+				"rsync://localhost/interop/expensive/dummy",
+			},
+			filepath.Base(dest))...)
+	rsync.Dir = filepath.Dir(dest)
+	rsync.Stdout = testlogger.New(t)
+	rsync.Stderr = testlogger.New(t)
+	if err := rsync.Run(); err != nil {
+		t.Fatalf("%v: %v", rsync.Args, err)
+	}
+
+	{
+		want := []byte("expensive")
+		got, err := os.ReadFile(dest)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if diff := cmp.Diff(want, got); diff != "" {
+			t.Fatalf("unexpected file contents: diff (-want +got):\n%s", diff)
+		}
+	}
+}
+
 func TestInteropSubdir(t *testing.T) {
 	t.Parallel()
 

@@ -88,6 +88,7 @@ type scopedWalker struct {
 	localDir  string
 	requested string
 	strip     string
+	subdir    string
 }
 
 func (s *scopedWalker) walk() error {
@@ -96,6 +97,15 @@ func (s *scopedWalker) walk() error {
 		if err != nil {
 			s.st.Logger.Printf("  OpenRoot(localDir=%q): %v", s.localDir, err)
 			return fmt.Errorf("i/o error: requested module path is not accessible")
+		}
+		// TODO: what about the s.source!=nil case?
+		if s.subdir != "." {
+			sub, err := root.OpenRoot(s.subdir)
+			if err != nil {
+				s.st.Logger.Printf("  root.OpenRoot(subdir=%q): %v", s.subdir, err)
+				return fmt.Errorf("i/o error: requested module path is not accessible")
+			}
+			root = sub
 		}
 		s.source = newOSRootSource(root)
 		s.fileList.Sources = append(s.fileList.Sources, s.source)
@@ -354,6 +364,7 @@ func (st *Transfer) SendFileList(localDir string, paths []string, excl *filterRu
 	}
 
 	for _, requested := range paths {
+		subdir := "."
 		local := localDir
 		if local == rsync.FileSystemRoot {
 			// Implicit module (/) and absolute requested path (/tmp/foo/),
@@ -366,6 +377,12 @@ func (st *Transfer) SendFileList(localDir string, paths []string, excl *filterRu
 				local = filepath.Dir(requested)
 				requested = filepath.Base(requested)
 			}
+		} else if !strings.HasSuffix(requested, "/") {
+			st.Logger.Printf("  handling requested=%q", requested)
+			clean := path.Clean(strings.TrimPrefix(requested, "/"))
+			subdir = path.Dir(clean)
+			requested = path.Base(clean)
+			st.Logger.Printf("  -> subdir=%q, requested=%q", subdir, requested)
 		}
 
 		if st.Opts.DebugGTE(rsyncopts.DEBUG_FLIST, 1) {
@@ -391,6 +408,7 @@ func (st *Transfer) SendFileList(localDir string, paths []string, excl *filterRu
 			localDir:  local,
 			requested: requested,
 			strip:     strip,
+			subdir:    subdir,
 		}
 		if err := sw.walk(); err != nil {
 			return nil, err
