@@ -1,5 +1,6 @@
 # gokrazy rsync
 
+[![Go Reference](https://pkg.go.dev/badge/github.com/gokrazy/rsync.svg)](https://pkg.go.dev/github.com/gokrazy/rsync)
 [![tests](https://github.com/gokrazy/rsync/actions/workflows/main.yml/badge.svg)](https://github.com/gokrazy/rsync/actions/workflows/main.yml)
 [![Sourcegraph](https://sourcegraph.com/github.com/gokrazy/rsync/-/badge.svg)](https://sourcegraph.com/github.com/gokrazy/rsync??badge)
 
