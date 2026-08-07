@@ -23,7 +23,7 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
-type mainFunc func(args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer) error
+type mainFunc func(args []string, stdin io.ReadCloser, stdout io.WriteCloser, stderr io.WriteCloser) error
 
 type anonssh struct {
 	cfg   *rsyncdconfig.Config
@@ -76,7 +76,13 @@ func (s *session) request(ctx context.Context, req *ssh.Request) error {
 		// 2021/09/12 21:25:34 cmdline: ["rsync" "--server" "--daemon" "."]
 		go func() {
 			stderr := s.channel.Stderr()
-			err := s.anonssh.main(cmdline, s.channel, s.channel, stderr)
+			err := s.anonssh.main(cmdline, s.channel, s.channel, struct {
+				io.Writer
+				io.Closer
+			}{
+				Writer: stderr,
+				Closer: s.channel,
+			})
 			if err != nil {
 				fmt.Fprintf(stderr, "%s\n", err)
 			}

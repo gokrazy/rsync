@@ -1,9 +1,9 @@
 package receiver
 
 import (
-	"context"
 	"io/fs"
 	"os"
+	"sync"
 
 	"github.com/gokrazy/rsync/internal/rsyncopts"
 	"github.com/gokrazy/rsync/internal/rsyncstats"
@@ -66,19 +66,6 @@ func (rt *Transfer) deleteFiles(fileList []*File) error {
 	return nil
 }
 
-// waitFor calls f and waits for it to complete, but only until the specified
-// context is cancelled.
-func waitFor(ctx context.Context, f func() error) error {
-	errChan := make(chan error, 1)
-	go func() { errChan <- f() }()
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	case err := <-errChan:
-		return err
-	}
-}
-
 // rsync/main.c:do_recv
 func (rt *Transfer) Do(c *rsyncwire.Conn, fileList []*File, noReport bool) (*rsyncstats.TransferStats, error) {
 	if rt.Opts.DeleteMode {
@@ -87,18 +74,22 @@ func (rt *Transfer) Do(c *rsyncwire.Conn, fileList []*File, noReport bool) (*rsy
 		}
 	}
 
-	ctx := context.Background()
-	eg, ctx := errgroup.WithContext(ctx)
+	var eg errgroup.Group
 	// Wrap both, the generator and the receiver goroutine, in waitFor() calls
 	// to ensure we don’t block on the generator when the receiver returns an
 	// error, or vice versa (instead, return and let the goroutine finish in the
 	// background).
-	eg.Go(func() error {
-		return waitFor(ctx, func() error { return rt.GenerateFiles(fileList) })
-	})
-	eg.Go(func() error {
-		return waitFor(ctx, func() error { return rt.RecvFiles(fileList) })
-	})
+	// waitFor calls f and waits for it to complete, but only until the specified
+	// context is cancelled.
+	var closeOnce sync.Once
+	closeOnErr := func(err error) error {
+		if err != nil {
+			closeOnce.Do(func() { c.Close() })
+		}
+		return err
+	}
+	eg.Go(func() error { return closeOnErr(rt.GenerateFiles(fileList)) })
+	eg.Go(func() error { return closeOnErr(rt.RecvFiles(fileList)) })
 	if err := eg.Wait(); err != nil {
 		return nil, err
 	}

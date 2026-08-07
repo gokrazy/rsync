@@ -18,7 +18,7 @@ const (
 const mplexBase = 7
 
 type MultiplexWriter struct {
-	Writer io.Writer
+	Writer io.WriteCloser
 }
 
 func (w *MultiplexWriter) Write(p []byte) (n int, err error) {
@@ -34,6 +34,8 @@ func (w *MultiplexWriter) WriteMsg(tag uint8, p []byte) (n int, err error) {
 	}
 	return w.Writer.Write(p)
 }
+
+func (w *MultiplexWriter) Close() error { return w.Writer.Close() }
 
 type MultiplexReader struct {
 	Env    *rsyncos.Env
@@ -129,8 +131,17 @@ func (b *Buffer) Reset() {
 }
 
 type Conn struct {
-	Writer io.Writer
-	Reader io.Reader
+	Writer io.WriteCloser
+	Reader io.ReadCloser
+}
+
+func (c *Conn) Close() error {
+	wcErr := c.Writer.Close()
+	rcErr := c.Reader.Close()
+	if wcErr != nil {
+		return wcErr
+	}
+	return rcErr
 }
 
 func (c *Conn) WriteByte(data byte) error {
@@ -195,7 +206,7 @@ func (c *Conn) ReadInt64() (int64, error) {
 }
 
 type CountingReader struct {
-	R         io.Reader
+	R         io.ReadCloser
 	BytesRead int64
 }
 
@@ -205,8 +216,10 @@ func (r *CountingReader) Read(p []byte) (n int, err error) {
 	return n, err
 }
 
+func (r *CountingReader) Close() error { return r.R.Close() }
+
 type CountingWriter struct {
-	W            io.Writer
+	W            io.WriteCloser
 	BytesWritten int64
 }
 
@@ -216,7 +229,9 @@ func (w *CountingWriter) Write(p []byte) (n int, err error) {
 	return n, err
 }
 
-func CounterPair(r io.Reader, w io.Writer) (*CountingReader, *CountingWriter) {
+func (w *CountingWriter) Close() error { return w.W.Close() }
+
+func CounterPair(r io.ReadCloser, w io.WriteCloser) (*CountingReader, *CountingWriter) {
 	crd := &CountingReader{R: r}
 	cwr := &CountingWriter{W: w}
 	return crd, cwr

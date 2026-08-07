@@ -11,6 +11,7 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/gokrazy/rsync"
 	"github.com/gokrazy/rsync/internal/rsyncopts"
 	"github.com/gokrazy/rsync/internal/rsyncos"
 	"github.com/gokrazy/rsync/internal/rsyncostest"
@@ -28,28 +29,24 @@ func ExampleClient_Run_receiveFromSubprocess() {
 		log.Fatal(err)
 	}
 
-	// Start an rsync server and run an rsync client on its stdin/stdout.
-	rsync := exec.Command("rsync", client.ServerCommandOptions(src)...)
-	stdin, err := rsync.StdinPipe()
+	// Start an rsynccmd server and run an rsynccmd client on its stdin/stdout.
+	rsynccmd := exec.Command("rsync", client.ServerCommandOptions(src)...)
+	stdin, err := rsynccmd.StdinPipe()
 	if err != nil {
 		log.Fatal(err)
 	}
-	stdout, err := rsync.StdoutPipe()
+	stdout, err := rsynccmd.StdoutPipe()
 	if err != nil {
 		log.Fatal(err)
 	}
-	if err := rsync.Start(); err != nil {
+	if err := rsynccmd.Start(); err != nil {
 		log.Fatal(err)
 	}
-	// Create an io.ReadWriter from a Reader and a Writer.
-	rw := &struct {
-		io.Reader
-		io.Writer
-	}{
-		Reader: stdout, // The client reads from the server's stdout.
-		Writer: stdin,  // The client writes to the server's stdin.
+	// Create an io.ReadWriteCloser from a ReadCloser and a WriteCloser.
+	rw := &rsync.BothCloser{
+		ReadCloser:  stdout, // The client reads from the server's stdout.
+		WriteCloser: stdin,  // The client writes to the server's stdin.
 	}
-
 	if _, err := client.Run(context.Background(), rw, []string{dest}); err != nil {
 		log.Fatal(err)
 	}
@@ -64,9 +61,9 @@ func ExampleClient_Run_sendToGoroutine() {
 		log.Fatal(err)
 	}
 
-	// Start an rsync server and run an rsync client on
+	// Start an srv server and run an srv client on
 	// an io.Pipe()-backend stdin/stdout.
-	rsync, err := rsyncd.NewServer(nil)
+	srv, err := rsyncd.NewServer(nil)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -80,28 +77,20 @@ func ExampleClient_Run_sendToGoroutine() {
 		if err := pc.ParseArguments(osenv, client.ServerCommandOptions(dest)); err != nil {
 			log.Fatalf("parsing server args: %v", err)
 		}
-		if err := rsync.InternalHandleConn(ctx, conn, nil, pc); err != nil {
+		if err := srv.InternalHandleConn(ctx, conn, nil, pc); err != nil {
 			log.Fatal(err)
 		}
 	}()
 
-	// Create an io.ReadWriter from a Reader and a Writer.
-	rw := &struct {
-		io.Reader
-		io.Writer
-	}{
-		Reader: stdoutrd, // The client reads from the server's stdout.
-		Writer: stdinwr,  // The client writes to the server's stdin.
+	// Create an io.ReadWriteCloser from a ReadCloser and a WriteCloser.
+	rw := &rsync.BothCloser{
+		ReadCloser:  stdoutrd, // The client reads from the server's stdout.
+		WriteCloser: stdinwr,  // The client writes to the server's stdin.
 	}
 
 	if _, err := client.Run(ctx, rw, []string{src}); err != nil {
 		log.Fatal(err)
 	}
-}
-
-type readWriter struct {
-	io.Reader
-	io.Writer
 }
 
 func TestClientCommand(t *testing.T) {
@@ -114,22 +103,23 @@ func TestClientCommand(t *testing.T) {
 
 	tmp := t.TempDir()
 	dest := filepath.Join(tmp, "dest")
-	// Start an rsync process directly for the server part of the test.
-	rsync := exec.Command(rsynctest.AnyRsync(t), client.ServerCommandOptions(".")...)
-	rsync.Dir = tmp
-	wc, err := rsync.StdinPipe()
+	// Start an rsynccmd process directly for the server part of the test.
+	rsynccmd := exec.Command(rsynctest.AnyRsync(t), client.ServerCommandOptions(".")...)
+	rsynccmd.Dir = tmp
+	wc, err := rsynccmd.StdinPipe()
 	if err != nil {
 		t.Fatal(err)
 	}
-	rc, err := rsync.StdoutPipe()
+	rc, err := rsynccmd.StdoutPipe()
 	if err != nil {
 		t.Fatal(err)
 	}
-	rw := &readWriter{
-		Reader: rc,
-		Writer: wc,
+	// Create an io.ReadWriteCloser from a ReadCloser and a WriteCloser.
+	rw := &rsync.BothCloser{
+		ReadCloser:  rc,
+		WriteCloser: wc,
 	}
-	if err := rsync.Start(); err != nil {
+	if err := rsynccmd.Start(); err != nil {
 		t.Fatal(err)
 	}
 
@@ -164,7 +154,7 @@ func TestClientServerModule(t *testing.T) {
 		Name: "tmp",
 		Path: src,
 	}
-	rsync, err := rsyncd.NewServer([]rsyncd.Module{mod}, rsyncd.WithStderr(stderr))
+	srv, err := rsyncd.NewServer([]rsyncd.Module{mod}, rsyncd.WithStderr(stderr))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -182,15 +172,16 @@ func TestClientServerModule(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		err := rsync.InternalHandleConn(t.Context(), conn, &mod, pc)
+		err := srv.InternalHandleConn(t.Context(), conn, &mod, pc)
 		if err != nil {
 			t.Error(err)
 		}
 	}()
 
-	rw := &readWriter{
-		Reader: stdoutrd,
-		Writer: stdinwr,
+	// Create an io.ReadWriteCloser from a ReadCloser and a WriteCloser.
+	rw := &rsync.BothCloser{
+		ReadCloser:  stdoutrd,
+		WriteCloser: stdinwr,
 	}
 	if _, err := client.Run(t.Context(), rw, []string{dest}); err != nil {
 		t.Fatal(err)
@@ -232,7 +223,7 @@ func TestClientServerCommand(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	rsync, err := rsyncd.NewServer(nil, rsyncd.WithStderr(stderr))
+	srv, err := rsyncd.NewServer(nil, rsyncd.WithStderr(stderr))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -250,15 +241,16 @@ func TestClientServerCommand(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		err := rsync.InternalHandleConn(t.Context(), conn, nil, pc)
+		err := srv.InternalHandleConn(t.Context(), conn, nil, pc)
 		if err != nil {
 			t.Error(err)
 		}
 	}()
 
-	rw := &readWriter{
-		Reader: stdoutrd,
-		Writer: stdinwr,
+	// Create an io.ReadWriteCloser from a ReadCloser and a WriteCloser.
+	rw := &rsync.BothCloser{
+		ReadCloser:  stdoutrd,
+		WriteCloser: stdinwr,
 	}
 	if _, err := client.Run(t.Context(), rw, []string{dest}); err != nil {
 		t.Fatal(err)
@@ -299,7 +291,7 @@ func TestClientServerCommandSender(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	rsync, err := rsyncd.NewServer(nil, rsyncd.WithStderr(stderr))
+	srv, err := rsyncd.NewServer(nil, rsyncd.WithStderr(stderr))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -317,15 +309,16 @@ func TestClientServerCommandSender(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		err := rsync.InternalHandleConn(t.Context(), conn, nil, pc)
+		err := srv.InternalHandleConn(t.Context(), conn, nil, pc)
 		if err != nil {
 			t.Error(err)
 		}
 	}()
 
-	rw := &readWriter{
-		Reader: stdoutrd,
-		Writer: stdinwr,
+	// Create an io.ReadWriteCloser from a ReadCloser and a WriteCloser.
+	rw := &rsync.BothCloser{
+		ReadCloser:  stdoutrd,
+		WriteCloser: stdinwr,
 	}
 	if _, err := client.Run(t.Context(), rw, []string{src}); err != nil {
 		t.Fatal(err)

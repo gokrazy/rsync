@@ -125,7 +125,7 @@ func rsyncMain(ctx context.Context, osenv *rsyncos.Env, opts *rsyncopts.Options,
 	}
 	defer rc.Close()
 	defer wc.Close()
-	conn := &readWriter{
+	conn := &readWriteCloser{
 		r: rc,
 		w: wc,
 	}
@@ -262,7 +262,7 @@ func doCmd(osenv *rsyncos.Env, opts *rsyncopts.Options, machine, user, path stri
 }
 
 // rsync/main.c:client_run
-func ClientRun(osenv *rsyncos.Env, opts *rsyncopts.Options, conn io.ReadWriter, paths []string, negotiate bool) (*rsyncstats.TransferStats, error) {
+func ClientRun(osenv *rsyncos.Env, opts *rsyncopts.Options, conn io.ReadWriteCloser, paths []string, negotiate bool) (*rsyncstats.TransferStats, error) {
 	crd := &rsyncwire.CountingReader{R: conn}
 	cwr := &rsyncwire.CountingWriter{W: conn}
 	c := &rsyncwire.Conn{
@@ -298,7 +298,13 @@ func ClientRun(osenv *rsyncos.Env, opts *rsyncopts.Options, conn io.ReadWriter, 
 	// Update crd to track the multiplexed reader,
 	// but copy the number of bytes read.
 	crd = &rsyncwire.CountingReader{
-		R:         rd,
+		R: struct {
+			io.Reader
+			io.Closer
+		}{
+			Reader: rd,
+			Closer: conn,
+		},
 		BytesRead: crd.BytesRead,
 	}
 	c.Reader = crd

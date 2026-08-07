@@ -54,7 +54,7 @@ func WithLogger(logger log.Logger) Option {
 	})
 }
 
-func WithStderr(stderr io.Writer) Option {
+func WithStderr(stderr io.WriteCloser) Option {
 	return serverOptionFunc(func(s *Server) {
 		s.stderr = stderr
 	})
@@ -106,7 +106,7 @@ func NewServer(modules []Module, opts ...Option) (*Server, error) {
 }
 
 type Server struct {
-	stderr       io.Writer
+	stderr       io.WriteCloser
 	logger       log.Logger
 	dontRestrict bool
 
@@ -254,7 +254,7 @@ func (s *Server) HandleDaemonConn(ctx context.Context, conn *Conn) (err error) {
 
 		// terminate connection with an error about which flag is not supported
 		c := &rsyncwire.Conn{
-			Reader: rd,
+			Reader: io.NopCloser(rd),
 			Writer: cwr,
 		}
 
@@ -303,13 +303,14 @@ func (s *Server) HandleDaemonConn(ctx context.Context, conn *Conn) (err error) {
 }
 
 type Conn struct {
-	name string
-	crd  *rsyncwire.CountingReader
-	cwr  *rsyncwire.CountingWriter
-	rd   *bufio.Reader
+	name   string
+	crd    *rsyncwire.CountingReader
+	cwr    *rsyncwire.CountingWriter
+	rd     *bufio.Reader
+	closer io.Closer
 }
 
-func NewConnection(r io.Reader, w io.Writer, name string) *Conn {
+func NewConnection(r io.ReadCloser, w io.WriteCloser, name string) *Conn {
 	crd, cwr := rsyncwire.CounterPair(r, w)
 	rd := bufio.NewReader(crd)
 	return &Conn{
@@ -317,6 +318,10 @@ func NewConnection(r io.Reader, w io.Writer, name string) *Conn {
 		crd:  crd,
 		cwr:  cwr,
 		rd:   rd,
+		closer: &rsync.BothCloser{
+			ReadCloser:  r,
+			WriteCloser: w,
+		},
 	}
 }
 
@@ -350,7 +355,13 @@ func (s *Server) handleConn(ctx context.Context, conn *Conn, module *Module, pc 
 	sessionChecksumSeed := int32(time.Now().Unix()) ^ (int32(os.Getpid()) << 6)
 
 	c := &rsyncwire.Conn{
-		Reader: rd,
+		Reader: struct {
+			io.Reader
+			io.Closer
+		}{
+			Reader: rd,
+			Closer: conn.closer,
+		},
 		Writer: cwr,
 	}
 

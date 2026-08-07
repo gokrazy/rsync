@@ -17,6 +17,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gokrazy/rsync"
 	"github.com/gokrazy/rsync/internal/anonssh"
 	"github.com/gokrazy/rsync/internal/maincmd"
 	"github.com/gokrazy/rsync/internal/rsyncdconfig"
@@ -140,7 +141,7 @@ func New(t *testing.T, modules []rsyncd.Module, opts ...Option) *TestServer {
 			Modules: modules,
 		}
 		go func() {
-			err := anonssh.Serve(ctx, osenv, ts.listener, sshListener, cfg, func(args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer) error {
+			err := anonssh.Serve(ctx, osenv, ts.listener, sshListener, cfg, func(args []string, stdin io.ReadCloser, stdout io.WriteCloser, stderr io.WriteCloser) error {
 				osenv := &rsyncos.Env{
 					Stdin:  stdin,
 					Stdout: stdout,
@@ -167,7 +168,7 @@ func New(t *testing.T, modules []rsyncd.Module, opts ...Option) *TestServer {
 			Modules: modules,
 		}
 		go func() {
-			err := anonssh.Serve(ctx, osenv, ts.listener, sshListener, cfg, func(args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer) error {
+			err := anonssh.Serve(ctx, osenv, ts.listener, sshListener, cfg, func(args []string, stdin io.ReadCloser, stdout io.WriteCloser, stderr io.WriteCloser) error {
 				osenv := &rsyncos.Env{
 					Stdin:  stdin,
 					Stdout: stdout,
@@ -203,12 +204,26 @@ func Run(tb testing.TB, args ...string) *rsyncstats.TransferStats {
 	return result.Stats
 }
 
+type nopCloser struct{}
+
+func (*nopCloser) Close() error { return nil }
+
+func nopClose(w io.Writer) io.WriteCloser {
+	return struct {
+		io.Writer
+		io.Closer
+	}{
+		Writer: w,
+		Closer: &nopCloser{},
+	}
+}
+
 func Output(tb testing.TB, args ...string) (stdout []byte, stderr []byte) {
 	tb.Helper()
 	var stdoutb, stderrb bytes.Buffer
 	cmd := rsynccmd.Command(args[0], args[1:]...)
-	cmd.Stdout = &stdoutb
-	cmd.Stderr = &stderrb
+	cmd.Stdout = nopClose(&stdoutb)
+	cmd.Stderr = nopClose(&stderrb)
 	_, err := cmd.Run(context.Background())
 	if err != nil {
 		tb.Fatal(err)
@@ -219,8 +234,8 @@ func Output(tb testing.TB, args ...string) (stdout []byte, stderr []byte) {
 func CombinedOutput(args ...string) ([]byte, error) {
 	var buf bytes.Buffer
 	cmd := rsynccmd.Command(args[0], args[1:]...)
-	cmd.Stdout = &buf
-	cmd.Stderr = &buf
+	cmd.Stdout = nopClose(&buf)
+	cmd.Stderr = nopClose(&buf)
 	_, err := cmd.Run(context.Background())
 	return buf.Bytes(), err
 }
@@ -248,12 +263,7 @@ func NewInMemory(t *testing.T, module rsyncd.Module, opts ...Option) *TestServer
 	return ts
 }
 
-type readWriter struct {
-	io.Reader
-	io.Writer
-}
-
-func (ts *TestServer) pipe(t *testing.T, args []string) (*sync.WaitGroup, io.ReadWriter) {
+func (ts *TestServer) pipe(t *testing.T, args []string) (*sync.WaitGroup, io.ReadWriteCloser) {
 	// stdin from the view of the rsync server
 	stdinrd, stdinwr := io.Pipe()
 	stdoutrd, stdoutwr := io.Pipe()
@@ -274,9 +284,9 @@ func (ts *TestServer) pipe(t *testing.T, args []string) (*sync.WaitGroup, io.Rea
 		}
 	}()
 
-	rw := &readWriter{
-		Reader: stdoutrd,
-		Writer: stdinwr,
+	rw := &rsync.BothCloser{
+		ReadCloser:  stdoutrd,
+		WriteCloser: stdinwr,
 	}
 	return &wg, rw
 }

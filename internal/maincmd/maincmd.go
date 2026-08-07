@@ -29,13 +29,15 @@ func version(osenv *rsyncos.Env) {
 	osenv.Logf("gokrazy rsync, pid %d", os.Getpid())
 }
 
-type readWriter struct {
+type readWriteCloser struct {
 	r io.Reader
 	w io.Writer
+	c io.Closer
 }
 
-func (r *readWriter) Read(p []byte) (n int, err error)  { return r.r.Read(p) }
-func (r *readWriter) Write(p []byte) (n int, err error) { return r.w.Write(p) }
+func (r *readWriteCloser) Read(p []byte) (n int, err error)  { return r.r.Read(p) }
+func (r *readWriteCloser) Write(p []byte) (n int, err error) { return r.w.Write(p) }
+func (r *readWriteCloser) Close() error                      { return r.c.Close() }
 
 func Main(ctx context.Context, osenv *rsyncos.Env, args []string, cfg *rsyncdconfig.Config) (*rsyncstats.TransferStats, error) {
 	osenv.Logf("Main(osenv=%v, args=%q)", osenv, args)
@@ -277,7 +279,7 @@ func Main(ctx context.Context, osenv *rsyncos.Env, args []string, cfg *rsyncdcon
 			return nil, fmt.Errorf("misconfiguration: authorized_keys must not be empty when using an authorized_ssh listener")
 		}
 		osenv.Logf("rsync daemon listening (authorized SSH) on %s", ln.Addr())
-		return nil, anonssh.Serve(ctx, osenv, ln, sshListener, cfg, func(args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer) error {
+		return nil, anonssh.Serve(ctx, osenv, ln, sshListener, cfg, func(args []string, stdin io.ReadCloser, stdout io.WriteCloser, stderr io.WriteCloser) error {
 			osenv := &rsyncos.Env{
 				Stdin:  stdin,
 				Stdout: stdout,
@@ -294,7 +296,7 @@ func Main(ctx context.Context, osenv *rsyncos.Env, args []string, cfg *rsyncdcon
 
 	if cfg.Listeners[0].AnonSSH != "" {
 		osenv.Logf("rsync daemon listening (anon SSH) on %s", ln.Addr())
-		return nil, anonssh.Serve(ctx, osenv, ln, sshListener, cfg, func(args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer) error {
+		return nil, anonssh.Serve(ctx, osenv, ln, sshListener, cfg, func(args []string, stdin io.ReadCloser, stdout io.WriteCloser, stderr io.WriteCloser) error {
 			osenv := &rsyncos.Env{
 				Stdin:  stdin,
 				Stdout: stdout,

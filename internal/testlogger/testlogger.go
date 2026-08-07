@@ -49,3 +49,6 @@ func New(tb testing.TB) *Logger {
 func (lw Logger) Write(p []byte) (n int, err error) {
 	return lw.writer.Write(p)
 }
+
+// Close implements io.Closer.
+func (lw Logger) Close() error { return nil }
