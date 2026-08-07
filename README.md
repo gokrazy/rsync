@@ -4,13 +4,41 @@
 [![tests](https://github.com/gokrazy/rsync/actions/workflows/main.yml/badge.svg)](https://github.com/gokrazy/rsync/actions/workflows/main.yml)
 [![Sourcegraph](https://sourcegraph.com/github.com/gokrazy/rsync/-/badge.svg)](https://sourcegraph.com/github.com/gokrazy/rsync??badge)
 
-This repository contains a native Go rsync implementation: the `gokr-rsync`
-command implements an rsync client and server, which can send or receive files
-(all directions supported). Daemon mode is supported, meaning you can deploy
-`gokr-rsync` behind SSH (anonymous or authorized), as command or daemon, or
-listening directly on the network (on port 873/tcp by default).
+gokrazy/rsync is [an Rsync program and reusable
+library](https://en.wikipedia.org/wiki/Rsync) implemented in the [Go programming
+language](https://en.wikipedia.org/wiki/Go_(programming_language)), originally
+as part of the [gokrazy Go appliance platform
+project](https://gokrazy.org). gokrazy/rsync is (wire-)compatible with the
+original "[tridge](https://en.wikipedia.org/wiki/Andrew_Tridgell)" Rsync.
+
+Various use-cases are supported:
+
+* The `gokr-rsync` command implements an rsync client and server, which can send
+  or receive files (all directions supported).
+* You can set up a public or private rsync server, in daemon mode or via SSH
+  (anonymous or authorized).
+* You can embed rsync in your program with the [`rsynccmd`
+  package](https://pkg.go.dev/github.com/gokrazy/rsync/rsynccmd).
+* You can implement your own rsync server with the [`rsyncd`
+  package](https://pkg.go.dev/github.com/gokrazy/rsync/rsyncd).
+
+Aside from being implemented in Go, a [memory-safe programming
+language](https://en.wikipedia.org/wiki/Memory_safety), gokrazy/rsync makes use
+of [Go’s traversal-resistant file API (`os.Root`)](https://go.dev/blog/osroot)
+and the Linux [Landlock Unprivileged Sandboxing](https://landlock.io/) to [steer
+clear of
+vulnerabilities](https://michael.stapelberg.ch/posts/2026-05-24-minimal-memory-safe-go-rsync-vulns/). In
+server settings, gokrazy/rsync supports mount namespaces and can be further
+locked down with systemd’s various hardening options.
 
 This project accepts contributions as time permits to merge them (best effort).
+
+## Notable users / use-cases
+
+* [NVIDIA/OSMA](https://github.com/NVIDIA/OSMO)
+* backup of [gokrazy Go appliances with gokrazy/rsync](https://gokrazy.org/userguide/rsync-backups/)
+* demo: [rsync file transfer over gRPC transport](https://github.com/stapelberg/rsync-over-grpc)
+* Simon Leinen’s presentation: [Go for rsync Diversity at RIPE 90 (2025)](https://ripe90.ripe.net/presentations/127-go-for-rsync-diversity.pdf)
 
 ## How do I know this project won’t eat my data?
 
