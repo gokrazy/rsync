@@ -102,6 +102,10 @@ func (o *Options) ServerOptions() []string {
 		sargv = append(sargv, argstr)
 	}
 
+	if o.Sender() && o.DoFsync() {
+		sargv = append(sargv, "--fsync")
+	}
+
 	// if (block_size) {
 	// 	if (asprintf(&arg, "-B%u", block_size) < 0)
 	// 		goto oom;

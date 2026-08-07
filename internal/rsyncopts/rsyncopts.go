@@ -714,6 +714,7 @@ func (o *Options) PreserveMTimes() bool       { return o.preserve_mtimes != 0 }
 func (o *Options) PreservePerms() bool        { return o.preserve_perms != 0 }
 func (o *Options) PreserveSpecials() bool     { return o.preserve_specials != 0 }
 func (o *Options) PreserveHardLinks() bool    { return o.preserve_hard_links != 0 }
+func (o *Options) DoFsync() bool              { return o.do_fsync != 0 }
 func (o *Options) Recurse() bool              { return o.recurse != 0 }
 func (o *Options) Verbose() bool              { return o.verbose != 0 }
 func (o *Options) DeleteMode() bool           { return o.delete_mode != 0 }
@@ -1000,7 +1001,7 @@ func (o *Options) gokrazyTable() []poptOption {
 		//{"no-timeout", "", POPT_ARG_VAL, &o.io_timeout, 0},
 		{"contimeout", "", POPT_ARG_INT, &o.connect_timeout, 0},
 		{"no-contimeout", "", POPT_ARG_VAL, &o.connect_timeout, 0},
-		//{"fsync", "", POPT_ARG_NONE, &o.do_fsync, 0},
+		{"fsync", "", POPT_ARG_NONE, &o.do_fsync, 0},
 		//{"stop-after", "", POPT_ARG_STRING, nil, OPT_STOP_AFTER},
 		//{"time-limit", "", POPT_ARG_STRING, nil, OPT_STOP_AFTER}, /* earlier stop-after name */
 		//{"stop-at", "", POPT_ARG_STRING, nil, OPT_STOP_AT},

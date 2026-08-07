@@ -108,7 +108,7 @@ func (rt *Transfer) receiveData(f *File, localFile *os.File) error {
 		local := filepath.Join(rt.Dest, f.Name)
 		rt.Logger.Printf("creating %s", local)
 	}
-	out, err := newPendingFile(rt.DestRoot, f.Name)
+	out, err := newPendingFile(rt.DestRoot, f.Name, rt.Opts.DoFsync)
 	if err != nil {
 		return err
 	}

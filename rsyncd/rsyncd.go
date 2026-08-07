@@ -455,6 +455,7 @@ func (s *Server) handleConnReceiver(module *Module, crd *rsyncwire.CountingReade
 			// TODO: PreserveHardlinks: opts.PreserveHardlinks,
 			IgnoreTimes:    opts.IgnoreTimes(),
 			AlwaysChecksum: opts.AlwaysChecksum(),
+			DoFsync:        opts.DoFsync(),
 
 			InfoGTE:  opts.InfoGTE,
 			DebugGTE: opts.DebugGTE,
