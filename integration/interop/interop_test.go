@@ -793,7 +793,10 @@ func TestInteropRemoteDaemonSSH(t *testing.T) {
 		srv := rsynctest.New(t,
 			rsynctest.InteropModule(source),
 			rsynctest.Listeners([]rsyncdconfig.Listener{
-				{AnonSSH: "localhost:0"},
+				{
+					AnonSSH:     "localhost:0",
+					HostKeyPath: filepath.Join(t.TempDir(), "gokr-rsyncd", "ssh_host_ed25519_key"),
+				},
 			}))
 
 		// sync into dest dir
