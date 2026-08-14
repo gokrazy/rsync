@@ -69,10 +69,17 @@ func (rt *Transfer) recvFile1(f *File) error {
 }
 
 func (rt *Transfer) openLocalFile(f *File) (*os.File, error) {
-	in, err := rt.DestRoot.Open(f.Name)
+	name := f.Name
+	in, err := rt.DestRoot.Open(name)
+	if err != nil && rt.Opts.KeepPartial && os.IsNotExist(err) {
+		// Final absent: fall back to the retained partial as the delta basis.
+		name = f.Name + partialSuffix
+		in, err = rt.DestRoot.Open(name)
+	}
 	if err != nil {
 		return nil, err
 	}
+	usedPartial := name != f.Name
 
 	st, err := in.Stat()
 	if err != nil {
@@ -80,16 +87,17 @@ func (rt *Transfer) openLocalFile(f *File) (*os.File, error) {
 	}
 
 	if st.IsDir() {
-		return nil, fmt.Errorf("%s is a directory", filepath.Join(rt.Dest, f.Name))
+		return nil, fmt.Errorf("%s is a directory", filepath.Join(rt.Dest, name))
 	}
 
 	if !st.Mode().IsRegular() {
 		return nil, nil
 	}
 
-	if !rt.Opts.PreservePerms {
+	if !rt.Opts.PreservePerms && !usedPartial {
 		// If the file exists already and we are not preserving permissions,
-		// then act as though the remote sent us the existing permissions:
+		// then act as though the remote sent us the existing permissions.
+		// Skipped for a partial basis, whose temp perms aren't the target's.
 		f.Mode = int32(st.Mode().Perm())
 	}
 
@@ -105,19 +113,71 @@ func (rt *Transfer) receiveData(f *File, localFile *os.File) error {
 	}
 
 	if rt.Opts.DebugGTE(rsyncopts.DEBUG_DELTASUM, 1) {
-		local := filepath.Join(rt.Dest, f.Name)
-		rt.Logger.Printf("creating %s", local)
+		rt.Logger.Printf("creating %s", filepath.Join(rt.Dest, f.Name))
 	}
-	out, err := newPendingFile(rt.DestRoot, f.Name, rt.Opts.DoFsync)
-	if err != nil {
-		return err
+
+	// Default path: renameio (atomic temp+rename, discard on failure). With
+	// KeepPartial an interrupt instead retains "<name>.partial" to resume from.
+	var w io.Writer
+	var commit func() error
+	var abort func()
+	// discardPartial drops the bytes on verification failure instead of keeping
+	// a corrupt partial as a future basis.
+	discardPartial := false
+
+	if rt.Opts.KeepPartial {
+		tmpName := f.Name + partialSuffix + ".tmp"
+		partialName := f.Name + partialSuffix
+		tmp, err := rt.DestRoot.OpenFile(tmpName, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o644)
+		if err != nil {
+			return err
+		}
+		w = tmp
+		commit = func() error {
+			if rt.Opts.DoFsync {
+				if err := tmp.Sync(); err != nil {
+					return err
+				}
+			}
+			if err := tmp.Close(); err != nil {
+				return err
+			}
+			if err := rt.DestRoot.Rename(tmpName, f.Name); err != nil {
+				return err
+			}
+			_ = rt.DestRoot.Remove(partialName)
+			return nil
+		}
+		abort = func() {
+			_ = tmp.Close()
+			if discardPartial {
+				_ = rt.DestRoot.Remove(tmpName)
+				_ = rt.DestRoot.Remove(partialName)
+				return
+			}
+			rt.retainPartial(tmpName, partialName)
+		}
+	} else {
+		out, err := newPendingFile(rt.DestRoot, f.Name, rt.Opts.DoFsync)
+		if err != nil {
+			return err
+		}
+		w = out
+		commit = out.CloseAtomicallyReplace
+		abort = func() { _ = out.Cleanup() }
 	}
-	defer out.Cleanup()
+
+	committed := false
+	defer func() {
+		if !committed {
+			abort()
+		}
+	}()
 
 	h := md4.New()
 	binary.Write(h, binary.LittleEndian, rt.Seed)
 
-	wr := io.MultiWriter(out, h)
+	wr := io.MultiWriter(w, h)
 
 	offset := 0
 	for {
@@ -145,7 +205,7 @@ func (rt *Transfer) receiveData(f *File, localFile *os.File) error {
 			continue
 		}
 		if localFile == nil {
-			return fmt.Errorf("BUG: local file %s not open for copying chunk", out.Name())
+			return fmt.Errorf("BUG: local file %s not open for copying chunk", f.Name)
 		}
 		token = -(token + 1)
 		offset2 := int64(token) * int64(sh.BlockLength)
@@ -170,6 +230,7 @@ func (rt *Transfer) receiveData(f *File, localFile *os.File) error {
 		return err
 	}
 	if !bytes.Equal(localSum, remoteSum) {
+		discardPartial = true
 		return fmt.Errorf("file corruption in %s", f.Name)
 	}
 	if rt.Opts.DebugGTE(rsyncopts.DEBUG_DELTASUM, 1) {
@@ -183,9 +244,10 @@ func (rt *Transfer) receiveData(f *File, localFile *os.File) error {
 		localFile.Close()
 	}
 
-	if err := out.CloseAtomicallyReplace(); err != nil {
+	if err := commit(); err != nil {
 		return err
 	}
+	committed = true
 
 	if err := rt.setPerms(f, fs.FileMode(f.Mode)); err != nil {
 		return err

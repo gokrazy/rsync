@@ -263,6 +263,17 @@ func (rt *Transfer) recvGenerator(idx int, f *File) error {
 	}
 
 	if os.IsNotExist(err) {
+		// Final absent: resume from a retained partial if one exists.
+		if rt.Opts.KeepPartial {
+			if pin, psize, ok := rt.openPartialBasis(f); ok {
+				defer pin.Close()
+				rt.Logger.Printf("resuming %s from partial (%d bytes)", f.Name, psize)
+				if err := rt.Conn.WriteInt32(int32(idx)); err != nil {
+					return err
+				}
+				return rt.generateAndSendSums(pin, psize)
+			}
+		}
 		return requestFullFile()
 	}
 	if err != nil {

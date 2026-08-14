@@ -727,6 +727,7 @@ func (o *Options) Daemon() bool               { return o.am_daemon != 0 }
 func (o *Options) ConnectTimeoutSeconds() int { return o.connect_timeout }
 func (o *Options) AlwaysChecksum() bool       { return o.always_checksum != 0 }
 func (o *Options) IgnoreTimes() bool          { return o.ignore_times != 0 }
+func (o *Options) KeepPartial() bool          { return o.keep_partial != 0 }
 func (o *Options) OutputMOTD() bool           { return o.output_motd != 0 }
 func (o *Options) RsyncPort() int             { return o.rsync_port }
 func (o *Options) XferDirs() int              { return o.xfer_dirs }
@@ -956,8 +957,8 @@ func (o *Options) gokrazyTable() []poptOption {
 		//{"", "P", POPT_ARG_NONE, nil, 'P'},
 		{"progress", "", POPT_ARG_VAL, &o.do_progress, 1},
 		{"no-progress", "", POPT_ARG_VAL, &o.do_progress, 0},
-		//{"partial", "", POPT_ARG_VAL, &o.keep_partial, 1},
-		//{"no-partial", "", POPT_ARG_VAL, &o.keep_partial, 0},
+		{"partial", "", POPT_ARG_VAL, &o.keep_partial, 1},
+		{"no-partial", "", POPT_ARG_VAL, &o.keep_partial, 0},
 		//{"partial-dir", "", POPT_ARG_STRING, &o.partial_dir, 0},
 		//{"delay-updates", "", POPT_ARG_VAL, &o.delay_updates, 1},
 		//{"no-delay-updates", "", POPT_ARG_VAL, &o.delay_updates, 0},

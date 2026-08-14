@@ -32,6 +32,8 @@ type TransferOpts struct {
 
 	InfoGTE  func(rsyncopts.InfoLevel, uint16) bool
 	DebugGTE func(rsyncopts.DebugLevel, uint16) bool
+
+	KeepPartial bool
 }
 
 type Transfer struct {
