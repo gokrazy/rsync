@@ -55,6 +55,18 @@ func (sh *SumHead) ReadFrom(c *rsyncwire.Conn) error {
 	if sh.BlockLength < 0 || sh.BlockLength > maxBlockLen {
 		return fmt.Errorf("invalid block length %d", sh.BlockLength)
 	}
+	if sh.ChecksumCount > 0 && sh.BlockLength == 0 {
+		// For ChecksumCount 0, BlockLength is expected to be 0.
+		// But for ChecksumCount > 0, BlockLength 0 panics in match.go:
+		//
+		// hashSearch sets k := int(head.BlockLength) == 0
+		// On the last offset, mmore == 0, so we call
+		// ms.ptr(offset-backup, k+mmore+backup), which is:
+		// ms.ptr(offset-backup, backup),
+		// update = update[backup:] // skips backup bytes, i.e. len==0
+		// s1 -= rsyncchecksum.SignExtend(update[0]) // now out of bounds
+		return fmt.Errorf("invalid block length 0 with non-zero checksum count")
+	}
 
 	sh.ChecksumLength, err = c.ReadInt32()
 	if err != nil {
