@@ -614,6 +614,28 @@ func (s *Server) Serve(ctx context.Context, ln net.Listener) error {
 			c := NewConnection(conn, conn, remoteAddr.String())
 			if err := s.HandleDaemonConn(ctx, c); err != nil {
 				s.logger.Printf("[%s] handle: %v", remoteAddr, err)
+				// Perform a “lingering close” [1] to work around
+				// “the TCP reset problem” (per RFC 9112 Section 9.6):
+				// When the server closes the TCP socket while there
+				// is still data in the recv buffer (usually the case
+				// with rsync, which is heavily pipelined),
+				// the kernel sends RST (not FIN), which the client
+				// might implement by dropping queued data,
+				// as mandated by the TCP RFC 9293 Section 3.10.7.4.
+				//
+				// As of 2026, Linux does not follow the RFC, Windows does.
+				//
+				// A lingering close shuts down the socket (sends FIN)
+				// and waits until the client has received it,
+				// which the client confirms by closing.
+				//
+				// [1]: https://apenwarr.ca/log/20090814-solinger-is-not-the-same-as-apaches-lingering-close
+				const lingerTimeout = 5 * time.Second
+				if cw, ok := conn.(interface{ CloseWrite() error }); ok {
+					cw.CloseWrite()
+				}
+				conn.SetReadDeadline(time.Now().Add(lingerTimeout))
+				io.Copy(io.Discard, conn)
 			}
 		}()
 	}
