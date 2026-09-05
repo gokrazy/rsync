@@ -33,6 +33,10 @@ func (rt *Transfer) RecvFiles(fileList []*File) error {
 			}
 			break
 		}
+		if idx < 0 || int(idx) >= len(fileList) {
+			return fmt.Errorf("protocol error: idx=%d out of bounds", idx)
+		}
+
 		if rt.Opts.DebugGTE(rsyncopts.DEBUG_RECV, 1) {
 			rt.Logger.Printf("receiving file idx=%d: %+v", idx, fileList[idx])
 		}

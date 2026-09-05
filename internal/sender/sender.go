@@ -38,6 +38,10 @@ func (st *Transfer) SendFiles(fileList *fileList) error {
 			break
 		}
 
+		if fileIndex < 0 || int(fileIndex) >= len(fileList.Files) {
+			return fmt.Errorf("protocol error: idx=%d out of bounds", fileIndex)
+		}
+
 		if st.Opts.DryRun() {
 			if err := st.Conn.WriteInt32(fileIndex); err != nil {
 				return err
