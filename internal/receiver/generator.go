@@ -262,6 +262,17 @@ func (rt *Transfer) recvGenerator(idx int, f *File) error {
 		return nil
 	}
 
+	if rt.Opts.KeepPartial {
+		sent, err := rt.recvGeneratorPartial(idx, f)
+		if err != nil {
+			return err
+		}
+		if sent {
+			return nil
+		}
+		// no partial file? fall through.
+	}
+
 	if os.IsNotExist(err) {
 		return requestFullFile()
 	}
@@ -319,6 +330,45 @@ func (rt *Transfer) recvGenerator(idx int, f *File) error {
 	}
 
 	return rt.generateAndSendSums(in, st.Size())
+}
+
+func (rt *Transfer) recvGeneratorPartial(idx int, f *File) (bool, error) {
+	// See if there is a partial file we can resume from.
+	partialName := rt.partialName(f.Name)
+	partial, err := rt.DestRoot.Open(partialName)
+	if os.IsNotExist(err) {
+		// No partial file, request the full file.
+		return false, nil
+	}
+	if err != nil {
+		rt.Logger.Printf("failed to open partial file %s, continuing: %v", partialName, err)
+		return false, nil
+	}
+	defer partial.Close()
+	st, err := partial.Stat()
+	if err != nil {
+		rt.Logger.Printf("failed to stat partial file %s, continuing: %v", partialName, err)
+		return false, nil
+	}
+
+	if rt.Opts.DryRun {
+		if err := rt.Conn.WriteInt32(int32(idx)); err != nil {
+			return true, err
+		}
+
+		return true, nil
+	}
+
+	// TODO: if deltas are disabled, request the file in full
+
+	if rt.Opts.DebugGTE(rsyncopts.DEBUG_GENR, 1) {
+		rt.Logger.Printf("sending sums for: %s", f.Name)
+	}
+	if err := rt.Conn.WriteInt32(int32(idx)); err != nil {
+		return true, err
+	}
+
+	return true, rt.generateAndSendSums(partial, st.Size())
 }
 
 // rsync/generator.c:generate_and_send_sums

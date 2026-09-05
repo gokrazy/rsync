@@ -256,6 +256,53 @@ func TestReceiverSync(t *testing.T) {
 	}
 }
 
+func TestReceiverSyncPartial(t *testing.T) {
+	t.Parallel()
+
+	tmp := t.TempDir()
+	source := filepath.Join(tmp, "source")
+	dest := filepath.Join(tmp, "dest")
+	destLarge := filepath.Join(dest, "large-data-file")
+
+	// Write 3 KB of data into source.
+	headPattern := []byte{0x11}
+	bodyPattern := []byte{0xbb}
+	endPattern := []byte{0xee}
+	rsynctest.WriteLargeDataFile(t, source, headPattern, bodyPattern, endPattern)
+
+	// start a server to sync from
+	srv := rsynctest.NewInMemory(t, rsyncd.Module{
+		Name: "interop",
+		Path: source,
+	})
+	args := []string{"-aH", "--verbose", "--debug=all4", "--partial"}
+	firstStats := srv.RunClient(t, args, "./", []string{dest})
+	t.Logf("firstStats: %+v", firstStats)
+	//     receiver_test.go:211: firstStats: &{Read:91 Written:3146087 Size:3149824}
+
+	if err := rsynctest.DataFileMatches(destLarge, headPattern, bodyPattern, endPattern); err != nil {
+		t.Fatal(err)
+	}
+
+	// Move the destination large data file out of dest
+	// (and into .gokrazy_rsync_partial/, the default --partial-dir)
+	// and run another --partial sync, meaning the delta transfer
+	// should not need to transfer any data.
+	partialDir := filepath.Join(dest, ".gokrazy_rsync_partial")
+	if err := os.MkdirAll(partialDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Rename(destLarge, filepath.Join(partialDir, "large-data-file")); err != nil {
+		t.Fatal(err)
+	}
+
+	incrementalStats := srv.RunClient(t, args, "./", []string{dest})
+	t.Logf("incrementalStats: %+v", incrementalStats)
+	if got, want := incrementalStats.Written, int64(1024); got >= want {
+		t.Fatalf("rsync unexpectedly transferred more data than needed: got %d, want < %d", got, want)
+	}
+}
+
 func TestReceiverSyncDelete(t *testing.T) {
 	t.Parallel()
 

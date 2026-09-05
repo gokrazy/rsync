@@ -164,8 +164,9 @@ func (o *Options) ServerOptions() []string {
 	// 	args[ac++] = arg;
 	// }
 
-	// if (keep_partial)
-	// 	args[ac++] = "--partial";
+	if o.Sender() && o.KeepPartial() {
+		sargv = append(sargv, "--partial")
+	}
 
 	// if (force_delete)
 	// 	args[ac++] = "--force";

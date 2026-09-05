@@ -40,6 +40,7 @@ type pendingFile struct {
 	fn      string
 	f       *os.File
 	sync    bool
+	renamed bool
 }
 
 func newPendingFile(root *os.Root, fn string, sync bool) (*pendingFile, error) {
@@ -77,12 +78,30 @@ func (p *pendingFile) CloseAtomicallyReplace() error {
 	if err := p.root.Rename(p.tmpname, p.fn); err != nil {
 		return err
 	}
+	p.renamed = true
 	return nil
 }
 
 func (p *pendingFile) Cleanup() error {
+	if p.renamed {
+		return nil // CloseAtomicallyReplace succeeded.
+	}
 	err := p.f.Close()
 	if err := p.root.Remove(p.tmpname); err != nil {
+		return err
+	}
+	return err
+}
+
+func (p *pendingFile) KeepAsPartial(partialName string) error {
+	if p.renamed {
+		return nil // CloseAtomicallyReplace succeeded.
+	}
+	err := p.f.Close()
+	if err := p.root.MkdirAll(filepath.Dir(partialName), 0700); err != nil {
+		return err
+	}
+	if err := p.root.Rename(p.tmpname, partialName); err != nil {
 		return err
 	}
 	return err

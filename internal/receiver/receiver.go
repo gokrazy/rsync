@@ -49,12 +49,42 @@ func (rt *Transfer) RecvFiles(fileList []*File) error {
 	return nil
 }
 
+func (rt *Transfer) partialName(name string) string {
+	dir, file := filepath.Split(name)
+	const partialDir = ".gokrazy_rsync_partial"
+	return filepath.Join(dir, partialDir, file)
+}
+
 func (rt *Transfer) recvFile1(f *File) error {
 	if rt.Opts.DryRun {
 		if !rt.Opts.Server {
 			fmt.Fprintln(rt.Env.Stdout, f.Name)
 		}
 		return nil
+	}
+
+	if rt.Opts.KeepPartial {
+		// Use the partial file, if any, to construct the destination,
+		// regardless of whether the localFile exists.
+		partialName := rt.partialName(f.Name)
+		partial, err := rt.DestRoot.Open(partialName)
+		if err != nil && !os.IsNotExist(err) {
+			rt.Logger.Printf("opening partial file failed, continuing: %v", err)
+			// fallthrough to local file
+		}
+		if err == nil {
+			// partial file exists; use it.
+			defer partial.Close()
+			if err := rt.receiveData(f, partial); err != nil {
+				return err
+			}
+			// receiveData called partial.Close()
+			if err := rt.DestRoot.Remove(partialName); err != nil {
+				return err
+			}
+			return nil
+		}
+		// fallthrough to local file
 	}
 
 	localFile, err := rt.openLocalFile(f)
@@ -112,7 +142,11 @@ func (rt *Transfer) receiveData(f *File, localFile *os.File) error {
 	if err != nil {
 		return err
 	}
-	defer out.Cleanup()
+	if rt.Opts.KeepPartial {
+		defer out.KeepAsPartial(rt.partialName(f.Name))
+	} else {
+		defer out.Cleanup()
+	}
 
 	h := md4.New()
 	binary.Write(h, binary.LittleEndian, rt.Seed)

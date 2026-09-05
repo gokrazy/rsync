@@ -29,6 +29,7 @@ type TransferOpts struct {
 	IgnoreTimes       bool
 	AlwaysChecksum    bool
 	DoFsync           bool
+	KeepPartial       bool
 
 	InfoGTE  func(rsyncopts.InfoLevel, uint16) bool
 	DebugGTE func(rsyncopts.DebugLevel, uint16) bool
