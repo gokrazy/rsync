@@ -313,7 +313,7 @@ func TestMapFSLargeFile(t *testing.T) {
 
 	incrementalStats := srv.RunClient(t, args, "./", []string{dest})
 	t.Logf("incrementalStats: %+v", incrementalStats)
-	if got, want := incrementalStats.Written, int64(2*1024*1024); got >= want {
+	if got, want := incrementalStats.Written, int64(2*1024); got >= want {
 		t.Fatalf("rsync unexpectedly transferred more data than needed: got %d, want < %d", got, want)
 	}
 
