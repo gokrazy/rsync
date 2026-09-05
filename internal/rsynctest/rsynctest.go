@@ -46,10 +46,9 @@ var GosPublicRelease = func() time.Time {
 
 type TestServer struct {
 	// config
-	module       rsyncd.Module
-	listener     net.Listener
-	listeners    []rsyncdconfig.Listener
-	dontRestrict bool
+	module    rsyncd.Module
+	listener  net.Listener
+	listeners []rsyncdconfig.Listener
 
 	// state
 	srv *rsyncd.Server
@@ -89,12 +88,6 @@ func Listeners(lns []rsyncdconfig.Listener) Option {
 func Listener(ln net.Listener) Option {
 	return func(ts *TestServer) {
 		ts.listener = ln
-	}
-}
-
-func DontRestrict() Option {
-	return func(ts *TestServer) {
-		ts.dontRestrict = true
 	}
 }
 
@@ -143,9 +136,10 @@ func New(t *testing.T, modules []rsyncd.Module, opts ...Option) *TestServer {
 		go func() {
 			err := anonssh.Serve(ctx, osenv, ts.listener, sshListener, cfg, func(args []string, stdin io.ReadCloser, stdout io.WriteCloser, stderr io.WriteCloser) error {
 				osenv := &rsyncos.Env{
-					Stdin:  stdin,
-					Stdout: stdout,
-					Stderr: stderr,
+					Stdin:        stdin,
+					Stdout:       stdout,
+					Stderr:       stderr,
+					DontRestrict: true,
 				}
 				_, err := maincmd.Main(context.Background(), osenv, args, cfg)
 				return err
@@ -170,9 +164,10 @@ func New(t *testing.T, modules []rsyncd.Module, opts ...Option) *TestServer {
 		go func() {
 			err := anonssh.Serve(ctx, osenv, ts.listener, sshListener, cfg, func(args []string, stdin io.ReadCloser, stdout io.WriteCloser, stderr io.WriteCloser) error {
 				osenv := &rsyncos.Env{
-					Stdin:  stdin,
-					Stdout: stdout,
-					Stderr: stderr,
+					Stdin:        stdin,
+					Stdout:       stdout,
+					Stderr:       stderr,
+					DontRestrict: true,
 				}
 				_, err := maincmd.Main(context.Background(), osenv, args, cfg)
 				return err
@@ -197,6 +192,7 @@ func Run(tb testing.TB, args ...string) *rsyncstats.TransferStats {
 	cmd := rsynccmd.Command(args[0], args[1:]...)
 	cmd.Stdout = testlogger.New(tb)
 	cmd.Stderr = testlogger.New(tb)
+	cmd.DontRestrict = true
 	result, err := cmd.Run(tb.Context())
 	if err != nil {
 		tb.Fatal(err)
@@ -224,6 +220,7 @@ func Output(tb testing.TB, args ...string) (stdout []byte, stderr []byte) {
 	cmd := rsynccmd.Command(args[0], args[1:]...)
 	cmd.Stdout = nopClose(&stdoutb)
 	cmd.Stderr = nopClose(&stderrb)
+	cmd.DontRestrict = true
 	_, err := cmd.Run(context.Background())
 	if err != nil {
 		tb.Fatal(err)
@@ -236,6 +233,7 @@ func CombinedOutput(args ...string) ([]byte, error) {
 	cmd := rsynccmd.Command(args[0], args[1:]...)
 	cmd.Stdout = nopClose(&buf)
 	cmd.Stderr = nopClose(&buf)
+	cmd.DontRestrict = true
 	_, err := cmd.Run(context.Background())
 	return buf.Bytes(), err
 }
@@ -251,9 +249,7 @@ func NewInMemory(t *testing.T, module rsyncd.Module, opts ...Option) *TestServer
 	stderr := testlogger.New(t)
 	rsyncdOpts := []rsyncd.Option{
 		rsyncd.WithStderr(stderr),
-	}
-	if ts.dontRestrict {
-		rsyncdOpts = append(rsyncdOpts, rsyncd.DontRestrict())
+		rsyncd.DontRestrict(),
 	}
 	srv, err := rsyncd.NewServer([]rsyncd.Module{module}, rsyncdOpts...)
 	if err != nil {
