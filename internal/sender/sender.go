@@ -155,10 +155,6 @@ func (st *Transfer) receiveSums() (rsync.SumHead, error) {
 }
 
 func (st *Transfer) sendFile(fileIndex int32, fl file) error {
-	// rsync/rsync.h defines chunkSize as 32 * 1024, but increasing it to 256K
-	// increases throughput with “tridge” rsync as client by 50 Mbit/s.
-	const chunkSize = 256 * 1024
-
 	f, err := fl.source.Open(fl.path)
 	if err != nil {
 		return err
