@@ -84,8 +84,9 @@ func (o *Options) ServerOptions() []string {
 	// 	argstr[x++] = 'R';
 	// if (one_file_system)
 	// 	argstr[x++] = 'x';
-	// if (sparse_files)
-	// 	argstr[x++] = 'S';
+	if o.SparseFiles() {
+		argstr += "S"
+	}
 	// if (do_compression)
 	// 	argstr[x++] = 'z';
 

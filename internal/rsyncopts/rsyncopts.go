@@ -729,6 +729,7 @@ func (o *Options) AlwaysChecksum() bool       { return o.always_checksum != 0 }
 func (o *Options) IgnoreTimes() bool          { return o.ignore_times != 0 }
 func (o *Options) OutputMOTD() bool           { return o.output_motd != 0 }
 func (o *Options) KeepPartial() bool          { return o.keep_partial != 0 }
+func (o *Options) SparseFiles() bool          { return o.sparse_files != 0 }
 func (o *Options) RsyncPort() int             { return o.rsync_port }
 func (o *Options) XferDirs() int              { return o.xfer_dirs }
 func (o *Options) FilterRules() []string      { return o.filterRules }
@@ -892,9 +893,9 @@ func (o *Options) gokrazyTable() []poptOption {
 		//{"max-size", "", POPT_ARG_STRING, &o.max_size_arg, OPT_MAX_SIZE},
 		//{"min-size", "", POPT_ARG_STRING, &o.min_size_arg, OPT_MIN_SIZE},
 		//{"max-alloc", "", POPT_ARG_STRING, &o.max_alloc_arg, 0},
-		//{"sparse", "S", POPT_ARG_VAL, &o.sparse_files, 1},
-		//{"no-sparse", "", POPT_ARG_VAL, &o.sparse_files, 0},
-		//{"no-S", "", POPT_ARG_VAL, &o.sparse_files, 0},
+		{"sparse", "S", POPT_ARG_VAL, &o.sparse_files, 1},
+		{"no-sparse", "", POPT_ARG_VAL, &o.sparse_files, 0},
+		{"no-S", "", POPT_ARG_VAL, &o.sparse_files, 0},
 		//{"preallocate", "", POPT_ARG_NONE, &o.preallocate_files, 0},
 		//{"inplace", "", POPT_ARG_VAL, &o.inplace, 1},
 		//{"no-inplace", "", POPT_ARG_VAL, &o.inplace, 0},

@@ -142,7 +142,7 @@ func (rt *Transfer) receiveData(f *File, localFile *os.File, perm fs.FileMode) e
 		local := filepath.Join(rt.Dest, f.Name)
 		rt.Logger.Printf("creating %s", local)
 	}
-	out, err := newPendingFile(rt.DestRoot, f.Name, rt.Opts.DoFsync)
+	out, err := newPendingFile(rt.DestRoot, f.Name, rt.Opts.DoFsync, rt.Opts.SparseFiles)
 	if err != nil {
 		return err
 	}

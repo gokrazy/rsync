@@ -370,6 +370,7 @@ func ClientRun(osenv *rsyncos.Env, opts *rsyncopts.Options, conn io.ReadWriteClo
 			AlwaysChecksum:    opts.AlwaysChecksum(),
 			DoFsync:           opts.DoFsync(),
 			KeepPartial:       opts.KeepPartial(),
+			SparseFiles:       opts.SparseFiles(),
 
 			InfoGTE:  opts.InfoGTE,
 			DebugGTE: opts.DebugGTE,
