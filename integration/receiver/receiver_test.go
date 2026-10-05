@@ -335,6 +335,10 @@ func TestReceiverSyncDelete(t *testing.T) {
 	if err := os.WriteFile(extra, []byte("deleteme"), 0644); err != nil {
 		t.Fatal(err)
 	}
+	extraSibling := filepath.Join(dest, "extrafile2")
+	if err := os.WriteFile(extraSibling, []byte("deleteme"), 0644); err != nil {
+		t.Fatal(err)
+	}
 	extraDir := filepath.Join(dest, "extradir")
 	if err := os.MkdirAll(extraDir, 0755); err != nil {
 		t.Fatal(err)
@@ -345,7 +349,7 @@ func TestReceiverSyncDelete(t *testing.T) {
 	}
 
 	srv.RunClient(t, args, "./", []string{dest})
-	for _, gone := range []string{extra, extraDir, extra2} {
+	for _, gone := range []string{extra, extraSibling, extraDir, extra2} {
 		if _, err := os.Stat(gone); !os.IsNotExist(err) {
 			t.Errorf("expected %s to be deleted, but it still exists", gone)
 		}

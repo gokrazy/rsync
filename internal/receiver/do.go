@@ -54,7 +54,10 @@ func (rt *Transfer) deleteFiles(fileList []*File) error {
 				rt.Logger.Printf("  deleting %s failed: %v", path, err)
 				// keep going
 			}
-			return fs.SkipDir // skip the just-deleted directory
+			if info.IsDir() {
+				return fs.SkipDir // skip the just-deleted directory
+			}
+			return nil
 		})
 		if err != nil {
 			if os.IsNotExist(err) {
