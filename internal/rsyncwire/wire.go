@@ -9,10 +9,12 @@ import (
 	"github.com/gokrazy/rsync/internal/rsyncos"
 )
 
+// rsync.h:msgcode enum
 const (
-	MsgData  uint8 = 0
-	MsgInfo  uint8 = 2
-	MsgError uint8 = 1
+	MsgData    uint8 = 0
+	MsgInfo    uint8 = 2   // log, INFO level
+	MsgError   uint8 = 1   // log, ERROR level
+	MsgSuccess uint8 = 100 // successfully updated indicated flist index
 )
 
 const mplexBase = 7
@@ -82,6 +84,12 @@ func (w *MultiplexReader) Read(p []byte) (n int, err error) {
 	case MsgInfo:
 		w.Env.Logf("info: %s", payload)
 		// io.ReadFull will call Read again
+		return 0, nil
+	case MsgSuccess:
+		// openrsync after 7c31e9525e89515401257621ddd7fb9f8019818d
+		// ("Massive up-merge of Apple's openrsync") started
+		// sending MsgSuccess unconditionally after every file.
+		// Ignore MsgSuccess for now to restore compatibility.
 		return 0, nil
 	case MsgData:
 		// continues below
