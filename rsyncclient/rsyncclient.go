@@ -35,6 +35,14 @@ func WithStderr(stderr io.WriteCloser) Option {
 	})
 }
 
+// WithStdout makes the [Client] write to the specified stdout instead of
+// [os.Stdout].
+func WithStdout(stdout io.WriteCloser) Option {
+	return clientOptionFunc(func(c *Client) {
+		c.osenv.Stdout = stdout
+	})
+}
+
 // WithSender enables sender mode (receiver by default).
 func WithSender() Option {
 	return clientOptionFunc(func(c *Client) {
