@@ -408,7 +408,7 @@ func (st *Transfer) SendFileList(localDir string, paths []string, excl *filterRu
 		strip := getStrip(requested)
 		// st.Logger.Printf("root=%q, strip=%q", root, strip)
 		if st.Opts.DebugGTE(rsyncopts.DEBUG_FLIST, 1) {
-			st.Logger.Printf("  fs.Walk(%q, %q), strip=%q", local, requested)
+			st.Logger.Printf("  fs.Walk(%q, %q), strip=%q", local, requested, strip)
 		}
 
 		sw := &scopedWalker{
