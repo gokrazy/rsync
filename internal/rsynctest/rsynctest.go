@@ -135,14 +135,7 @@ func New(t *testing.T, modules []rsyncd.Module, opts ...Option) *TestServer {
 		}
 		go func() {
 			err := anonssh.Serve(ctx, osenv, ts.listener, sshListener, cfg, func(args []string, stdin io.ReadCloser, stdout io.WriteCloser, stderr io.WriteCloser) error {
-				osenv := &rsyncos.Env{
-					Stdin:        stdin,
-					Stdout:       stdout,
-					Stderr:       stderr,
-					DontRestrict: true,
-				}
-				_, err := maincmd.Main(context.Background(), osenv, args, cfg)
-				return err
+				return srv.HandleDaemonConn(ctx, rsyncd.NewConnection(stdin, stdout, "<authorized-ssh>"))
 			})
 
 			if errors.Is(err, net.ErrClosed) {
@@ -163,14 +156,7 @@ func New(t *testing.T, modules []rsyncd.Module, opts ...Option) *TestServer {
 		}
 		go func() {
 			err := anonssh.Serve(ctx, osenv, ts.listener, sshListener, cfg, func(args []string, stdin io.ReadCloser, stdout io.WriteCloser, stderr io.WriteCloser) error {
-				osenv := &rsyncos.Env{
-					Stdin:        stdin,
-					Stdout:       stdout,
-					Stderr:       stderr,
-					DontRestrict: true,
-				}
-				_, err := maincmd.Main(context.Background(), osenv, args, cfg)
-				return err
+				return srv.HandleDaemonConn(ctx, rsyncd.NewConnection(stdin, stdout, "<anon-ssh>"))
 			})
 
 			if errors.Is(err, net.ErrClosed) {

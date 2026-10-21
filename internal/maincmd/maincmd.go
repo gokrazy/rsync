@@ -280,34 +280,14 @@ func Main(ctx context.Context, osenv *rsyncos.Env, args []string, cfg *rsyncdcon
 		}
 		osenv.Logf("rsync daemon listening (authorized SSH) on %s", ln.Addr())
 		return nil, anonssh.Serve(ctx, osenv, ln, sshListener, cfg, func(args []string, stdin io.ReadCloser, stdout io.WriteCloser, stderr io.WriteCloser) error {
-			osenv := &rsyncos.Env{
-				Stdin:  stdin,
-				Stdout: stdout,
-				Stderr: stderr,
-				// This process is already restricted since to the
-				// rsyncd.NewServer call above. Do not add more rulesets to stay
-				// under the limit of policy layers per process.
-				DontRestrict: true,
-			}
-			_, err := Main(ctx, osenv, args, cfg)
-			return err
+			return srv.HandleDaemonConn(ctx, rsyncd.NewConnection(stdin, stdout, "<authorized-ssh>"))
 		})
 	}
 
 	if cfg.Listeners[0].AnonSSH != "" {
 		osenv.Logf("rsync daemon listening (anon SSH) on %s", ln.Addr())
 		return nil, anonssh.Serve(ctx, osenv, ln, sshListener, cfg, func(args []string, stdin io.ReadCloser, stdout io.WriteCloser, stderr io.WriteCloser) error {
-			osenv := &rsyncos.Env{
-				Stdin:  stdin,
-				Stdout: stdout,
-				Stderr: stderr,
-				// This process is already restricted since to the
-				// rsyncd.NewServer call above. Do not add more rulesets to stay
-				// under the limit of policy layers per process.
-				DontRestrict: true,
-			}
-			_, err := Main(ctx, osenv, args, cfg)
-			return err
+			return srv.HandleDaemonConn(ctx, rsyncd.NewConnection(stdin, stdout, "<anon-ssh>"))
 		})
 	}
 
