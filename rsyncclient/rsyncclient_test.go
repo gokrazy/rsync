@@ -5,9 +5,11 @@ import (
 	"context"
 	"io"
 	"log"
+	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 
@@ -334,4 +336,61 @@ func TestClientServerCommandSender(t *testing.T) {
 
 	// Ensure an error would be displayed, if any.
 	wg.Wait()
+}
+
+// Not parallel: it replaces os.Stdout, which other tests would write to.
+func TestClientStdout(t *testing.T) {
+	realStdout, err := os.CreateTemp(t.TempDir(), "stdout")
+	if err != nil {
+		t.Fatal(err)
+	}
+	orig := os.Stdout
+	os.Stdout = realStdout
+	t.Cleanup(func() { os.Stdout = orig })
+
+	tmp := t.TempDir()
+	if err := os.WriteFile(filepath.Join(tmp, "hello"), []byte("world"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	srv := rsynctest.New(t, rsynctest.InteropModule(tmp))
+
+	stdout, err := os.CreateTemp(t.TempDir(), "stdout")
+	if err != nil {
+		t.Fatal(err)
+	}
+	client, err := rsyncclient.New([]string{"-r"},
+		rsyncclient.WithStdout(stdout),
+		rsyncclient.WithStderr(testlogger.New(t)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	conn, err := net.Dial("tcp", "localhost:"+srv.Port)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close()
+	// An empty destination lists the files, on stdout.
+	if _, err := client.RunDaemon(t.Context(), conn, "interop/", []string{""}); err != nil {
+		t.Fatal(err)
+	}
+	if err := stdout.Close(); err != nil {
+		t.Fatal(err)
+	}
+	got, err := os.ReadFile(stdout.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := "hello"; !strings.Contains(string(got), want) {
+		t.Fatalf("stdout unexpectedly did not contain %q:\n%s", want, got)
+	}
+	if err := realStdout.Close(); err != nil {
+		t.Fatal(err)
+	}
+	leaked, err := os.ReadFile(realStdout.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(leaked) > 0 {
+		t.Fatalf("os.Stdout unexpectedly written to:\n%s", leaked)
+	}
 }
