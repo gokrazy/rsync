@@ -20,12 +20,13 @@ systemd: all
 test:
 	GOGC=off CGO_ENABLED=0 go test -fullpath ./...
 
+MEMLIMITRUN := systemd-run --user --scope -p MemoryMax=4G -p OOMPolicy=continue --quiet
 # The fuzz target limits memory to 4 GB and reduces parallel workers.
 # This limits the impact of large memory allocations (via fuzzed values).
 # Note that GOGC must not be set to GOGC=off for this target.
 fuzz:
-	CGO_ENABLED=0 systemd-run --user --scope -p MemoryMax=4G -p OOMPolicy=continue --quiet \
-		go test -parallel=4 -fuzz=. -fuzztime=10s -fullpath ./internal/receiver
+	CGO_ENABLED=0 $(MEMLIMITRUN) go test -parallel=4 -fuzz=. -fuzztime=10s -fullpath ./internal/receiver
+	CGO_ENABLED=0 $(MEMLIMITRUN) go test -parallel=4 -fuzz=. -fuzztime=10s -fullpath ./internal/sender
 
 privileged-test:
 	GOGC=off CGO_ENABLED=0 sudo go test -fullpath ./integration/interop ./integration/receiver
