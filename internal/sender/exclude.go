@@ -62,6 +62,9 @@ func RecvFilterList(c *rsyncwire.Conn) (*filterRuleList, error) {
 			return nil, err
 		}
 		l.addRule(fr)
+		if fr.flag&filtruleWild != 0 {
+			return nil, fmt.Errorf("wildcard filter rules not yet implemented")
+		}
 	}
 	return &l, nil
 }
