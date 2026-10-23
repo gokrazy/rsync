@@ -190,7 +190,7 @@ type nopCloser struct{}
 
 func (*nopCloser) Close() error { return nil }
 
-func nopClose(w io.Writer) io.WriteCloser {
+func NopClose(w io.Writer) io.WriteCloser {
 	return struct {
 		io.Writer
 		io.Closer
@@ -204,8 +204,8 @@ func Output(tb testing.TB, args ...string) (stdout []byte, stderr []byte) {
 	tb.Helper()
 	var stdoutb, stderrb bytes.Buffer
 	cmd := rsynccmd.Command(args[0], args[1:]...)
-	cmd.Stdout = nopClose(&stdoutb)
-	cmd.Stderr = nopClose(&stderrb)
+	cmd.Stdout = NopClose(&stdoutb)
+	cmd.Stderr = NopClose(&stderrb)
 	cmd.DontRestrict = true
 	_, err := cmd.Run(context.Background())
 	if err != nil {
@@ -217,8 +217,8 @@ func Output(tb testing.TB, args ...string) (stdout []byte, stderr []byte) {
 func CombinedOutput(args ...string) ([]byte, error) {
 	var buf bytes.Buffer
 	cmd := rsynccmd.Command(args[0], args[1:]...)
-	cmd.Stdout = nopClose(&buf)
-	cmd.Stderr = nopClose(&buf)
+	cmd.Stdout = NopClose(&buf)
+	cmd.Stderr = NopClose(&buf)
 	cmd.DontRestrict = true
 	_, err := cmd.Run(context.Background())
 	return buf.Bytes(), err
