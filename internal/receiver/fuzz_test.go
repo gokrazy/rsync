@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"io"
 	"os"
+	"runtime/metrics"
 	"testing"
 	"time"
 
@@ -100,6 +101,12 @@ func fuzzTransfer(t *testing.T, tmp string, root *os.Root, opts1, opts2, opts3 b
 	}
 }
 
+func allocated() uint64 {
+	s := []metrics.Sample{{Name: "/gc/heap/allocs:bytes"}}
+	metrics.Read(s)
+	return s[0].Value.Uint64()
+}
+
 func FuzzReceiveFileList(f *testing.F) {
 	// This fuzz test does not write to root,
 	// so create an empty temporary directory (once),
@@ -111,10 +118,17 @@ func FuzzReceiveFileList(f *testing.F) {
 	}
 	f.Cleanup(func() { root.Close() })
 
+	const allocLimit = 16 // MB
+
 	// TODO: provide seed bytes?
 	f.Fuzz(func(t *testing.T, opts1, opts2, opts3 byte, wire []byte) {
 		rt := fuzzTransfer(t, tmp, root, opts1, opts2, opts3, wire)
+		before := allocated()
 		// If ReceiveFileList panics, that is a fuzzer finding.
 		rt.ReceiveFileList()
+		after := allocated()
+		if n := after - before; n > allocLimit*1024*1024 {
+			t.Fatalf("allocated %d MB for a %d byte input", n/1024/1024, len(wire))
+		}
 	})
 }

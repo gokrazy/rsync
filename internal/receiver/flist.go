@@ -183,6 +183,10 @@ func (rt *Transfer) receiveFileEntry(flags uint16, last *File) (*File, error) {
 		if err != nil {
 			return nil, err
 		}
+		// rsync/flist.c:recv_file_entry
+		if length <= 0 || length > PATH_MAX {
+			return nil, fmt.Errorf("overflow: symlink target length=%d", length)
+		}
 		b := make([]byte, length)
 		if _, err := io.ReadFull(rt.Conn.Reader, b); err != nil {
 			return nil, err
