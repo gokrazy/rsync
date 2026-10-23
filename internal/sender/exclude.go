@@ -1,6 +1,7 @@
 package sender
 
 import (
+	"fmt"
 	"io"
 	"path/filepath"
 	"strings"
@@ -40,6 +41,7 @@ func (l *filterRuleList) matches(name string) bool {
 func RecvFilterList(c *rsyncwire.Conn) (*filterRuleList, error) {
 	var l filterRuleList
 	const exclusionListEnd = 0
+	const bigpathbuflen = 4096 + 1024 // matches rsync.h
 	for {
 		length, err := c.ReadInt32()
 		if err != nil {
@@ -47,6 +49,9 @@ func RecvFilterList(c *rsyncwire.Conn) (*filterRuleList, error) {
 		}
 		if length == exclusionListEnd {
 			break
+		}
+		if length < 0 || length >= bigpathbuflen {
+			return nil, fmt.Errorf("overflow: filter rule length=%d", length)
 		}
 		line := make([]byte, length)
 		if _, err := io.ReadFull(c.Reader, line); err != nil {
