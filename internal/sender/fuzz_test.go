@@ -83,3 +83,22 @@ func FuzzRecvFilterList(f *testing.F) {
 		}
 	})
 }
+
+func FuzzReceiveSums(f *testing.F) {
+	const allocLimit = 16 // MB
+
+	f.Fuzz(func(t *testing.T, wire []byte) {
+		st := fuzzTransfer(t, wire)
+		before := allocated()
+		// If receiveSums panics, that is a fuzzer finding.
+		head, err := st.receiveSums()
+		after := allocated()
+		if n := after - before; n > allocLimit*1024*1024 {
+			t.Fatalf("allocated %d MB for a %d byte input", n/1024/1024, len(wire))
+		}
+		if err != nil {
+			return
+		}
+		_ = head
+	})
+}
