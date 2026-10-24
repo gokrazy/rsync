@@ -28,6 +28,7 @@ fuzz:
 	CGO_ENABLED=0 $(MEMLIMITRUN) go test -parallel=4 -fuzz=. -fuzztime=10s -fullpath ./internal/receiver
 	CGO_ENABLED=0 $(MEMLIMITRUN) go test -parallel=4 -fuzz=RecvFilterList -fuzztime=10s -fullpath ./internal/sender
 	CGO_ENABLED=0 $(MEMLIMITRUN) go test -parallel=4 -fuzz=ReceiveSums -fuzztime=10s -fullpath ./internal/sender
+	CGO_ENABLED=0 $(MEMLIMITRUN) go test -parallel=4 -fuzz=SendFiles -fuzztime=10s -fullpath ./internal/sender
 
 privileged-test:
 	GOGC=off CGO_ENABLED=0 sudo go test -fullpath ./integration/interop ./integration/receiver

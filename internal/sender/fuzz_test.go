@@ -3,6 +3,8 @@ package sender
 import (
 	"bytes"
 	"io"
+	"os"
+	"path/filepath"
 	"runtime/metrics"
 	"testing"
 	"time"
@@ -100,5 +102,57 @@ func FuzzReceiveSums(f *testing.F) {
 			return
 		}
 		_ = head
+	})
+}
+
+func FuzzSendFiles(f *testing.F) {
+	tmp := f.TempDir()
+	root, err := os.OpenRoot(tmp)
+	if err != nil {
+		f.Fatal(err)
+	}
+	f.Cleanup(func() { root.Close() })
+
+	// Create a couple of test files for SendFiles.
+	medium := make([]byte, 4096)
+	for i := range medium {
+		medium[i] = byte(i * 7)
+	}
+	testFiles := map[string][]byte{
+		"empty":  nil,
+		"small":  []byte("hello"),
+		"medium": medium,
+	}
+	var files []file
+	for name, content := range testFiles {
+		fn := filepath.Join(tmp, name)
+		if err := os.WriteFile(fn, content, 0644); err != nil {
+			f.Fatal(err)
+		}
+		files = append(files, file{
+			source:  newOSRootSource(root),
+			path:    name,
+			Wpath:   name,
+			regular: true,
+			Length:  int64(len(content)),
+		})
+	}
+
+	const allocLimit = 16 // MB
+
+	f.Fuzz(func(t *testing.T, wire []byte) {
+		st := fuzzTransfer(t, wire)
+		before := allocated()
+		// If SendFiles panics, that is a fuzzer finding.
+		err := st.SendFiles(&fileList{
+			Files: files,
+		})
+		after := allocated()
+		if n := after - before; n > allocLimit*1024*1024 {
+			t.Fatalf("allocated %d MB for a %d byte input", n/1024/1024, len(wire))
+		}
+		if err != nil {
+			return
+		}
 	})
 }
