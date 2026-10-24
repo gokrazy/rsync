@@ -31,6 +31,12 @@ func (st *Transfer) hashSearch(targets []target, tagTable map[uint16]int, head r
 		return err
 	}
 
+	if fi.Size() == 0 {
+		// The file might have been truncated after the file list was built.
+		// Either way, just send the whole file (fast path).
+		return st.sendFile(fileIndex, fl)
+	}
+
 	readSize := max(3*head.BlockLength, 256*1024)
 	ms := mapFile(f, fi.Size(), readSize, head.BlockLength)
 
