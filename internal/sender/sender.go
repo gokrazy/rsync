@@ -125,7 +125,6 @@ func (st *Transfer) receiveSums() (rsync.SumHead, error) {
 		return head, err
 	}
 	var offset int64
-	head.Sums = make([]rsync.SumBuf, int(head.ChecksumCount))
 	for i := int32(0); i < head.ChecksumCount; i++ {
 		shortChecksum, err := st.Conn.ReadInt32()
 		if err != nil {
@@ -149,7 +148,7 @@ func (st *Transfer) receiveSums() (rsync.SumHead, error) {
 		_ = n
 		// st.logger.Printf("chunk[%d] len=%d offset=%.0f sum1=%08x, sum2=%x",
 		// 	i, sb.len, float64(sb.offset), sb.sum1, sb.sum2[:n])
-		head.Sums[i] = sb
+		head.Sums = append(head.Sums, sb)
 	}
 	return head, nil
 }
