@@ -2,11 +2,14 @@ package receiver_test
 
 import (
 	"bytes"
+	"io"
+	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/gokrazy/rsync/internal/rsynctest"
 	"github.com/gokrazy/rsync/internal/testlogger"
@@ -297,5 +300,35 @@ func TestDaemonReceiverSyncHardLinks(t *testing.T) {
 
 	if err := rsynctest.DataFileMatches(destLarge, headPattern, bodyPattern, endPattern); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestDaemonRejectsLongLine(t *testing.T) {
+	t.Parallel()
+
+	tmp := t.TempDir()
+	srv := rsynctest.New(t, rsynctest.InteropModule(tmp))
+
+	// Dial the server directly and send a 1 MB line.
+	// The expectation is that the server immediately refuses,
+	// instead of buffering indefinitely.
+	conn, err := net.Dial("tcp", "localhost:"+srv.Port)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close()
+	longModuleName := strings.Repeat("a", 1*1024*1024) // 1 MB
+	greeting := strings.NewReader("@RSYNCD: 27\n" + longModuleName)
+	go io.Copy(conn, greeting)
+	conn.SetReadDeadline(time.Now().Add(5 * time.Second))
+	b, err := io.ReadAll(conn)
+	if err != nil {
+		if ne, ok := err.(net.Error); ok && ne.Timeout() {
+			t.Fatalf("daemon unexpectedly did not close the connection")
+		}
+		t.Fatal(err)
+	}
+	if strings.Contains(string(b), "@RSYNCD: OK") {
+		t.Fatalf("daemon unexpectedly accepted a 1 MB module name")
 	}
 }

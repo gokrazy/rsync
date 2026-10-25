@@ -196,21 +196,21 @@ func (s *Server) HandleDaemonConn(ctx context.Context, conn *Conn) (err error) {
 	fmt.Fprintf(cwr, "@RSYNCD: %d\n", rsync.ProtocolVersion)
 
 	// read client greeting
-	clientGreeting, err := rd.ReadString('\n')
+	clientGreeting, err := rd.ReadSlice('\n')
 	if err != nil {
 		return err
 	}
-	if !strings.HasPrefix(clientGreeting, "@RSYNCD: ") {
-		return fmt.Errorf("invalid client greeting: got %q", clientGreeting)
+	if got := string(clientGreeting); !strings.HasPrefix(got, "@RSYNCD: ") {
+		return fmt.Errorf("invalid client greeting: got %q", got)
 	}
 	// TODO: protocol negotiation
 
 	// read requested module(s), if any
-	requestedModule, err := rd.ReadString('\n')
+	line, err := rd.ReadSlice('\n')
 	if err != nil {
 		return err
 	}
-	requestedModule = strings.TrimSpace(requestedModule)
+	requestedModule := strings.TrimSpace(string(line))
 	if requestedModule == "" || requestedModule == "#list" {
 		s.logger.Printf("client %v requested rsync module listing", conn.name)
 		io.WriteString(cwr, s.formatModuleList())
@@ -234,11 +234,11 @@ func (s *Server) HandleDaemonConn(ctx context.Context, conn *Conn) (err error) {
 	// read requested flags
 	var flags []string
 	for {
-		flag, err := rd.ReadString('\n')
+		line, err := rd.ReadSlice('\n')
 		if err != nil {
 			return err
 		}
-		flag = strings.TrimSpace(flag)
+		flag := strings.TrimSpace(string(line))
 		s.logger.Printf("client sent: %q", flag)
 		if flag == "" {
 			break
