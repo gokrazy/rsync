@@ -185,9 +185,12 @@ func checkACL(acls []string, remoteAddr string) error {
 	return nil
 }
 
-// FIXME: context cancellation not yet implemented
 func (s *Server) HandleDaemonConn(ctx context.Context, conn *Conn) (err error) {
-	_ = ctx // not implemented. what would be the best thing to do? wrap conn's reader part with cancelable reader?
+	stop := context.AfterFunc(ctx, func() {
+		// Pending Read or Write calls will return with an error.
+		conn.closer.Close()
+	})
+	defer stop()
 
 	const terminationCommand = "@RSYNCD: OK\n"
 	cwr := conn.cwr
