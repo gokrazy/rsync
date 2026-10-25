@@ -1,0 +1,5 @@
+go test fuzz v1
+byte('-')
+byte('ð')
+byte('[')
+[]byte("\x01\x00\x00\x000000000\x01\x00\x00\x00\x00000\x00000\x8b")

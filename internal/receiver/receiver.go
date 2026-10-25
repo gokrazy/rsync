@@ -193,12 +193,8 @@ func (rt *Transfer) receiveData(f *File, localFile *os.File, perm fs.FileMode) e
 		if token == sh.ChecksumCount-1 && sh.RemainderLength != 0 {
 			dataLen = sh.RemainderLength
 		}
-		data := make([]byte, dataLen)
-		if _, err := localFile.ReadAt(data, offset2); err != nil {
-			return err
-		}
-
-		n, err := wr.Write(data)
+		dataReader := io.NewSectionReader(localFile, offset2, int64(dataLen))
+		n, err := io.CopyBuffer(wr, dataReader, buf[:])
 		if err != nil {
 			return err
 		}
