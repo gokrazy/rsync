@@ -11,7 +11,6 @@ import (
 	"errors"
 	"fmt"
 	"math"
-	"os"
 	"slices"
 	"strconv"
 	"strings"
@@ -21,6 +20,15 @@ import (
 	"github.com/gokrazy/rsync/internal/rsyncos"
 	"github.com/gokrazy/rsync/internal/version"
 )
+
+type ExitError struct {
+	Output   string // should be printed before exiting
+	ExitCode int    // exit code to use when exiting
+}
+
+func (ee *ExitError) Error() string {
+	return fmt.Sprintf("arguments request program exit (status %d)", ee.ExitCode)
+}
 
 const (
 	OPT_SERVER = 1000 + iota
@@ -430,10 +438,14 @@ Level:
 		all := false
 		switch trimmed {
 		case "help":
-			osenv.Logf("TODO: print --info/--debug help and exit")
-			os.Exit(0)
+			return &ExitError{
+				Output:   "TODO: print --info/--debug help",
+				ExitCode: 0,
+			}
+
 		case "none":
 			lev = 0
+
 		case "all":
 			all = true
 		}
@@ -1368,8 +1380,13 @@ func (pc *Context) ParseArguments(osenv *rsyncos.Env, args []string) error {
 				// are returned and handled here.
 				switch opt {
 				case 'h':
-					fmt.Println(opts.DaemonHelp()) // tridge rsync prints help to stdout
-					os.Exit(0)                     // exit with code 0 for compatibility with tridge rsync
+					return &ExitError{
+						// tridge rsync prints help to stdout
+						Output: opts.DaemonHelp(),
+						// exit with code 0 for compatibility with tridge rsync
+						ExitCode: 0,
+					}
+
 				case 'M':
 					return errNotYetImplemented
 
@@ -1494,10 +1511,16 @@ func (pc *Context) ParseArguments(osenv *rsyncos.Env, args []string) error {
 			return errNotYetImplemented
 
 		case OPT_INFO:
-			parseOutputWords(osenv, infoWords[:], opts.info[:], pc.poptGetOptArg(), USER_PRIORITY)
+			err := parseOutputWords(osenv, infoWords[:], opts.info[:], pc.poptGetOptArg(), USER_PRIORITY)
+			if err != nil {
+				return err
+			}
 
 		case OPT_DEBUG:
-			parseOutputWords(osenv, debugWords[:], opts.debug[:], pc.poptGetOptArg(), USER_PRIORITY)
+			err := parseOutputWords(osenv, debugWords[:], opts.debug[:], pc.poptGetOptArg(), USER_PRIORITY)
+			if err != nil {
+				return err
+			}
 
 		case OPT_USERMAP,
 			OPT_GROUPMAP,
@@ -1505,8 +1528,12 @@ func (pc *Context) ParseArguments(osenv *rsyncos.Env, args []string) error {
 			return errNotYetImplemented
 
 		case OPT_HELP:
-			fmt.Println(opts.Help()) // tridge rsync prints help to stdout
-			os.Exit(0)               // exit with code 0 for compatibility with tridge rsync
+			return &ExitError{
+				// tridge rsync prints help to stdout
+				Output: opts.Help(),
+				// exit with code 0 for compatibility with tridge rsync
+				ExitCode: 0,
+			}
 
 		case 'A':
 			return fmt.Errorf("ACLs are not supported by gokrazy/rsync")
@@ -1528,19 +1555,23 @@ func (pc *Context) ParseArguments(osenv *rsyncos.Env, args []string) error {
 	// other options
 
 	if version_opt_cnt > 0 {
-		fmt.Println(version.Read())
-		os.Exit(0)
+		return &ExitError{
+			Output:   version.Read(),
+			ExitCode: 0,
+		}
 	}
 
 	if opts.human_readable > 1 && len(args) == 1 /* && !am_server */ {
-		fmt.Println(opts.Help()) // tridge rsync prints help to stdout
-		os.Exit(0)               // exit with code 0 for compatibility with tridge rsync
+		return &ExitError{
+			// tridge rsync prints help to stdout
+			Output: opts.Help(),
+			// exit with code 0 for compatibility with tridge rsync
+			ExitCode: 0,
+		}
 	}
 
 	if err := opts.setOutputVerbosity(DEFAULT_PRIORITY); err != nil {
-		// TODO: plumb error
-		fmt.Println(err.Error())
-		os.Exit(1)
+		return err
 	}
 
 	if opts.recurse != 0 {

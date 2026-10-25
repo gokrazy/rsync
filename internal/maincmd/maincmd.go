@@ -43,6 +43,10 @@ func Main(ctx context.Context, osenv *rsyncos.Env, args []string, cfg *rsyncdcon
 	osenv.Logf("Main(osenv=%v, args=%q)", osenv, args)
 	pc := rsyncopts.NewContext(rsyncopts.NewOptionsWithGokrazyDefaults(osenv))
 	if err := pc.ParseArguments(osenv, args[1:]); err != nil {
+		if ee, ok := err.(*rsyncopts.ExitError); ok {
+			fmt.Fprintf(osenv.Stdout, "%s\n", ee.Output)
+			os.Exit(ee.ExitCode)
+		}
 		if pe, ok := err.(*rsyncopts.PoptError); ok &&
 			pe.Errno == rsyncopts.POPT_ERROR_BADOPT &&
 			strings.HasPrefix(pe.Error(), "--gokr.") {
