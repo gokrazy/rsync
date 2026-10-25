@@ -33,6 +33,10 @@ jobs:
       run: |
         [ "$(gofmt -l $(find . -name '*.go') 2>&1)" = "" ]
 
+    - name: go vet
+      run: |
+        go vet ./...
+
     - name: install rsync
       if: matrix.os == 'ubuntu-latest'
       run: |

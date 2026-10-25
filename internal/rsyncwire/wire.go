@@ -107,8 +107,9 @@ type Buffer struct {
 	buf bytes.Buffer
 }
 
-func (b *Buffer) WriteByte(data byte) {
+func (b *Buffer) WriteByte(data byte) error {
 	binary.Write(&b.buf, binary.LittleEndian, data)
+	return nil
 }
 
 func (b *Buffer) WriteInt32(data int32) {

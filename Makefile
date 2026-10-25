@@ -18,6 +18,7 @@ systemd: all
 	sudo systemctl restart gokr-rsyncd.socket)
 
 test:
+	go vet ./...
 	GOGC=off CGO_ENABLED=0 go test -fullpath ./...
 
 MEMLIMITRUN := systemd-run --user --scope -p MemoryMax=4G -p OOMPolicy=continue --quiet
