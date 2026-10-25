@@ -125,6 +125,11 @@ func rsyncMain(ctx context.Context, osenv *rsyncos.Env, opts *rsyncopts.Options,
 	}
 	defer rc.Close()
 	defer wc.Close()
+	stop := context.AfterFunc(ctx, func() {
+		rc.Close()
+		wc.Close()
+	})
+	defer stop()
 	conn := &readWriteCloser{
 		r: rc,
 		w: wc,

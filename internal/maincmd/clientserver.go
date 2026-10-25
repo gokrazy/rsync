@@ -53,6 +53,10 @@ func socketClient(ctx context.Context, osenv *rsyncos.Env, opts *rsyncopts.Optio
 		return nil, err
 	}
 	defer conn.Close()
+	stop := context.AfterFunc(ctx, func() {
+		conn.Close()
+	})
+	defer stop()
 
 	if osenv.Restrict() {
 		if err := restrict.MaybeFileSystem(roDirs, rwDirs); err != nil {
