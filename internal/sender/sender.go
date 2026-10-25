@@ -204,7 +204,7 @@ func (st *Transfer) sendFile(fileIndex int32, fl file) error {
 		return nil
 	})
 
-	offset := 0
+	var offset int64
 	buf := make([]byte, chunkSize)
 	for {
 		if st.Opts.InfoGTE(rsyncopts.INFO_PROGRESS, 1) {
@@ -226,7 +226,7 @@ func (st *Transfer) sendFile(fileIndex int32, fl file) error {
 		if err != nil {
 			return err
 		}
-		offset += n
+		offset += int64(n)
 	}
 	if st.Opts.InfoGTE(rsyncopts.INFO_PROGRESS, 1) {
 		st.Progress.Show(uint64(offset), true)

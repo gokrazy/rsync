@@ -78,8 +78,10 @@ func (st *Transfer) hashSearch(targets []target, tagTable map[uint16]int, head r
 
 	readChunk := func() error {
 		k = int(head.BlockLength)
-		if remaining := int(fi.Size() - offset); remaining < k {
-			k = remaining
+		if remaining := fi.Size() - offset; remaining < int64(k) {
+			// This int conversion is safe because k starts at head.BlockLength,
+			// which is verified to be <= maxBlockLen (1<<29) and only shrinks.
+			k = int(remaining)
 		}
 
 		chunk, err := ms.ptr(offset, int32(k))

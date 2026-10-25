@@ -157,7 +157,7 @@ func (rt *Transfer) receiveData(f *File, localFile *os.File, perm fs.FileMode) e
 
 	wr := io.MultiWriter(out, h)
 
-	offset := 0
+	var offset int64
 	for {
 		token, data, err := rt.recvToken()
 		if err != nil {
@@ -179,7 +179,7 @@ func (rt *Transfer) receiveData(f *File, localFile *os.File, perm fs.FileMode) e
 			if err != nil {
 				return err
 			}
-			offset += n
+			offset += int64(n)
 			continue
 		}
 		if localFile == nil {
@@ -200,7 +200,7 @@ func (rt *Transfer) receiveData(f *File, localFile *os.File, perm fs.FileMode) e
 		if err != nil {
 			return err
 		}
-		offset += n
+		offset += int64(n)
 	}
 	localSum := h.Sum(nil)
 	remoteSum := make([]byte, len(localSum))
