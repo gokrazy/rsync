@@ -143,7 +143,9 @@ Outer:
 				}
 
 				if local, remote := sum2[:head.ChecksumLength], head.Sums[i].Sum2[:head.ChecksumLength]; !bytes.Equal(local, remote) {
-					st.Logger.Printf("false alarm: local %x, remote %x", local, remote)
+					if st.Opts.DebugGTE(rsyncopts.DEBUG_DELTASUM, 3) {
+						st.Logger.Printf("false alarm: local %x, remote %x", local, remote)
+					}
 					//falseAlarms++
 					continue
 				}
