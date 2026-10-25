@@ -157,9 +157,10 @@ func (rt *Transfer) receiveData(f *File, localFile *os.File, perm fs.FileMode) e
 
 	wr := io.MultiWriter(out, h)
 
+	var buf [rsync.ChunkSize]byte
 	var offset int64
 	for {
-		token, data, err := rt.recvToken()
+		token, err := rt.Conn.ReadInt32()
 		if err != nil {
 			return err
 		}
@@ -175,11 +176,12 @@ func (rt *Transfer) receiveData(f *File, localFile *os.File, perm fs.FileMode) e
 			}
 		}
 		if token > 0 {
-			n, err := wr.Write(data)
+			tokenReader := io.LimitReader(rt.Conn.Reader, int64(token))
+			n, err := io.CopyBuffer(wr, tokenReader, buf[:])
 			if err != nil {
 				return err
 			}
-			offset += int64(n)
+			offset += n
 			continue
 		}
 		if localFile == nil {
@@ -191,7 +193,7 @@ func (rt *Transfer) receiveData(f *File, localFile *os.File, perm fs.FileMode) e
 		if token == sh.ChecksumCount-1 && sh.RemainderLength != 0 {
 			dataLen = sh.RemainderLength
 		}
-		data = make([]byte, dataLen)
+		data := make([]byte, dataLen)
 		if _, err := localFile.ReadAt(data, offset2); err != nil {
 			return err
 		}
