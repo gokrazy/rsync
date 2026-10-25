@@ -87,11 +87,11 @@ func StartInbandExchange(osenv *rsyncos.Env, opts *rsyncopts.Options, conn io.Re
 	fmt.Fprintf(conn, "@RSYNCD: %d\n", rsync.ProtocolVersion)
 
 	// read server greeting
-	serverGreeting, err := rd.ReadString('\n')
+	line, err := rd.ReadSlice('\n')
 	if err != nil {
-		return false, fmt.Errorf("ReadString: %v", err)
+		return false, fmt.Errorf("reading server greeting: %v", err)
 	}
-	serverGreeting = strings.TrimSpace(serverGreeting)
+	serverGreeting := strings.TrimSpace(string(line))
 	const serverGreetingPrefix = "@RSYNCD: "
 	if !strings.HasPrefix(serverGreeting, serverGreetingPrefix) {
 		return false, fmt.Errorf("invalid server greeting: got %q", serverGreeting)
@@ -116,11 +116,11 @@ func StartInbandExchange(osenv *rsyncos.Env, opts *rsyncopts.Options, conn io.Re
 	// send module name
 	fmt.Fprintf(conn, "%s\n", module)
 	for {
-		line, err := rd.ReadString('\n')
+		b, err := rd.ReadSlice('\n')
 		if err != nil {
 			return false, fmt.Errorf("did not get server startup line: %v", err)
 		}
-		line = strings.TrimSpace(line)
+		line := strings.TrimSpace(string(b))
 		if opts.DebugGTE(rsyncopts.DEBUG_PROTO, 1) {
 			osenv.Logf("read line: %q", line)
 		}
