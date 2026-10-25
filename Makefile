@@ -26,7 +26,8 @@ MEMLIMITRUN := systemd-run --user --scope -p MemoryMax=4G -p OOMPolicy=continue 
 # This limits the impact of large memory allocations (via fuzzed values).
 # Note that GOGC must not be set to GOGC=off for this target.
 fuzz:
-	CGO_ENABLED=0 $(MEMLIMITRUN) go test -parallel=4 -fuzz=. -fuzztime=10s -fullpath ./internal/receiver
+	CGO_ENABLED=0 $(MEMLIMITRUN) go test -parallel=4 -fuzz=ReceiveFileList -fuzztime=10s -fullpath ./internal/receiver
+	CGO_ENABLED=0 $(MEMLIMITRUN) go test -parallel=4 -fuzz=RecvFiles -fuzztime=10s -fullpath ./internal/receiver
 	CGO_ENABLED=0 $(MEMLIMITRUN) go test -parallel=4 -fuzz=RecvFilterList -fuzztime=10s -fullpath ./internal/sender
 	CGO_ENABLED=0 $(MEMLIMITRUN) go test -parallel=4 -fuzz=ReceiveSums -fuzztime=10s -fullpath ./internal/sender
 	CGO_ENABLED=0 $(MEMLIMITRUN) go test -parallel=4 -fuzz=SendFiles -fuzztime=10s -fullpath ./internal/sender

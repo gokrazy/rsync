@@ -3,11 +3,15 @@ package receiver_test
 import (
 	"bytes"
 	"io"
+	"maps"
 	"os"
+	"path/filepath"
 	"runtime/metrics"
+	"slices"
 	"testing"
 	"time"
 
+	"github.com/gokrazy/rsync"
 	"github.com/gokrazy/rsync/internal/log"
 	"github.com/gokrazy/rsync/internal/progress"
 	"github.com/gokrazy/rsync/internal/receiver"
@@ -126,6 +130,62 @@ func FuzzReceiveFileList(f *testing.F) {
 		before := allocated()
 		// If ReceiveFileList panics, that is a fuzzer finding.
 		rt.ReceiveFileList()
+		after := allocated()
+		if n := after - before; n > allocLimit*1024*1024 {
+			t.Fatalf("allocated %d MB for a %d byte input", n/1024/1024, len(wire))
+		}
+	})
+}
+
+func FuzzRecvFiles(f *testing.F) {
+	// This fuzz test does not write to root,
+	// so create an empty temporary directory (once),
+	// which is never written to.
+	tmp := f.TempDir()
+	root, err := os.OpenRoot(tmp)
+	if err != nil {
+		f.Fatal(err)
+	}
+	f.Cleanup(func() { root.Close() })
+
+	// Create a couple of test files for SendFiles.
+	medium := make([]byte, 4096)
+	for i := range medium {
+		medium[i] = byte(i * 7)
+	}
+	testFiles := map[string][]byte{
+		"empty":  nil,
+		"small":  []byte("hello"),
+		"medium": medium,
+	}
+	var files []*receiver.File
+	for _, name := range slices.Sorted(maps.Keys(testFiles)) {
+		content := testFiles[name]
+		fn := filepath.Join(tmp, name)
+		if err := os.WriteFile(fn, content, 0644); err != nil {
+			f.Fatal(err)
+		}
+		files = append(files, &receiver.File{
+			Name:   name,
+			Length: int64(len(content)),
+			// ModTime    time.Time
+			Mode: rsync.S_IFREG | 0o644,
+			// Uid        int32
+			// Gid        int32
+			// LinkTarget string
+			// Rdev       int32
+			// Checksum   [rsyncchecksum.Size]byte
+		})
+	}
+
+	const allocLimit = 16 // MB
+
+	// TODO: provide seed bytes?
+	f.Fuzz(func(t *testing.T, opts1, opts2, opts3 byte, wire []byte) {
+		rt := fuzzTransfer(t, tmp, root, opts1, opts2, opts3, wire)
+		before := allocated()
+		// If ReceiveFileList panics, that is a fuzzer finding.
+		rt.RecvFiles(files)
 		after := allocated()
 		if n := after - before; n > allocLimit*1024*1024 {
 			t.Fatalf("allocated %d MB for a %d byte input", n/1024/1024, len(wire))
