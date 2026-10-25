@@ -34,3 +34,13 @@ const (
 // compatibility: version 27 was introduced by rsync 2.6.0 (released 2004), and
 // is supported by openrsync and rsyn.
 const ProtocolVersion = 27
+
+// rsync/rsync.h defines chunkSize as 32 * 1024, which we match.
+//
+// Other parts of rsync have subtle dependencies on the chunkSize.
+// For example, (*sender.Transfer).hashSearch declares a window
+// of at least 256 KB and then reads from that window, requesting
+// 2*chunkSize+alignFudge, which must not exceed the window.
+// So raising chunkSize to 128 KB or 256 KB breaks transfers
+// with "file has changed mid-transfer" (issue #53).
+const ChunkSize = 32 * 1024

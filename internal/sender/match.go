@@ -211,7 +211,7 @@ Outer:
 		s1 = uint32(uint16(s1))
 		s2 = uint32(uint16(s2))
 
-		if backup >= int64(head.BlockLength)+chunkSize && end-offset > chunkSize {
+		if backup >= int64(head.BlockLength)+rsync.ChunkSize && end-offset > rsync.ChunkSize {
 			// Prevent offset-st.lastMatch from growing too large by flushing
 			// intermediate chunks.
 			if err := st.matched(h, ms, head, offset-int64(head.BlockLength), -2); err != nil {
@@ -275,8 +275,8 @@ func (st *Transfer) matched(h hash.Hash, ms *mapStruct, head rsync.SumHead, offs
 		n += head.Sums[i].Len
 	}
 
-	for j := int64(0); j < n; j += chunkSize {
-		n1 := min(int64(chunkSize), n-j)
+	for j := int64(0); j < n; j += rsync.ChunkSize {
+		n1 := min(int64(rsync.ChunkSize), n-j)
 		chunk, err := ms.ptr(st.lastMatch+j, int32(n1))
 		if err != nil {
 			return err

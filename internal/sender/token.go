@@ -1,6 +1,9 @@
 package sender
 
-import "github.com/gokrazy/rsync/internal/rsyncopts"
+import (
+	"github.com/gokrazy/rsync"
+	"github.com/gokrazy/rsync/internal/rsyncopts"
+)
 
 // rsync/token.c:simple_send_token
 func (st *Transfer) simpleSendToken(ms *mapStruct, token int32, offset int64, n int64) error {
@@ -10,7 +13,7 @@ func (st *Transfer) simpleSendToken(ms *mapStruct, token int32, offset int64, n 
 		}
 		l := int64(0)
 		for l < n {
-			n1 := min(int64(chunkSize), n-l)
+			n1 := min(int64(rsync.ChunkSize), n-l)
 
 			chunk, err := ms.ptr(offset+l, int32(n1))
 			if err != nil {

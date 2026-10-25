@@ -49,16 +49,6 @@ func (fl *fileList) Close() {
 	fl.Sources = nil
 }
 
-// rsync/rsync.h defines chunkSize as 32 * 1024, which we match.
-//
-// Other parts of rsync have subtle dependencies on the chunkSize.
-// For example, (*sender.Transfer).hashSearch declares a window
-// of at least 256 KB and then reads from that window, requesting
-// 2*chunkSize+alignFudge, which must not exceed the window.
-// So raising chunkSize to 128 KB or 256 KB breaks transfers
-// with "file has changed mid-transfer" (issue #53).
-const chunkSize = 32 * 1024
-
 var (
 	lookupOnce      sync.Once
 	lookupGroupOnce sync.Once

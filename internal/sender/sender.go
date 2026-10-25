@@ -197,7 +197,7 @@ func (st *Transfer) sendFile(fileIndex int32, fl file) error {
 			return err
 		}
 		defer f.Close()
-		var buf [chunkSize]byte
+		var buf [rsync.ChunkSize]byte
 		if _, err := io.CopyBuffer(h, f, buf[:]); err != nil {
 			return err
 		}
@@ -205,7 +205,7 @@ func (st *Transfer) sendFile(fileIndex int32, fl file) error {
 	})
 
 	var offset int64
-	buf := make([]byte, chunkSize)
+	buf := make([]byte, rsync.ChunkSize)
 	for {
 		if st.Opts.InfoGTE(rsyncopts.INFO_PROGRESS, 1) {
 			st.Progress.MaybeShow(uint64(offset), false)
