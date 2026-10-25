@@ -3,9 +3,11 @@ package sender
 import (
 	"bytes"
 	"io"
+	"maps"
 	"os"
 	"path/filepath"
 	"runtime/metrics"
+	"slices"
 	"testing"
 	"time"
 
@@ -124,7 +126,8 @@ func FuzzSendFiles(f *testing.F) {
 		"medium": medium,
 	}
 	var files []file
-	for name, content := range testFiles {
+	for _, name := range slices.Sorted(maps.Keys(testFiles)) {
+		content := testFiles[name]
 		fn := filepath.Join(tmp, name)
 		if err := os.WriteFile(fn, content, 0644); err != nil {
 			f.Fatal(err)
