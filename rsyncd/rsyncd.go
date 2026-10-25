@@ -243,6 +243,10 @@ func (s *Server) HandleDaemonConn(ctx context.Context, conn *Conn) (err error) {
 		if flag == "" {
 			break
 		}
+		const maxArgs = 1000 // matches rsync.h:MAX_ARGS
+		if len(flags) >= maxArgs {
+			return fmt.Errorf("too many args")
+		}
 		flags = append(flags, flag)
 	}
 
