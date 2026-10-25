@@ -15,6 +15,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/gokrazy/rsync"
@@ -609,6 +610,15 @@ func (s *Server) Serve(ctx context.Context, ln net.Listener) error {
 			case <-ctx.Done():
 				return nil // ignore expected 'use of closed network connection' error on context cancel
 			default:
+				// Keep serving even when all file descriptors are in use.
+				// As older transfers finish, new connections can be accepted.
+				temporary := errors.Is(err, syscall.EMFILE) || // too many open files
+					errors.Is(err, syscall.ENFILE) // too many open files in system
+				if temporary {
+					s.logger.Printf("accept: %v (retrying)", err)
+					time.Sleep(100 * time.Millisecond)
+					continue
+				}
 				return err
 			}
 		}
